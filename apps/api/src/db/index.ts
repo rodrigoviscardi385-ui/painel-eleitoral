@@ -6,7 +6,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/painel_eleitoral';
+function getConnectionString(): string {
+  const envUrl = process.env.DATABASE_URL || '';
+  if (!envUrl || envUrl.includes('db.irpjyfoykknhlevmedig.supabase.co') || envUrl.includes('.supabase.co:5432')) {
+    return 'postgresql://postgres.irpjyfoykknhlevmedig:030210.Gege%40@aws-0-us-west-2.pooler.supabase.com:6543/postgres';
+  }
+  return envUrl;
+}
+
+const connectionString = getConnectionString();
 
 // Configuração otimizada para PgBouncer Supabase na porta 6543 (modo Transaction)
 export const queryClient = postgres(connectionString, {
@@ -14,6 +22,7 @@ export const queryClient = postgres(connectionString, {
   max: 10,        // Baixo consumo de conexões para Free Tier
   idle_timeout: 20,
   connect_timeout: 10,
+  ssl: 'require',
 });
 
 export const db = drizzle(queryClient, { schema });
