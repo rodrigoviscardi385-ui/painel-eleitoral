@@ -131,41 +131,51 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Nome e WhatsApp são obrigatórios' });
       }
 
-      const cleanWhatsapp = whatsapp.replace(/\D/g, '');
-      if (cleanWhatsapp.length < 10) {
-        return reply.status(400).send({ error: 'WhatsApp inválido. Informe com DDD.' });
+      let cleanWhatsapp = String(whatsapp).replace(/\D/g, '');
+      if (cleanWhatsapp.length < 8) {
+        return reply.status(400).send({ error: 'WhatsApp inválido. Informe o número com DDD.' });
+      }
+      if (cleanWhatsapp.length === 10 || cleanWhatsapp.length === 11) {
+        cleanWhatsapp = `55${cleanWhatsapp}`;
       }
 
       const [novoGestor] = await db
         .insert(schema.usuarios)
         .values({
-          nome: nome.trim(),
+          nome: String(nome).trim(),
           whatsapp: cleanWhatsapp,
           cargo: cargo === 'ADMIN' ? 'ADMIN' : 'GESTOR',
-          bairro: bairro || 'Geral',
-          zona_eleitoral: zona_eleitoral || null,
+          bairro: bairro ? String(bairro).trim() : 'Geral',
+          zona_eleitoral: zona_eleitoral ? String(zona_eleitoral).trim() : null,
           status_onboarding: 'COMPLETO',
         })
         .onConflictDoUpdate({
           target: schema.usuarios.whatsapp,
           set: {
-            nome: nome.trim(),
+            nome: String(nome).trim(),
             cargo: cargo === 'ADMIN' ? 'ADMIN' : 'GESTOR',
-            bairro: bairro || 'Geral',
-            zona_eleitoral: zona_eleitoral || null,
+            bairro: bairro ? String(bairro).trim() : 'Geral',
+            zona_eleitoral: zona_eleitoral ? String(zona_eleitoral).trim() : null,
             status_onboarding: 'COMPLETO',
             updated_at: new Date(),
           },
         })
         .returning();
 
+      setImmediate(() => {
+        recalculateNetworkMetrics().catch(() => {});
+      });
+
       return reply.status(201).send({
         success: true,
         gestor: novoGestor,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao cadastrar gestor:', error);
-      return reply.status(500).send({ error: 'Falha ao cadastrar gestor' });
+      return reply.status(500).send({ 
+        error: 'Falha ao cadastrar gestor',
+        detail: error?.message || String(error)
+      });
     }
   });
 
