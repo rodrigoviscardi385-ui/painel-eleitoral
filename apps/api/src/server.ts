@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
@@ -163,7 +165,24 @@ async function seedInitialDataIfEmpty() {
 
 async function bootstrap() {
   try {
-    // 1. Registrar CORS
+    // 1. Registrar Helmet com CSP seguro
+    await fastify.register(helmet, {
+      contentSecurityPolicy: false, // Permite Swagger UI e SSE fluidos
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    });
+
+    // 2. Registrar Rate Limiting (120 req/min por IP com resposta padrão)
+    await fastify.register(rateLimit, {
+      max: 120,
+      timeWindow: '1 minute',
+      errorResponseBuilder: () => ({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: 'Limite de requisições excedido. Tente novamente em instantes.',
+      }),
+    });
+
+    // 3. Registrar CORS
     await fastify.register(cors, {
       origin: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],

@@ -31,9 +31,10 @@ import { ModalQRCodeComite } from '../../components/ModalQRCodeComite';
 import { ModalGestores } from '../../components/ModalGestores';
 import { ModalCriarGrupo } from '../../components/ModalCriarGrupo';
 import { ModalUsuariosAuth } from '../../components/ModalUsuariosAuth';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { Smartphone, QrCode, UserCheck, Users } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -487,38 +488,46 @@ export default function AdminPage() {
       {/* Conteúdo da Aba Ativa */}
       <main>
         {activeTab === 'cockpit' && (
-          <CockpitMetas
-            kpis={kpis}
-            metas={metas}
-            onOpenModalMeta={() => setIsModalMetaOpen(true)}
-            onExportPdf={handleExportPdf}
-            onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
-          />
+          <ErrorBoundary fallbackTitle="Erro ao carregar o Cockpit de Metas">
+            <CockpitMetas
+              kpis={kpis}
+              metas={metas}
+              onOpenModalMeta={() => setIsModalMetaOpen(true)}
+              onExportPdf={handleExportPdf}
+              onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'arvore' && (
-          <ArvoreLideranca
-            nodes={treeNodes}
-            isMasked={isMasked}
-            onToggleMask={() => {
-              if (isMasked) setShowUnmaskModal(true);
-              else setIsMasked(true);
-            }}
-            apiBaseUrl={API_BASE_URL}
-            onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
-            onRefresh={refreshData}
-          />
+          <ErrorBoundary fallbackTitle="Erro ao renderizar a Árvore de Lideranças">
+            <ArvoreLideranca
+              nodes={treeNodes}
+              isMasked={isMasked}
+              onToggleMask={() => {
+                if (isMasked) setShowUnmaskModal(true);
+                else setIsMasked(true);
+              }}
+              apiBaseUrl={API_BASE_URL}
+              onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
+              onRefresh={refreshData}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'disparos' && (
-          <DisparadorWhatsApp apiBaseUrl={API_BASE_URL} />
+          <ErrorBoundary fallbackTitle="Erro ao carregar o Disparador">
+            <DisparadorWhatsApp apiBaseUrl={API_BASE_URL} />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'chat' && (
-          <ChatAoVivo
-            apiBaseUrl={API_BASE_URL}
-            currentUser={currentUser || { nome: 'Operador', role: 'ADMIN' }}
-          />
+          <ErrorBoundary fallbackTitle="Erro ao carregar o Chat ao Vivo">
+            <ChatAoVivo
+              apiBaseUrl={API_BASE_URL}
+              currentUser={currentUser || { nome: 'Operador', role: 'ADMIN' }}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'lgpd' && (

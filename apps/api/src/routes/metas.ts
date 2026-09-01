@@ -11,7 +11,7 @@ const metaSchema = z.object({
   quantidade_meta: z.number().int().positive(),
   data_fim: z.string(), // ISO date
   meta_diaria_cadencia: z.number().int().positive().default(10),
-});
+}).strip();
 
 export async function metasRoutes(fastify: FastifyInstance) {
   /**

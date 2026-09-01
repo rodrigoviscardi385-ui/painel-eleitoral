@@ -6,6 +6,48 @@ import { transcribeAudioWithWhisper, extractSupportersFromText } from '../servic
 import { evolutionService } from '../services/evolutionService.js';
 import { nativeWhatsAppService } from '../services/nativeWhatsAppService.js';
 import axios from 'axios';
+import crypto from 'crypto';
+
+// Cache de Idempotência em memória (TTL: 15 minutos)
+const processedMessagesCache = new Map<string, number>();
+
+function isMessageDuplicate(messageId: string): boolean {
+  if (!messageId) return false;
+  const now = Date.now();
+  const cachedTime = processedMessagesCache.get(messageId);
+  if (cachedTime && now - cachedTime < 15 * 60 * 1000) {
+    return true; // Mensagem já processada
+  }
+  // Limpeza de cache antigo se exceder 5000 itens
+  if (processedMessagesCache.size > 5000) {
+    for (const [k, v] of processedMessagesCache.entries()) {
+      if (now - v > 15 * 60 * 1000) processedMessagesCache.delete(k);
+    }
+  }
+  processedMessagesCache.set(messageId, now);
+  return false;
+}
+
+function maskPhoneLog(phone: string): string {
+  if (!phone || phone.length < 8) return '****';
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length === 11) return `${clean.slice(0, 2)} 9****-${clean.slice(7)}`;
+  return `****-${clean.slice(-4)}`;
+}
+
+// Validação em tempo constante contra timing-attacks
+function isValidWebhookSecret(providedSecret?: string, expectedSecret?: string): boolean {
+  if (!expectedSecret) return true; // Se não configurado secret, não bloqueia
+  if (!providedSecret) return false;
+  try {
+    const providedBuffer = Buffer.from(providedSecret);
+    const expectedBuffer = Buffer.from(expectedSecret);
+    if (providedBuffer.length !== expectedBuffer.length) return false;
+    return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+  } catch {
+    return false;
+  }
+}
 
 async function sendWhatsAppMessage(to: string, message: string) {
   if (nativeWhatsAppService.isConnected) {
@@ -34,6 +76,14 @@ export async function webhookRoutes(fastify: FastifyInstance) {
    */
   fastify.post('/webhook/evolution', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      const webhookSecret = process.env.WEBHOOK_SECRET || process.env.EVOLUTION_API_KEY;
+      const clientSecret = (request.headers['x-webhook-secret'] || request.headers['apikey'] || request.headers['authorization']) as string | undefined;
+
+      // Validação timing-safe se o secret estiver configurado
+      if (webhookSecret && clientSecret && !isValidWebhookSecret(clientSecret.replace('Bearer ', ''), webhookSecret)) {
+        return reply.status(401).send({ error: 'Assinatura de webhook inválida' });
+      }
+
       const body: any = request.body || {};
       const event = body.event || body.type;
 
@@ -42,6 +92,12 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         const messageData = body.data || body;
         const key = messageData.key || {};
         const fromMe = key.fromMe;
+        const messageId = key.id || messageData.id || messageData.messageId;
+
+        // Idempotência Absoluta: Ignora retransmissões repetidas da mesma mensagem
+        if (messageId && isMessageDuplicate(messageId)) {
+          return reply.status(200).send({ status: 'ignored_duplicate', messageId });
+        }
         
         // Ignorar mensagens enviadas pelo próprio bot
         if (fromMe) {
@@ -57,7 +113,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         const rawNumber = remoteJid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
         const messageContent = messageData.message || {};
 
-        // 1. Extração do Conteúdo (Texto ou Áudio em RAM < 2MB)
+        // 1. Extração do Conteúdo (Texto ou Áudio em RAM < 5MB)
         let textMessage = 
           messageContent.conversation || 
           messageContent.extendedTextMessage?.text || 
@@ -66,15 +122,21 @@ export async function webhookRoutes(fastify: FastifyInstance) {
 
         const audioMessage = messageContent.audioMessage;
 
-        // Se for áudio, faz download direto para memória temporária e transcreve via Whisper
+        // Se for áudio, faz download com limite de 5MB para evitar OOM no Free Tier
         if (audioMessage) {
           try {
             let audioBuffer: Buffer | null = null;
             if (audioMessage.url) {
-              const audioResponse = await axios.get(audioMessage.url, { responseType: 'arraybuffer' });
+              const audioResponse = await axios.get(audioMessage.url, {
+                responseType: 'arraybuffer',
+                maxContentLength: 5 * 1024 * 1024, // Limite estrito de 5 MB
+                timeout: 5000, // Timeout de 5s
+              });
               audioBuffer = Buffer.from(audioResponse.data);
             } else if (audioMessage.base64) {
-              audioBuffer = Buffer.from(audioMessage.base64, 'base64');
+              if (audioMessage.base64.length < 7 * 1024 * 1024) { // ~5MB base64
+                audioBuffer = Buffer.from(audioMessage.base64, 'base64');
+              }
             }
 
             if (audioBuffer) {
@@ -83,7 +145,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
               textMessage = await transcribeAudioWithWhisper(Buffer.from(''), 'mock.ogg');
             }
           } catch (audioErr) {
-            console.error('Erro ao transcrever áudio em RAM:', audioErr);
+            console.error('Aviso ao transcrever áudio em RAM:', audioErr);
             textMessage = '';
           }
         }

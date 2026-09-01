@@ -1,24 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   GitBranch, 
   ChevronRight, 
   ChevronDown, 
   User, 
   Users, 
-  Shield, 
-  ExternalLink, 
   Search, 
   Eye, 
   EyeOff, 
-  CheckCircle,
-  MapPin,
-  Vote,
-  Sparkles,
-  Loader2,
-  Pencil,
-  Trash2
+  MapPin, 
+  Vote, 
+  Loader2, 
+  Pencil, 
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 import { ModalEditarLideranca } from './ModalEditarLideranca';
 import { ModalConfirmarExclusao } from './ModalConfirmarExclusao';
@@ -42,7 +39,7 @@ export interface TreeNode {
 }
 
 interface ArvoreLiderancaProps {
-  nodes: TreeNode[];
+  nodes?: TreeNode[];
   isMasked: boolean;
   onToggleMask: () => void;
   apiBaseUrl?: string;
@@ -51,10 +48,10 @@ interface ArvoreLiderancaProps {
 }
 
 export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
-  nodes,
+  nodes = [],
   isMasked,
   onToggleMask,
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
   onOpenCreateGroup,
   onRefresh,
 }) => {
@@ -62,8 +59,6 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [lazySupporters, setLazySupporters] = useState<Record<string, TreeNode[]>>({});
   const [loadingLazy, setLoadingLazy] = useState<Record<string, boolean>>({});
-  const [creatingGroupId, setCreatingGroupId] = useState<string | null>(null);
-  const [createdInviteLinks, setCreatedInviteLinks] = useState<Record<string, string>>({});
 
   // Modais de Edição e Exclusão
   const [selectedEditNode, setSelectedEditNode] = useState<TreeNode | null>(null);
@@ -71,34 +66,29 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
   const [selectedDeleteNode, setSelectedDeleteNode] = useState<TreeNode | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const handleCreateGroup = async (leaderId: string, leaderNome: string) => {
-    setCreatingGroupId(leaderId);
-    try {
-      const res = await fetch(`${apiBaseUrl}/api/liderancas/${leaderId}/create-group`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (res.ok && data.inviteLink) {
-        setCreatedInviteLinks((prev) => ({ ...prev, [leaderId]: data.inviteLink }));
-        if (onRefresh) onRefresh();
-      } else {
-        alert(data.error || 'Não foi possível criar o grupo.');
-      }
-    } catch (err) {
-      alert('Erro de conexão ao criar grupo de WhatsApp.');
-    } finally {
-      setCreatingGroupId(null);
-    }
-  };
+  // Lista garantida de nós válidos
+  const safeNodes = useMemo(() => {
+    if (!Array.isArray(nodes)) return [];
+    return nodes.filter((n) => n && typeof n.id === 'string');
+  }, [nodes]);
+
+  // Mapa rápido de IDs existentes para identificar nós órfãos
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, TreeNode>();
+    safeNodes.forEach((n) => map.set(n.id, n));
+    return map;
+  }, [safeNodes]);
 
   // Auto-expand root level nodes by default
   useEffect(() => {
     const initialExpanded: Record<string, boolean> = {};
-    nodes.filter((n) => !n.lider_acima_id || n.nivel === 0).forEach((n) => {
-      initialExpanded[n.id] = true;
-    });
+    safeNodes
+      .filter((n) => !n.lider_acima_id || n.nivel === 0 || !nodeMap.has(n.lider_acima_id))
+      .forEach((n) => {
+        initialExpanded[n.id] = true;
+      });
     setExpandedNodes(initialExpanded);
-  }, [nodes]);
+  }, [safeNodes, nodeMap]);
 
   const toggleExpand = async (nodeId: string) => {
     const nextState = !expandedNodes[nodeId];
@@ -108,10 +98,16 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
     if (nextState && !lazySupporters[nodeId]) {
       setLoadingLazy((prev) => ({ ...prev, [nodeId]: true }));
       try {
-        const res = await fetch(`${apiBaseUrl}/api/liderancas/${nodeId}/supporters?maskLGPD=${isMasked}`);
+        const fetchUrl = apiBaseUrl
+          ? `${apiBaseUrl}/api/liderancas/${nodeId}/supporters?maskLGPD=${isMasked}`
+          : `/api/liderancas/${nodeId}/supporters?maskLGPD=${isMasked}`;
+
+        const res = await fetch(fetchUrl);
         if (res.ok) {
           const data = await res.json();
-          setLazySupporters((prev) => ({ ...prev, [nodeId]: data.supporters || [] }));
+          if (Array.isArray(data.supporters)) {
+            setLazySupporters((prev) => ({ ...prev, [nodeId]: data.supporters }));
+          }
         }
       } catch (err) {
         console.warn('Falha ao carregar apoiadores em lazy loading:', err);
@@ -121,26 +117,35 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
     }
   };
 
-  // Filtragem de nós
-  const filteredNodes = nodes.filter((node) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      node.nome.toLowerCase().includes(term) ||
-      (node.bairro && node.bairro.toLowerCase().includes(term)) ||
-      (node.zona_eleitoral && node.zona_eleitoral.includes(term)) ||
-      node.whatsapp.includes(term)
-    );
-  });
+  // Filtragem segura de nós
+  const filteredNodes = useMemo(() => {
+    const term = (searchTerm || '').trim().toLowerCase();
+    if (!term) return safeNodes;
 
-  // Estrutura hierárquica por níveis
+    return safeNodes.filter((node) => {
+      const nome = (node.nome || '').toLowerCase();
+      const bairro = (node.bairro || '').toLowerCase();
+      const zona = (node.zona_eleitoral || '').toLowerCase();
+      const whatsapp = (node.whatsapp || '').toLowerCase();
+      return (
+        nome.includes(term) ||
+        bairro.includes(term) ||
+        zona.includes(term) ||
+        whatsapp.includes(term)
+      );
+    });
+  }, [safeNodes, searchTerm]);
+
+  // Estrutura hierárquica por níveis com proteção contra ciclos
   const getChildNodes = (parentId: string): TreeNode[] => {
-    const directChildren = nodes.filter((n) => n.lider_acima_id === parentId);
+    const directChildren = safeNodes.filter(
+      (n) => n.lider_acima_id === parentId && n.id !== parentId
+    );
     const lazyChildren = lazySupporters[parentId] || [];
-    
-    // Mescla sem duplicatas
+
     const all = [...directChildren];
     lazyChildren.forEach((lc) => {
-      if (!all.some((d) => d.id === lc.id)) {
+      if (lc && lc.id !== parentId && !all.some((d) => d.id === lc.id)) {
         all.push(lc);
       }
     });
@@ -164,15 +169,22 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
     if (onRefresh) {
       onRefresh();
     }
-    // Limpar cache de lazy loading para recarregar se necessário
     setLazySupporters({});
   };
 
-  const renderNode = (node: TreeNode, depth = 0) => {
+  // Renderização recursiva com proteção estrita contra overflow de pilha
+  const renderNode = (node: TreeNode, depth = 0, visited = new Set<string>()): React.ReactNode => {
+    if (!node || !node.id) return null;
+    if (depth > 10) return null; // Teto de segurança anti-stack overflow
+    if (visited.has(node.id)) return null; // Prevenção de loop circular A -> B -> A
+
+    const currentVisited = new Set(visited);
+    currentVisited.add(node.id);
+
     const isExpanded = !!expandedNodes[node.id];
     const children = getChildNodes(node.id);
-    const hasChildren = node.total_indicados_diretos > 0 || children.length > 0;
-    const isLoading = loadingLazy[node.id];
+    const hasChildren = (node.total_indicados_diretos || 0) > 0 || children.length > 0;
+    const isLoading = !!loadingLazy[node.id];
 
     return (
       <div key={node.id} className="relative select-none">
@@ -185,11 +197,10 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
               ? 'bg-slate-900/50 border-slate-800'
               : 'bg-slate-950/40 border-slate-800/60'
           } hover:border-cyan-500/40`}
-          style={{ marginLeft: `${Math.min(depth * 24, 96)}px` }}
+          style={{ marginLeft: `${Math.min(depth * 20, 80)}px` }}
         >
           {/* Informações do Líder / Apoiador */}
           <div className="flex items-center gap-3">
-            {/* Botão de Expandir / Recolher */}
             {hasChildren ? (
               <button
                 onClick={() => toggleExpand(node.id)}
@@ -229,9 +240,9 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
 
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-100">{node.nome}</span>
+                  <span className="text-sm font-bold text-slate-100">{node.nome || 'Sem Nome'}</span>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${getCargoBadge(node.cargo)}`}>
-                    {node.cargo}
+                    {node.cargo || 'APOIADOR'}
                   </span>
                 </div>
 
@@ -244,97 +255,67 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
                     <Vote className="w-3 h-3 text-emerald-400" /> Z: {node.zona_eleitoral || '-'} / S: {node.secao_eleitoral || '-'}
                   </span>
                   <span>•</span>
-                  <span className="font-mono text-slate-300">{node.whatsapp}</span>
+                  <span className="font-mono text-slate-300">{node.whatsapp || '-'}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Métricas do Nó e Ações */}
-          <div className="mt-3 sm:mt-0 flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
-            {/* Contadores de Rede (para quem tem liderança) */}
-            {(node.cargo === 'LIDER' || node.cargo === 'ADMIN' || node.cargo === 'GESTOR' || node.total_indicados_rede > 0) && (
-              <div className="flex items-center gap-2 text-xs mr-1">
-                <span className="px-2 py-1 rounded bg-slate-800/80 border border-slate-700 text-slate-300">
-                  Diretos: <strong className="text-cyan-400 font-bold">{node.total_indicados_diretos}</strong>
-                </span>
-                <span className="px-2 py-1 rounded bg-slate-800/80 border border-slate-700 text-slate-300">
-                  Rede Total: <strong className="text-emerald-400 font-bold">{node.total_indicados_rede}</strong>
-                </span>
+          {/* Estatísticas e Ações */}
+          <div className="flex items-center gap-4 mt-3 sm:mt-0 justify-end">
+            <div className="flex items-center gap-3 text-xs">
+              <div className="text-right">
+                <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Diretos</span>
+                <span className="font-bold text-cyan-400">{node.total_indicados_diretos || 0}</span>
               </div>
-            )}
+              <div className="text-right">
+                <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Rede</span>
+                <span className="font-bold text-indigo-400">{node.total_indicados_rede || 0}</span>
+              </div>
+            </div>
 
-            {/* Link do Grupo WhatsApp ou Botão Criar Grupo */}
-            {node.grupo_link_convite || createdInviteLinks[node.id] ? (
-              <a
-                href={node.grupo_link_convite || createdInviteLinks[node.id]}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 rounded-lg transition-all"
-                title="Abrir grupo oficial do WhatsApp"
-              >
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                Grupo Base
-                <ExternalLink className="w-3 h-3 ml-0.5" />
-              </a>
-            ) : node.cargo === 'LIDER' || node.cargo === 'ADMIN' || node.cargo === 'GESTOR' ? (
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
               <button
-                onClick={() => handleCreateGroup(node.id, node.nome)}
-                disabled={creatingGroupId === node.id}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/30 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                title="Criar grupo oficial de WhatsApp para este líder com ADMs automáticos"
+                onClick={() => {
+                  setSelectedEditNode(node);
+                  setIsEditModalOpen(true);
+                }}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-400 transition-colors cursor-pointer"
+                title={`Editar cadastro de ${node.nome}`}
               >
-                {creatingGroupId === node.id ? (
-                  <>
-                    <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
-                    <span>Criando Grupo...</span>
-                  </>
-                ) : (
-                  <>
-                    <Users className="w-3 h-3 text-cyan-400" />
-                    <span>+ Criar Grupo</span>
-                  </>
-                )}
+                <Pencil className="w-3.5 h-3.5" />
               </button>
-            ) : null}
 
-            {/* Botão de Editar */}
-            <button
-              onClick={() => {
-                setSelectedEditNode(node);
-                setIsEditModalOpen(true);
-              }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 border border-slate-700 hover:border-cyan-500/40 transition-all cursor-pointer"
-              title={`Editar dados de ${node.nome}`}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Botão de Excluir */}
-            <button
-              onClick={() => {
-                setSelectedDeleteNode(node);
-                setIsDeleteModalOpen(true);
-              }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/40 transition-all cursor-pointer"
-              title={`Excluir cadastro de ${node.nome}`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+              <button
+                onClick={() => {
+                  setSelectedDeleteNode(node);
+                  setIsDeleteModalOpen(true);
+                }}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-400 transition-colors cursor-pointer"
+                title={`Excluir cadastro de ${node.nome}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Nós Filhos (Recursão) */}
+        {/* Nós Filhos (Recursão Protegida) */}
         {isExpanded && children.length > 0 && (
           <div className="border-l-2 border-slate-800/80 ml-6 pl-2">
-            {children.map((child) => renderNode(child, depth + 1))}
+            {children.map((child) => renderNode(child, depth + 1, currentVisited))}
           </div>
         )}
       </div>
     );
   };
 
-  const rootNodes = filteredNodes.filter((n) => !n.lider_acima_id || n.nivel === 0);
+  // Identificação segura de raízes (nós sem pai ou nós órfãos cujo pai não existe)
+  const rootNodes = useMemo(() => {
+    return filteredNodes.filter(
+      (n) => !n.lider_acima_id || n.nivel === 0 || !nodeMap.has(n.lider_acima_id)
+    );
+  }, [filteredNodes, nodeMap]);
 
   return (
     <div className="space-y-4 animate-fadeIn">
@@ -406,6 +387,7 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
       <div className="glass-panel rounded-xl p-4 max-h-[600px] overflow-y-auto">
         {rootNodes.length === 0 ? (
           <div className="p-12 text-center text-slate-500 text-xs">
+            <AlertCircle className="w-8 h-8 text-slate-600 mx-auto mb-2" />
             Nenhum líder ou apoiador encontrado para o filtro aplicado.
           </div>
         ) : (
@@ -433,4 +415,3 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
     </div>
   );
 };
-
