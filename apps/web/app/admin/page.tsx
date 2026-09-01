@@ -165,7 +165,7 @@ export default function AdminPage() {
       const resTree = await fetch(`${API_BASE_URL}/api/liderancas/tree?maskLGPD=${isMasked}`);
       if (resTree.ok) {
         const data = await resTree.json();
-        if (data.tree && data.tree.length > 0) setTreeNodes(data.tree);
+        if (Array.isArray(data.tree)) setTreeNodes(data.tree);
       }
     } catch (err) {
       console.warn('API backend offline ou em inicialização. Usando dados locais.', err);

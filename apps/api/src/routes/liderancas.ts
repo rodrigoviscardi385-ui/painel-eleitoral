@@ -333,6 +333,14 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
       const { id } = request.params;
       const body: any = request.body || {};
 
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (!isUuid) {
+        return reply.send({
+          success: true,
+          usuario: { id, ...body },
+        });
+      }
+
       const [existing] = await db
         .select()
         .from(schema.usuarios)
@@ -367,7 +375,9 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
         .where(eq(schema.usuarios.id, id))
         .returning();
 
-      await recalculateNetworkMetrics().catch(() => {});
+      setImmediate(() => {
+        recalculateNetworkMetrics().catch(() => {});
+      });
 
       return reply.send({
         success: true,
@@ -385,6 +395,15 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
   fastify.delete('/api/liderancas/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       const { id } = request.params;
+
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (!isUuid) {
+        return reply.send({
+          success: true,
+          message: 'Registro demonstrativo removido com sucesso',
+        });
+      }
+
       const [existing] = await db
         .select()
         .from(schema.usuarios)
@@ -392,7 +411,7 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
         .limit(1);
 
       if (!existing) {
-        return reply.status(404).send({ error: 'Usuário não encontrado' });
+        return reply.send({ success: true, message: 'Registro já removido' });
       }
 
       // 1. Remover eventuais itens de campanhas de disparo vinculados a este usuário
