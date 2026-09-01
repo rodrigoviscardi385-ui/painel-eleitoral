@@ -6,9 +6,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm --workspace=apps/web run dev",
-    "build": "npm --workspace=apps/web run build",
-    "start": "npm --workspace=apps/web run start",
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "start": "cd apps/web && npm run start",
     "dev:api": "npm --workspace=apps/api run dev",
     "dev:web": "npm --workspace=apps/web run dev",
     "build:api": "npm --workspace=apps/api run build",
