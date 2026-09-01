@@ -6,10 +6,17 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "npm --workspace=apps/web run dev",
+    "build": "npm --workspace=apps/web run build",
+    "start": "npm --workspace=apps/web run start",
     "dev:api": "npm --workspace=apps/api run dev",
     "dev:web": "npm --workspace=apps/web run dev",
     "build:api": "npm --workspace=apps/api run build",
-    "build:web": "npm --workspace=apps/web run build",
-    "build": "npm run build:api && npm run build:web"
+    "build:web": "npm --workspace=apps/web run build"
+  },
+  "dependencies": {
+    "next": "^15.2.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }
