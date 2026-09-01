@@ -26,11 +26,11 @@ export async function getLeadershipHierarchy(rootLiderId?: string) {
   try {
     const filterClause = rootLiderId
       ? sql`WHERE u.id = ${rootLiderId}`
-      : sql`WHERE u.lider_acima_id IS NULL AND u.cargo IN ('ADMIN', 'GESTOR', 'LIDER')`;
+      : sql`WHERE (u.lider_acima_id IS NULL OR u.lider_acima_id = u.id OR u.lider_acima_id NOT IN (SELECT id FROM ${schema.usuarios}))`;
 
     const hierarchyQuery = sql`
       WITH RECURSIVE hierarquia_arvore AS (
-        -- Âncora: Líderes do topo
+        -- Âncora: Líderes e nós do topo
         SELECT 
           u.id,
           u.nome,
@@ -70,7 +70,8 @@ export async function getLeadershipHierarchy(rootLiderId?: string) {
           pai.nivel + 1 AS nivel,
           pai.caminho_arvore || filho.id AS caminho_arvore
         FROM ${schema.usuarios} filho
-        INNER JOIN hierarquia_arvore pai ON filho.lider_acima_id = pai.id
+        INNER JOIN hierarquia_arvore pai ON filho.lider_acima_id = pai.id AND filho.id != pai.id
+        WHERE pai.nivel < 10 AND NOT (filho.id = ANY(pai.caminho_arvore))
       )
       SELECT * FROM hierarquia_arvore ORDER BY nivel ASC, nome ASC;
     `;
@@ -78,8 +79,8 @@ export async function getLeadershipHierarchy(rootLiderId?: string) {
     const result = await db.execute(hierarchyQuery);
     return result;
   } catch (error) {
-    console.warn('Aviso: Falha ao executar CTE no banco. Retornando fallback.', error);
-    return [];
+    console.warn('Aviso: Falha ao executar CTE no banco. Retornando lista direta.', error);
+    return db.select().from(schema.usuarios);
   }
 }
 

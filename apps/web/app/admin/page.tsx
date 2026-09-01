@@ -91,53 +91,7 @@ export default function AdminPage() {
     },
   ]);
 
-  const [treeNodes, setTreeNodes] = useState<TreeNode[]>([
-    {
-      id: 'lider-1',
-      nome: 'Roberto Silveira (Coord. Geral)',
-      whatsapp: '+55 (11) 9****-1111',
-      cargo: 'ADMIN',
-      lider_acima_id: null,
-      bairro: 'Centro',
-      zona_eleitoral: '100',
-      secao_eleitoral: '01',
-      grupo_link_convite: 'https://chat.whatsapp.com/LiderancaGeral2026',
-      total_indicados_diretos: 2,
-      total_indicados_rede: 5,
-      nivel: 0,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'lider-2',
-      nome: 'Cláudia Mendes',
-      whatsapp: '+55 (11) 9****-2222',
-      cargo: 'LIDER',
-      lider_acima_id: 'lider-1',
-      bairro: 'Santana / Zona Norte',
-      zona_eleitoral: '120',
-      secao_eleitoral: '15',
-      grupo_link_convite: 'https://chat.whatsapp.com/BaseNorteClaudia',
-      total_indicados_diretos: 3,
-      total_indicados_rede: 3,
-      nivel: 1,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'lider-3',
-      nome: 'Fernando Antunes',
-      whatsapp: '+55 (11) 9****-3333',
-      cargo: 'LIDER',
-      lider_acima_id: 'lider-1',
-      bairro: 'Santo Amaro / Zona Sul',
-      zona_eleitoral: '150',
-      secao_eleitoral: '42',
-      grupo_link_convite: 'https://chat.whatsapp.com/BaseSulFernando',
-      total_indicados_diretos: 2,
-      total_indicados_rede: 2,
-      nivel: 1,
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  const [treeNodes, setTreeNodes] = useState<TreeNode[]>([]);
 
   const [auditLogs, setAuditLogs] = useState<any[]>([
     {
