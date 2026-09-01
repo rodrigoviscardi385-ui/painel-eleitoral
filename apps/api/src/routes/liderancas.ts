@@ -395,7 +395,13 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Usuário não encontrado' });
       }
 
-      // Re-linkar eventuais filhos ao pai deste nó para não corromper a árvore
+      // 1. Remover eventuais itens de campanhas de disparo vinculados a este usuário
+      await db
+        .delete(schema.disparosItens)
+        .where(eq(schema.disparosItens.usuario_id, id))
+        .catch((e) => console.warn('Aviso ao limpar disparos_itens:', e));
+
+      // 2. Re-linkar eventuais filhos ao pai deste nó para não corromper a árvore
       await db
         .update(schema.usuarios)
         .set({
@@ -403,28 +409,34 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
           updated_at: new Date(),
         })
         .where(eq(schema.usuarios.lider_acima_id, id))
-        .catch(() => {});
+        .catch((e) => console.warn('Aviso ao re-linkar filhos:', e));
 
-      // Deletar da tabela de usuários
-      await db.delete(schema.usuarios).where(eq(schema.usuarios.id, id));
-
-      // Limpar fluxo de onboarding temporário se houver
+      // 3. Limpar fluxo de onboarding temporário se houver
       if (existing.whatsapp) {
         await db
           .delete(schema.fluxosOnboardingTemp)
           .where(eq(schema.fluxosOnboardingTemp.whatsapp, existing.whatsapp))
-          .catch(() => {});
+          .catch((e) => console.warn('Aviso ao limpar onboarding temp:', e));
       }
 
-      await recalculateNetworkMetrics().catch(() => {});
+      // 4. Deletar da tabela de usuários
+      await db.delete(schema.usuarios).where(eq(schema.usuarios.id, id));
+
+      // 5. Recalcular contadores de rede em background
+      setImmediate(() => {
+        recalculateNetworkMetrics().catch((e) => console.warn('Aviso ao recalcular métricas:', e));
+      });
 
       return reply.send({
         success: true,
         message: 'Registro excluído com sucesso',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir usuário:', error);
-      return reply.status(500).send({ error: 'Falha ao excluir registro' });
+      return reply.status(500).send({ 
+        error: 'Falha ao excluir registro',
+        detail: error?.message || String(error)
+      });
     }
   });
 
