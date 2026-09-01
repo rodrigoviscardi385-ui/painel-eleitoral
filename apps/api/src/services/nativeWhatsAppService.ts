@@ -52,15 +52,36 @@ class NativeWhatsAppService {
   }
 
   /**
-   * Auto-reconecta na inicialização do servidor se houver credenciais salvas
+   * Auto-reconecta na inicialização do servidor se houver credenciais salvas (local ou Supabase)
    */
   async autoReconnectIfAuthenticated(): Promise<void> {
-    const credsPath = path.join(this.authDir, 'creds.json');
-    if (fs.existsSync(credsPath)) {
-      console.log('🔄 Credenciais do WhatsApp detectadas. Restaurando conexão 24/7 em segundo plano...');
-      await this.initialize().catch((err) => {
-        console.error('Falha na auto-reconexão do WhatsApp:', err);
-      });
+    try {
+      const credsPath = path.join(this.authDir, 'creds.json');
+      if (!fs.existsSync(credsPath)) {
+        // Tenta restaurar do Supabase Cloud Storage
+        const [sessionRecord] = await db
+          .select()
+          .from(schema.whatsappSessions)
+          .where(eq(schema.whatsappSessions.session_id, 'campanha_2026'))
+          .limit(1);
+
+        if (sessionRecord?.creds_data) {
+          console.log('☁️ Restaurando sessão 24/7 do WhatsApp do Supabase Cloud...');
+          const files = JSON.parse(sessionRecord.creds_data);
+          for (const [filename, content] of Object.entries(files)) {
+            fs.writeFileSync(path.join(this.authDir, filename), content as string, 'utf-8');
+          }
+        }
+      }
+
+      if (fs.existsSync(path.join(this.authDir, 'creds.json'))) {
+        console.log('🔄 Credenciais do WhatsApp detectadas. Restaurando conexão 24/7 em segundo plano...');
+        await this.initialize().catch((err) => {
+          console.error('Falha na auto-reconexão do WhatsApp:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('Aviso ao verificar sessão na nuvem:', err);
     }
   }
 
@@ -89,7 +110,34 @@ class NativeWhatsAppService {
         syncFullHistory: false,
       });
 
-      this.sock.ev.on('creds.update', saveCreds);
+      this.sock.ev.on('creds.update', async () => {
+        await saveCreds();
+        try {
+          const files: Record<string, string> = {};
+          const dirFiles = fs.readdirSync(this.authDir);
+          for (const f of dirFiles) {
+            if (f.endsWith('.json')) {
+              files[f] = fs.readFileSync(path.join(this.authDir, f), 'utf-8');
+            }
+          }
+          await db
+            .insert(schema.whatsappSessions)
+            .values({
+              session_id: 'campanha_2026',
+              creds_data: JSON.stringify(files),
+              updated_at: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: schema.whatsappSessions.session_id,
+              set: {
+                creds_data: JSON.stringify(files),
+                updated_at: new Date(),
+              },
+            });
+        } catch (e) {
+          // ignora erro de backup temporário
+        }
+      });
 
       this.sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -125,6 +173,10 @@ class NativeWhatsAppService {
             if (fs.existsSync(this.authDir)) {
               fs.rmSync(this.authDir, { recursive: true, force: true });
             }
+            await db
+              .delete(schema.whatsappSessions)
+              .where(eq(schema.whatsappSessions.session_id, 'campanha_2026'))
+              .catch(() => {});
             this.isInitializing = false;
           }
         } else if (connection === 'open') {
@@ -150,8 +202,6 @@ class NativeWhatsAppService {
           const senderNumber = remoteJid.split('@')[0].split(':')[0].replace(/\D/g, '');
           const isSelf = senderNumber === myNumber;
 
-          // Se for mensagem enviada de mim para OUTRA pessoa, ignora para não entrar em loop.
-          // Mas se for uma mensagem enviada no chat consigo mesmo (auto-teste), processa!
           if (msg.key.fromMe && !isSelf) continue;
 
           let incomingText =
@@ -163,7 +213,7 @@ class NativeWhatsAppService {
             (msg.message as any).ephemeralMessage?.message?.extendedTextMessage?.text ||
             '';
 
-          // Se for mensagem de áudio (voz ou arquivo de áudio)
+          // Se for mensagem de áudio
           const audioMsg =
             msg.message.audioMessage ||
             (msg.message as any).ephemeralMessage?.message?.audioMessage;
@@ -190,6 +240,31 @@ class NativeWhatsAppService {
           if (!incomingText) continue;
 
           console.log(`📩 Mensagem recebida de ${remoteJid} (self: ${isSelf}): "${incomingText}"`);
+
+          // 1. Gravar no Histórico do Chat ao Vivo
+          try {
+            const { broadcastChatMessage } = await import('../routes/chat.js');
+            const [savedMsg] = await db
+              .insert(schema.mensagensChat)
+              .values({
+                conversa_id: senderNumber,
+                de_whatsapp: senderNumber,
+                para_whatsapp: 'painel_central',
+                remetente_nome: msg.pushName || senderNumber,
+                conteudo: incomingText,
+                tipo: audioMsg ? 'AUDIO' : 'TEXTO',
+                direcao: 'ENTRADA',
+                status: 'LIDO',
+                tags: JSON.stringify([]),
+              })
+              .returning();
+
+            broadcastChatMessage(savedMsg);
+          } catch (chatErr) {
+            console.warn('Aviso ao gravar mensagem no chat:', chatErr);
+          }
+
+          // 2. Processar máquina de estado de onboarding / bot
           await this.processIncomingMessage(remoteJid, incomingText);
         }
       });

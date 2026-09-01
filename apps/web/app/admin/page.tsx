@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 import { 
   Target, 
   GitBranch, 
@@ -13,22 +15,37 @@ import {
   Eye,
   EyeOff,
   AlertOctagon,
-  CheckCircle2
+  CheckCircle2,
+  MessageSquare,
+  KeyRound,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { CockpitMetas } from '../../components/CockpitMetas';
 import { ArvoreLideranca, TreeNode } from '../../components/ArvoreLideranca';
 import { DisparadorWhatsApp } from '../../components/DisparadorWhatsApp';
+import { ChatAoVivo } from '../../components/ChatAoVivo';
 import { ModalMetas } from '../../components/ModalMetas';
 import { ModalConectarWhatsApp } from '../../components/ModalConectarWhatsApp';
 import { ModalQRCodeComite } from '../../components/ModalQRCodeComite';
 import { ModalGestores } from '../../components/ModalGestores';
 import { ModalCriarGrupo } from '../../components/ModalCriarGrupo';
+import { ModalUsuariosAuth } from '../../components/ModalUsuariosAuth';
 import { Smartphone, QrCode, UserCheck, Users } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'lgpd'>('cockpit');
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    nome: string;
+    email: string;
+    role: string;
+    permissoes: string[];
+  } | null>(null);
+
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'lgpd'>('cockpit');
   const [isMasked, setIsMasked] = useState(true);
   const [showUnmaskModal, setShowUnmaskModal] = useState(false);
   const [isModalMetaOpen, setIsModalMetaOpen] = useState(false);
@@ -36,10 +53,42 @@ export default function AdminPage() {
   const [isModalQRCodeComiteOpen, setIsModalQRCodeComiteOpen] = useState(false);
   const [isModalGestoresOpen, setIsModalGestoresOpen] = useState(false);
   const [isModalCriarGrupoOpen, setIsModalCriarGrupoOpen] = useState(false);
+  const [isModalUsuariosAuthOpen, setIsModalUsuariosAuthOpen] = useState(false);
   const [whatsappConnected, setWhatsappConnected] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [unmaskReason, setUnmaskReason] = useState('');
   const [unmaskAuditStatus, setUnmaskAuditStatus] = useState<string | null>(null);
+
+  // Verificação de Autenticação na montagem
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token') || Cookies.get('auth_token');
+    const userStr = localStorage.getItem('auth_user');
+
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr);
+        setCurrentUser(parsed);
+        // Se o usuário tiver permissão apenas para chat, abre na aba chat por padrão
+        if (parsed.permissoes && !parsed.permissoes.includes('COCKPIT') && parsed.permissoes.includes('CHAT')) {
+          setActiveTab('chat');
+        }
+      } catch {
+        // ignora
+      }
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    Cookies.remove('auth_token');
+    router.push('/login');
+  };
 
   // Estados de Dados
   const [kpis, setKpis] = useState({
@@ -229,8 +278,40 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Ações Globais */}
+        {/* Ações Globais & Perfil de Usuário */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {/* Badge de Usuário Logado & Logout */}
+          {currentUser && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[11px]">
+                {currentUser.nome.substring(0, 1).toUpperCase()}
+              </div>
+              <div className="hidden sm:block">
+                <div className="text-white font-bold text-[11px] leading-tight">{currentUser.nome}</div>
+                <div className="text-[9px] text-emerald-400 font-mono">{currentUser.role}</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="ml-1 p-1 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Sair do Sistema"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Botão Gestão de Logins (Admin Only) */}
+          {(!currentUser || currentUser.role === 'ADMIN') && (
+            <button
+              onClick={() => setIsModalUsuariosAuthOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg shadow-sm transition-all cursor-pointer"
+              title="Gerenciar acessos, atendentes e coordenadores da campanha"
+            >
+              <KeyRound className="w-4 h-4 text-amber-400" />
+              <span>Acessos & Logins</span>
+            </button>
+          )}
+
           {/* Botão Conectar WhatsApp */}
           <button
             onClick={() => setIsModalWhatsAppOpen(true)}
@@ -331,53 +412,76 @@ export default function AdminPage() {
 
       {/* Navegação por Abas */}
       <nav className="flex items-center gap-2 p-1.5 glass-panel rounded-xl border border-slate-800 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('cockpit')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'cockpit'
-              ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          Cockpit de Metas & Velocímetro
-        </button>
+        {(!currentUser || currentUser.permissoes.includes('COCKPIT')) && (
+          <button
+            onClick={() => setActiveTab('cockpit')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'cockpit'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Target className="w-4 h-4" />
+            Cockpit de Metas & Velocímetro
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('arvore')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'arvore'
-              ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <GitBranch className="w-4 h-4" />
-          Árvore de Lideranças
-        </button>
+        {(!currentUser || currentUser.permissoes.includes('ARVORE')) && (
+          <button
+            onClick={() => setActiveTab('arvore')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'arvore'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <GitBranch className="w-4 h-4" />
+            Árvore de Lideranças
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('disparos')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'disparos'
-              ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <Send className="w-4 h-4" />
-          Disparador em Massa
-        </button>
+        {(!currentUser || currentUser.permissoes.includes('DISPAROS')) && (
+          <button
+            onClick={() => setActiveTab('disparos')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'disparos'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            Disparador em Massa
+          </button>
+        )}
 
-        <button
-          onClick={() => setActiveTab('lgpd')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'lgpd'
-              ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <Shield className="w-4 h-4" />
-          Auditoria & Segurança LGPD
-        </button>
+        {(!currentUser || currentUser.permissoes.includes('CHAT')) && (
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'chat'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Chat ao Vivo (WhatsApp)</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </button>
+        )}
+
+        {(!currentUser || currentUser.permissoes.includes('LGPD')) && (
+          <button
+            onClick={() => setActiveTab('lgpd')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'lgpd'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Auditoria & Segurança LGPD
+          </button>
+        )}
       </nav>
 
       {/* Conteúdo da Aba Ativa */}
@@ -408,6 +512,13 @@ export default function AdminPage() {
 
         {activeTab === 'disparos' && (
           <DisparadorWhatsApp apiBaseUrl={API_BASE_URL} />
+        )}
+
+        {activeTab === 'chat' && (
+          <ChatAoVivo
+            apiBaseUrl={API_BASE_URL}
+            currentUser={currentUser || { nome: 'Operador', role: 'ADMIN' }}
+          />
         )}
 
         {activeTab === 'lgpd' && (
@@ -476,6 +587,13 @@ export default function AdminPage() {
       <ModalGestores
         isOpen={isModalGestoresOpen}
         onClose={() => setIsModalGestoresOpen(false)}
+        apiBaseUrl={API_BASE_URL}
+      />
+
+      {/* Modal de Gestão de Logins e Acessos ao Sistema (RBAC) */}
+      <ModalUsuariosAuth
+        isOpen={isModalUsuariosAuthOpen}
+        onClose={() => setIsModalUsuariosAuthOpen(false)}
         apiBaseUrl={API_BASE_URL}
       />
 

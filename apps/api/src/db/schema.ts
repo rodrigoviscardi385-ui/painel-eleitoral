@@ -136,3 +136,59 @@ export const fluxosOnboardingTemp = pgTable(
     index('idx_onboarding_whatsapp').on(table.whatsapp),
   ]
 );
+
+export const usuariosAuth = pgTable(
+  'usuarios_auth',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    usuario_id: uuid('usuario_id').references(() => usuarios.id, { onDelete: 'set null' }),
+    nome: text('nome').notNull(),
+    email: text('email').notNull().unique(),
+    whatsapp: text('whatsapp'),
+    senha_hash: text('senha_hash').notNull(),
+    role: text('role', { enum: ['ADMIN', 'COORDENADOR', 'OPERADOR', 'LIDER'] }).default('OPERADOR').notNull(),
+    permissoes: text('permissoes').default('["CHAT"]').notNull(), // JSON string com array de permissões
+    ativo: text('ativo').default('SIM').notNull(),
+    ultimo_login: timestamp('ultimo_login', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_usuarios_auth_email').on(table.email),
+    index('idx_usuarios_auth_role').on(table.role),
+  ]
+);
+
+export const mensagensChat = pgTable(
+  'mensagens_chat',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversa_id: text('conversa_id').notNull(), // WhatsApp do contato (ex: "5513991063105" ou "120363001@g.us")
+    de_whatsapp: text('de_whatsapp').notNull(),
+    para_whatsapp: text('para_whatsapp').notNull(),
+    remetente_nome: text('remetente_nome'),
+    conteudo: text('conteudo').notNull(),
+    tipo: text('tipo', { enum: ['TEXTO', 'AUDIO', 'IMAGEM', 'DOCUMENTO'] }).default('TEXTO').notNull(),
+    direcao: text('direcao', { enum: ['ENTRADA', 'SAIDA'] }).notNull(),
+    status: text('status', { enum: ['PENDENTE', 'ENVIADO', 'ENTREGUE', 'LIDO', 'ERRO'] }).default('PENDENTE').notNull(),
+    midia_url: text('midia_url'),
+    atendente_nome: text('atendente_nome'),
+    tags: text('tags').default('[]').notNull(), // JSON string com array de tags
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_mensagens_chat_conversa_id').on(table.conversa_id),
+    index('idx_mensagens_chat_created_at').on(table.created_at),
+    index('idx_mensagens_chat_status').on(table.status),
+  ]
+);
+
+export const whatsappSessions = pgTable(
+  'whatsapp_sessions',
+  {
+    session_id: text('session_id').primaryKey(),
+    creds_data: text('creds_data').notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+

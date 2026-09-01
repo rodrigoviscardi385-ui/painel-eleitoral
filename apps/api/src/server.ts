@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
+import { authRoutes } from './routes/auth.js';
+import { chatRoutes } from './routes/chat.js';
 import { webhookRoutes } from './routes/webhook.js';
 import { disparosRoutes } from './routes/disparos.js';
 import { reportsRoutes } from './routes/reports.js';
@@ -205,6 +207,8 @@ async function bootstrap() {
     });
 
     // 4. Registrar Rotas
+    await fastify.register(authRoutes);
+    await fastify.register(chatRoutes);
     await fastify.register(webhookRoutes);
     await fastify.register(disparosRoutes);
     await fastify.register(reportsRoutes);
