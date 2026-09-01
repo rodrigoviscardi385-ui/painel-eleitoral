@@ -25,7 +25,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +38,8 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const loginUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login';
+      const res = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), senha }),
@@ -47,7 +48,10 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Falha ao autenticar. Verifique suas credenciais.');
+        const errorMsg = data.detail
+          ? `${data.error} (${data.detail})`
+          : data.error || 'Falha ao autenticar. Verifique suas credenciais.';
+        setError(errorMsg);
         setLoading(false);
         return;
       }
@@ -61,9 +65,9 @@ export default function LoginPage() {
         // Redirecionar para o painel
         router.push('/admin');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro na requisição de login:', err);
-      setError('Não foi possível conectar ao servidor. Tente novamente em instantes.');
+      setError(`Falha de conexão com o servidor: ${err?.message || 'Tente novamente.'}`);
     } finally {
       setLoading(false);
     }
