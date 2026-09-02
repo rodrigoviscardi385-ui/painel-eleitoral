@@ -37,6 +37,8 @@ interface Conversa {
   ultima_mensagem?: string;
   tipo?: string;
   status?: string;
+  setor?: string;
+  opt_out?: boolean;
   tags?: string[];
   updated_at: string;
   nao_lidas?: number;
@@ -71,11 +73,12 @@ export function ChatAoVivo({
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [inputText, setInputText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'NAO_LIDOS' | 'LIDERES' | 'APOIADORES'>('TODOS');
+  const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'NAO_LIDOS' | 'LIDERES' | 'OPT_OUT' | 'JURIDICO' | 'AGENDA'>('TODOS');
   const [loadingConversas, setLoadingConversas] = useState(false);
   const [loadingMensagens, setLoadingMensagens] = useState(false);
   const [sending, setSending] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -178,7 +181,7 @@ export function ChatAoVivo({
     };
   }, [selectedConversa, apiBaseUrl]);
 
-  // 4. Envio de mensagem
+  // 4. Envio de mensagem com sincronização de conversa_id
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim() || !selectedConversa || sending) return;
@@ -186,6 +189,7 @@ export function ChatAoVivo({
     const texto = inputText.trim();
     setInputText('');
     setSending(true);
+    setWarningMessage(null);
 
     try {
       const res = await fetch(`${apiBaseUrl}/api/chat/enviar`, {
@@ -193,6 +197,7 @@ export function ChatAoVivo({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           para_whatsapp: selectedConversa.whatsapp,
+          conversa_id: selectedConversa.id || selectedConversa.whatsapp,
           conteudo: texto,
           tipo: 'TEXTO',
           atendente_nome: currentUser.nome || 'Operador',
@@ -207,9 +212,19 @@ export function ChatAoVivo({
           return [...prev, data.mensagem];
         });
         setTimeout(scrollToBottom, 100);
+
+        if (data.success === false) {
+          setWarningMessage('⚠️ Mensagem gravada no painel. O WhatsApp do servidor pode estar desconectado no momento.');
+          setTimeout(() => setWarningMessage(null), 8000);
+        }
+      } else {
+        setWarningMessage('❌ ' + (data.error || 'Erro ao enviar mensagem pelo WhatsApp.'));
+        setTimeout(() => setWarningMessage(null), 8000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao enviar mensagem:', err);
+      setWarningMessage('❌ Falha de rede ao tentar enviar: ' + (err.message || ''));
+      setTimeout(() => setWarningMessage(null), 8000);
     } finally {
       setSending(false);
     }
@@ -279,7 +294,9 @@ export function ChatAoVivo({
 
     if (filtroTipo === 'NAO_LIDOS') return (c.nao_lidas || 0) > 0;
     if (filtroTipo === 'LIDERES') return c.cargo === 'LIDER' || c.cargo === 'ADMIN';
-    if (filtroTipo === 'APOIADORES') return c.cargo === 'APOIADOR';
+    if (filtroTipo === 'OPT_OUT') return !!c.opt_out;
+    if (filtroTipo === 'JURIDICO') return c.setor === 'JURIDICO';
+    if (filtroTipo === 'AGENDA') return c.setor === 'AGENDA';
     return true;
   });
 
@@ -335,7 +352,7 @@ export function ChatAoVivo({
 
             {/* Pills de Filtro */}
             <div className="flex items-center gap-1.5 text-[11px] overflow-x-auto pb-1 scrollbar-none">
-              {(['TODOS', 'NAO_LIDOS', 'LIDERES', 'APOIADORES'] as const).map((tipo) => (
+              {(['TODOS', 'NAO_LIDOS', 'LIDERES', 'OPT_OUT', 'JURIDICO', 'AGENDA'] as const).map((tipo) => (
                 <button
                   key={tipo}
                   onClick={() => setFiltroTipo(tipo)}
@@ -351,7 +368,11 @@ export function ChatAoVivo({
                     ? 'Não Lidos'
                     : tipo === 'LIDERES'
                     ? 'Líderes'
-                    : 'Apoiadores'}
+                    : tipo === 'OPT_OUT'
+                    ? '🛑 Opt-Out'
+                    : tipo === 'JURIDICO'
+                    ? '⚖️ Jurídico'
+                    : '📅 Agenda'}
                 </button>
               ))}
             </div>
@@ -457,10 +478,20 @@ export function ChatAoVivo({
                     {selectedConversa.nome.substring(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900 dark:text-white">{selectedConversa.nome}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-slate-900 dark:text-white">{selectedConversa.nome}</h3>
+                      {selectedConversa.opt_out && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-300 dark:border-red-500/30">
+                          🛑 Opt-Out TSE
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5">
                       <span>{selectedConversa.whatsapp}</span>
                       {selectedConversa.bairro && <span>• {selectedConversa.bairro}</span>}
+                      {selectedConversa.setor && selectedConversa.setor !== 'GERAL' && (
+                        <span className="text-blue-600 dark:text-blue-400 font-semibold">• Setor: {selectedConversa.setor}</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -560,6 +591,11 @@ export function ChatAoVivo({
 
               {/* Barra de Templates e Copilot IA */}
               <div className="px-3 pt-2 pb-1 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 space-y-2">
+                {warningMessage && (
+                  <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 animate-fadeIn">
+                    {warningMessage}
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none text-[10px]">
                   {/* Botão Copilot Groq AI */}
                   <button

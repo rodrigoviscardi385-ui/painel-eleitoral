@@ -257,19 +257,22 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
                 <span className="text-[10px] text-slate-400">Clique para inserir variável:</span>
               </div>
 
-              {/* Botões de Inserção de Tags */}
-              <div className="flex flex-wrap gap-1.5 mb-2">
+              {/* Botões de Inserção de Tags e Spintax */}
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
                 {[
                   { tag: '{nome}', label: 'Nome Eleitor' },
                   { tag: '{bairro}', label: 'Bairro' },
-                  { tag: '{zona}', label: 'Zona Eleitoral' },
+                  { tag: '{zona}', label: 'Zona' },
                   { tag: '{secao}', label: 'Seção' },
+                  { tag: '{Olá|Oi|Tudo bem}', label: 'Saudação Variável' },
+                  { tag: '{Confira|Veja as novidades}', label: 'Ação Variável' },
                 ].map((item) => (
                   <button
                     key={item.tag}
                     type="button"
                     onClick={() => insertVariable(item.tag)}
                     className="px-2 py-0.5 text-[11px] font-mono bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/30 rounded transition-colors cursor-pointer"
+                    title={item.label}
                   >
                     +{item.tag}
                   </button>
@@ -283,6 +286,20 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
                 className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
                 required
               />
+
+              {/* Dica de Spintax Anti-Ban & Compliance TSE */}
+              <div className="mt-2 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 space-y-1 text-[11px]">
+                <div className="flex items-center gap-1.5 text-cyan-400 font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Proteção Anti-Ban (Spintax) & Compliance TSE</span>
+                </div>
+                <p className="text-slate-400 leading-relaxed">
+                  • Use chaves com barras <code className="text-cyan-300">{"{Olá|Oi|Tudo bem}"}</code> para que cada mensagem seja disparada com uma redação diferente, evitando bloqueios da Meta.
+                </p>
+                <p className="text-slate-400 leading-relaxed">
+                  • Eleitores que responderem <strong>CANCELAR</strong> ou <strong>SAIR</strong> são imediatamente bloqueados pelo sistema, garantindo conformidade total com a Lei Eleitoral e LGPD.
+                </p>
+              </div>
             </div>
 
             {/* Anexo de PDF (URL Supabase Storage ou Link Público) */}

@@ -241,6 +241,55 @@ class NativeWhatsAppService {
 
           console.log(`📩 Mensagem recebida de ${remoteJid} (self: ${isSelf}): "${incomingText}"`);
 
+          const trimmedIncoming = incomingText.trim();
+
+          // 0. Interceptação de Compliance TSE / LGPD: Opt-Out e Reativação
+          const optOutKeywords = /^(cancelar|sair|parar|nao quero|não quero|descadastrar|remover)$/i;
+          const optInKeywords = /^(começar|comecar|iniciar|reativar|quero apoiar)$/i;
+
+          if (optOutKeywords.test(trimmedIncoming)) {
+            console.log(`🛑 Solicitação de Opt-Out TSE/LGPD detectada de ${senderNumber}`);
+            try {
+              await db
+                .update(schema.usuarios)
+                .set({
+                  opt_out: true,
+                  updated_at: new Date(),
+                })
+                .where(eq(schema.usuarios.whatsapp, senderNumber));
+
+              await this.sendMessage(
+                remoteJid,
+                `🛑 *Descadastro Confirmado!*\n\n` +
+                  `Você não receberá mais mensagens da nossa campanha eleitoral. Respeitamos a sua privacidade e a legislação do TSE (LGPD Eleitoral).\n\n` +
+                  `Caso deseje reativar no futuro, basta nos enviar *COMEÇAR*. Tenha um excelente dia!`
+              );
+            } catch (optErr) {
+              console.error('Erro ao processar opt-out no banco:', optErr);
+            }
+            continue;
+          }
+
+          if (optInKeywords.test(trimmedIncoming)) {
+            try {
+              await db
+                .update(schema.usuarios)
+                .set({
+                  opt_out: false,
+                  updated_at: new Date(),
+                })
+                .where(eq(schema.usuarios.whatsapp, senderNumber));
+            } catch (optInErr) {
+              console.warn('Aviso ao reativar opt-in:', optInErr);
+            }
+          }
+
+          // Detecção de setor (se o eleitor escolheu no menu)
+          let detectedSetor = 'GERAL';
+          if (/agenda|comicio|evento/i.test(trimmedIncoming)) detectedSetor = 'AGENDA';
+          else if (/juridico|denuncia|fake news|advogado/i.test(trimmedIncoming)) detectedSetor = 'JURIDICO';
+          else if (/material|adesivo|santinho|bandeira/i.test(trimmedIncoming)) detectedSetor = 'MATERIAIS';
+
           // 1. Gravar no Histórico do Chat ao Vivo
           try {
             const { broadcastChatMessage } = await import('../routes/chat.js');
@@ -255,6 +304,7 @@ class NativeWhatsAppService {
                 tipo: audioMsg ? 'AUDIO' : 'TEXTO',
                 direcao: 'ENTRADA',
                 status: 'LIDO',
+                setor: detectedSetor,
                 tags: JSON.stringify([]),
               })
               .returning();
@@ -725,26 +775,54 @@ class NativeWhatsAppService {
   }
 
   /**
-   * Envia uma mensagem de texto via Baileys oficial
+   * Envia uma mensagem de texto via Baileys oficial com resolução canônica de JID (9º dígito Brasil)
    */
   async sendMessage(to: string, message: string): Promise<boolean> {
     if (!to || to.startsWith('SEM_TEL_') || to.startsWith('sem_contato_')) {
       return false;
     }
 
+    let cleanNumber = to.replace(/\D/g, '');
+    if (cleanNumber.length === 10 || cleanNumber.length === 11) {
+      cleanNumber = `55${cleanNumber}`;
+    }
+
     let jid = to.trim();
     if (!jid.includes('@')) {
-      let cleanNumber = to.replace(/\D/g, '');
-      if (cleanNumber.length === 10 || cleanNumber.length === 11) {
-        cleanNumber = `55${cleanNumber}`;
-      }
       jid = `${cleanNumber}@s.whatsapp.net`;
     }
 
     if (this.sock && this.isConnected) {
       try {
-        await this.sock.sendMessage(jid, { text: message });
-        console.log(`📤 Mensagem enviada com sucesso via Baileys para ${jid}`);
+        let targetJid = jid;
+
+        // 1. Resolução canônica de JID no WhatsApp (evita descarte silencioso do 9º dígito no Brasil)
+        try {
+          const check = await this.sock.onWhatsApp(cleanNumber);
+          if (check && check.length > 0 && check[0]?.exists && check[0]?.jid) {
+            targetJid = check[0].jid;
+          } else {
+            // Tenta a variação do 9º dígito
+            let altNumber = cleanNumber;
+            if (cleanNumber.startsWith('55') && cleanNumber.length === 13 && cleanNumber[4] === '9') {
+              altNumber = cleanNumber.slice(0, 4) + cleanNumber.slice(5); // remove 9
+            } else if (cleanNumber.startsWith('55') && cleanNumber.length === 12) {
+              altNumber = cleanNumber.slice(0, 4) + '9' + cleanNumber.slice(4); // adiciona 9
+            }
+
+            if (altNumber !== cleanNumber) {
+              const altCheck = await this.sock.onWhatsApp(altNumber);
+              if (altCheck && altCheck.length > 0 && altCheck[0]?.exists && altCheck[0]?.jid) {
+                targetJid = altCheck[0].jid;
+              }
+            }
+          }
+        } catch (checkErr) {
+          console.warn('Aviso ao resolver JID via onWhatsApp:', checkErr);
+        }
+
+        await this.sock.sendMessage(targetJid, { text: message });
+        console.log(`📤 Mensagem enviada com sucesso via Baileys para ${targetJid}`);
         return true;
       } catch (err) {
         console.error(`Erro ao enviar mensagem Baileys para ${jid}:`, err);

@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, index, boolean } from 'drizzle-orm/pg-core';
 
 export const usuarios = pgTable(
   'usuarios',
@@ -18,6 +18,7 @@ export const usuarios = pgTable(
     grupo_link_convite: text('grupo_link_convite'),
     total_indicados_diretos: integer('total_indicados_diretos').default(0).notNull(),
     total_indicados_rede: integer('total_indicados_rede').default(0).notNull(),
+    opt_out: boolean('opt_out').default(false).notNull(),
     notas: text('notas'),
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -74,6 +75,7 @@ export const mensagensChat = pgTable(
     status: text('status', { enum: ['PENDENTE', 'ENVIADO', 'ENTREGUE', 'LIDO', 'ERRO'] }).default('PENDENTE').notNull(),
     midia_url: text('midia_url'),
     atendente_nome: text('atendente_nome'),
+    setor: text('setor').default('GERAL').notNull(),
     tags: text('tags').default('[]').notNull(),
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   }

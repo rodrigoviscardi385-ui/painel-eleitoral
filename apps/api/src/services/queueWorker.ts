@@ -7,9 +7,25 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-function capitalizeFirstLetter(str: string): string {
-  if (!str) return '';
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+function capitalizeFirstLetter(string: string): string {
+  if (!string) return '';
+  return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+}
+
+/**
+ * Parser de Spintax recursivo: transforma {Olá|Oi|Tudo bem} em uma variação aleatória única
+ */
+export function parseSpintax(text: string): string {
+  if (!text) return '';
+  const spintaxRegex = /\{([^{}]+)\}/;
+  let match = spintaxRegex.exec(text);
+  while (match) {
+    const options = match[1].split('|');
+    const chosen = options[Math.floor(Math.random() * options.length)];
+    text = text.replace(match[0], chosen);
+    match = spintaxRegex.exec(text);
+  }
+  return text;
 }
 
 function getRandomDelay(min = 3000, max = 7500): number {
@@ -77,15 +93,31 @@ export class DisparoQueueWorker {
       let batchCounter = 0;
 
       for (const { item, usuario } of pendingItems) {
+        // 0. Bloqueio Estrito de Opt-Out (Compliance TSE / LGPD)
+        if (usuario.opt_out) {
+          console.log(`🛑 Disparo ignorado para ${usuario.whatsapp} (${usuario.nome}) devido a Opt-Out ativo.`);
+          await db
+            .update(schema.disparosItens)
+            .set({
+              status: 'ERRO',
+              erro_detalhe: 'Cancelado: Eleitor solicitou descadastro (Opt-Out TSE/LGPD)',
+            })
+            .where(eq(schema.disparosItens.id, item.id));
+          errorCount++;
+          continue;
+        }
+
         // Formatar primeiro nome capitalizado
         const primeiroNome = capitalizeFirstLetter(usuario.nome ? usuario.nome.split(' ')[0] : 'Amigo(a)');
 
-        // Substituição atômica de variáveis dinâmicas no corpo da mensagem
-        const personalizedMessage = campaign.mensagem_template
+        // Substituição atômica de variáveis dinâmicas + Motor Spintax Anti-Bloqueio
+        const rawTemplate = campaign.mensagem_template
           .replace(/{nome}/gi, primeiroNome)
-          .replace(/{bairro}/gi, usuario.bairro || 'seu bairro')
+          .replace(/{bairro}/gi, usuario.bairro || 'sua região')
           .replace(/{zona}/gi, usuario.zona_eleitoral || '')
           .replace(/{secao}/gi, usuario.secao_eleitoral || '');
+
+        const personalizedMessage = parseSpintax(rawTemplate);
 
         let sendSuccess = false;
         let errorMessage = '';

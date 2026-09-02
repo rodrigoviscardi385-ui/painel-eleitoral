@@ -57,6 +57,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
           ultima_mensagem: schema.mensagensChat.conteudo,
           tipo: schema.mensagensChat.tipo,
           status: schema.mensagensChat.status,
+          setor: schema.mensagensChat.setor,
           tags: schema.mensagensChat.tags,
           created_at: schema.mensagensChat.created_at,
         })
@@ -81,9 +82,11 @@ export async function chatRoutes(fastify: FastifyInstance) {
             ultima_mensagem: msg.ultima_mensagem,
             tipo: msg.tipo,
             status: msg.status,
+            setor: msg.setor || 'GERAL',
             tags: tagsList,
             updated_at: msg.created_at,
             nao_lidas: msg.status === 'PENDENTE' || msg.status === 'ENTREGUE' ? 1 : 0,
+            opt_out: false,
           });
         }
       }
@@ -97,6 +100,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
           cargo: schema.usuarios.cargo,
           bairro: schema.usuarios.bairro,
           zona_eleitoral: schema.usuarios.zona_eleitoral,
+          opt_out: schema.usuarios.opt_out,
         })
         .from(schema.usuarios);
 
@@ -111,6 +115,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
           existing.cargo = u.cargo;
           existing.bairro = u.bairro;
           existing.zona_eleitoral = u.zona_eleitoral;
+          existing.opt_out = u.opt_out;
         } else if (listaFinal.length < 20) {
           listaFinal.push({
             id: u.whatsapp,
@@ -122,6 +127,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
             ultima_mensagem: 'Toque para iniciar conversa',
             tipo: 'TEXTO',
             status: 'LIDO',
+            setor: 'GERAL',
+            opt_out: u.opt_out,
             tags: [u.cargo],
             updated_at: new Date().toISOString(),
             nao_lidas: 0,
@@ -179,7 +186,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
   fastify.post('/api/chat/enviar', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body: any = request.body || {};
-      const { para_whatsapp, conteudo, tipo = 'TEXTO', atendente_nome = 'Operador' } = body;
+      const { para_whatsapp, conversa_id, conteudo, tipo = 'TEXTO', atendente_nome = 'Operador' } = body;
 
       if (!para_whatsapp || !conteudo) {
         return reply.status(400).send({ error: 'Destinatário e conteúdo são obrigatórios' });
@@ -190,14 +197,16 @@ export async function chatRoutes(fastify: FastifyInstance) {
         cleanPhone = `55${cleanPhone}`;
       }
 
-      // Enviar via Baileys WhatsApp
-      const sendSuccess = await nativeWhatsAppService.sendMessage(cleanPhone, conteudo);
+      const convId = conversa_id ? String(conversa_id) : cleanPhone;
+
+      // Enviar via Baileys WhatsApp com resolução de JID canônico
+      const sendSuccess = await nativeWhatsAppService.sendMessage(cleanPhone, String(conteudo).trim());
 
       // Gravar no histórico do chat
       const [novaMensagem] = await db
         .insert(schema.mensagensChat)
         .values({
-          conversa_id: cleanPhone,
+          conversa_id: convId,
           de_whatsapp: 'painel_central',
           para_whatsapp: cleanPhone,
           remetente_nome: atendente_nome,

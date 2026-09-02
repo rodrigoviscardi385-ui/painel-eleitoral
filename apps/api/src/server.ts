@@ -96,6 +96,9 @@ async function seedInitialDataIfEmpty() {
         atendente_nome TEXT,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS opt_out BOOLEAN DEFAULT FALSE;
+      ALTER TABLE mensagens_chat ADD COLUMN IF NOT EXISTS setor TEXT DEFAULT 'GERAL';
     `).catch((migErr) => console.warn('Aviso ao auto-migrar tabelas auxiliares:', migErr));
 
     const [result] = (await db.execute(sql`SELECT COUNT(*) AS total FROM ${schema.usuarios}`)) as any;
