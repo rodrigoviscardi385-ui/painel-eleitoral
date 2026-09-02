@@ -5,26 +5,26 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 const campanhaConfigSchema = z.object({
-  nome_urna: z.string().min(2).max(100),
-  nome_completo: z.string().min(2).max(150),
-  numero_candidato: z.string().min(1).max(20),
-  cargo: z.string().min(2).max(100),
-  partido: z.string().min(1).max(50),
-  coligacao: z.string().max(255).optional().nullable(),
-  slogan: z.string().max(255).optional().nullable(),
+  nome_urna: z.string().default('Rodrigo da Saúde'),
+  nome_completo: z.string().default('Rodrigo Viscardi'),
+  numero_candidato: z.string().default('2026'),
+  cargo: z.string().default('Deputado Federal'),
+  partido: z.string().default('AVANTE'),
+  coligacao: z.string().optional().nullable(),
+  slogan: z.string().optional().nullable(),
   foto_url: z.string().optional().nullable(),
   logo_url: z.string().optional().nullable(),
-  cor_primaria: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#10b981'),
-  cidade: z.string().min(2).max(100),
-  estado: z.string().length(2).toUpperCase(),
+  cor_primaria: z.string().default('#10b981'),
+  cidade: z.string().default('São Paulo'),
+  estado: z.string().default('SP'),
   data_eleicao: z.string().default('2026-10-04'),
-  cnpj_campanha: z.string().max(30).optional().nullable(),
-  biografia_ia: z.string().max(3000),
-  propostas_ia: z.string().max(5000),
+  cnpj_campanha: z.string().optional().nullable(),
+  biografia_ia: z.string().optional().nullable().default(''),
+  propostas_ia: z.string().optional().nullable().default(''),
   tom_voz_ia: z.enum(['POPULAR', 'FORMAL', 'DESCONTRAIDO', 'TECNICO']).default('POPULAR'),
-  link_grupo_geral: z.string().url().optional().nullable().or(z.literal('')),
-  whatsapp_comite: z.string().max(30).optional().nullable(),
-}).strip();
+  link_grupo_geral: z.string().optional().nullable(),
+  whatsapp_comite: z.string().optional().nullable(),
+}).passthrough();
 
 // Cache em memória para desempenho máximo e tolerância a falhas
 let cachedConfig: any = null;
@@ -82,19 +82,22 @@ export async function campanhaRoutes(fastify: FastifyInstance) {
   /** PUT /api/campanha/config — Atualizar dados da campanha */
   fastify.put('/api/campanha/config', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const body = campanhaConfigSchema.partial().parse(request.body);
+      const rawBody = (request.body || {}) as any;
+      const parsedBody = campanhaConfigSchema.partial().parse(rawBody);
+      const { id, created_at, updated_at, ...cleanData } = parsedBody as any;
+
       const [existe] = await db.select({ id: schema.campanhaConfig.id }).from(schema.campanhaConfig).limit(1);
 
       let resultado;
       if (existe) {
         const [atualizado] = await db
           .update(schema.campanhaConfig)
-          .set({ ...(body as any), updated_at: new Date() })
+          .set({ ...cleanData, updated_at: new Date() })
           .where(eq(schema.campanhaConfig.id, existe.id))
           .returning();
         resultado = atualizado;
       } else {
-        const [novo] = await db.insert(schema.campanhaConfig).values(body as any).returning();
+        const [novo] = await db.insert(schema.campanhaConfig).values(cleanData).returning();
         resultado = novo;
       }
 
@@ -105,7 +108,10 @@ export async function campanhaRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Dados inválidos', detalhes: err.errors });
       }
       console.error('[Campanha] Erro ao salvar:', err);
-      return reply.status(500).send({ error: 'Erro ao salvar personalização da campanha' });
+      return reply.status(500).send({
+        error: 'Erro ao salvar personalização da campanha',
+        detalhes: err?.message || String(err),
+      });
     }
   });
 }

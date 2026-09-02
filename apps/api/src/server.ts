@@ -35,6 +35,69 @@ const fastify = Fastify({
 
 async function seedInitialDataIfEmpty() {
   try {
+    // 0. Auto-migração resiliente das tabelas auxiliares
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS campanha_config (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        nome_urna TEXT NOT NULL DEFAULT 'Rodrigo da Saúde',
+        nome_completo TEXT NOT NULL DEFAULT 'Rodrigo Viscardi',
+        numero_candidato TEXT NOT NULL DEFAULT '2026',
+        cargo TEXT NOT NULL DEFAULT 'Deputado Federal',
+        partido TEXT NOT NULL DEFAULT 'AVANTE',
+        coligacao TEXT DEFAULT 'Coligação Por Dias Melhores',
+        slogan TEXT DEFAULT 'Trabalho, honestidade e compromisso com você',
+        foto_url TEXT,
+        logo_url TEXT,
+        cor_primaria TEXT NOT NULL DEFAULT '#10b981',
+        cidade TEXT NOT NULL DEFAULT 'São Paulo',
+        estado TEXT NOT NULL DEFAULT 'SP',
+        data_eleicao TEXT NOT NULL DEFAULT '2026-10-04',
+        cnpj_campanha TEXT DEFAULT '00.000.000/0001-00',
+        biografia_ia TEXT NOT NULL DEFAULT 'Candidato comprometido com a melhoria da saúde pública, geração de empregos e desenvolvimento sustentável das nossas comunidades.',
+        propostas_ia TEXT NOT NULL DEFAULT 'SAÚDE: Fortalecimento dos postos de saúde, redução de filas para exames e valorização dos profissionais.\nEDUCAÇÃO: Escolas de tempo integral e tecnologia em sala de aula.\nEMPREGO: Apoio ao pequeno empreendedor e incentivos fiscais para empresas locais.',
+        tom_voz_ia TEXT NOT NULL DEFAULT 'POPULAR',
+        link_grupo_geral TEXT DEFAULT 'https://chat.whatsapp.com/convite-campanha',
+        whatsapp_comite TEXT DEFAULT '',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      INSERT INTO campanha_config (nome_urna)
+      SELECT 'Rodrigo da Saúde' WHERE NOT EXISTS (SELECT 1 FROM campanha_config);
+
+      CREATE TABLE IF NOT EXISTS materiais_online (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        titulo TEXT NOT NULL,
+        descricao TEXT,
+        tipo TEXT NOT NULL DEFAULT 'LINK',
+        url TEXT NOT NULL,
+        tags TEXT NOT NULL DEFAULT '[]',
+        ativo TEXT NOT NULL DEFAULT 'SIM',
+        ordem INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS bot_config (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        modo TEXT NOT NULL DEFAULT 'BOT_ATIVO',
+        mensagem_boas_vindas TEXT NOT NULL DEFAULT 'Olá! 👋 Sou o assistente virtual da campanha. Como posso ajudar?\n\n1️⃣ Conhecer as propostas\n2️⃣ Receber material de campanha\n3️⃣ Falar com um atendente\n\nDigite o número da opção desejada.',
+        menu_opcoes TEXT NOT NULL DEFAULT '[{"numero":1,"texto":"Conhecer as propostas","acao":"INFO"},{"numero":2,"texto":"Receber material","acao":"MATERIAL"},{"numero":3,"texto":"Falar com atendente","acao":"HUMANO"}]',
+        mensagem_encerramento_bot TEXT NOT NULL DEFAULT '✅ Obrigado pelo contato! Qualquer dúvida, estamos aqui.',
+        mensagem_transferencia TEXT NOT NULL DEFAULT '⏳ Aguarde um momento! Vou conectar você com um atendente da nossa equipe. 🙋',
+        horario_inicio TEXT NOT NULL DEFAULT '08:00',
+        horario_fim TEXT NOT NULL DEFAULT '18:00',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      INSERT INTO bot_config (modo)
+      SELECT 'BOT_ATIVO' WHERE NOT EXISTS (SELECT 1 FROM bot_config);
+
+      CREATE TABLE IF NOT EXISTS conversa_status (
+        conversa_id TEXT PRIMARY KEY,
+        modo TEXT NOT NULL DEFAULT 'BOT',
+        atendente_nome TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `).catch((migErr) => console.warn('Aviso ao auto-migrar tabelas auxiliares:', migErr));
+
     const [result] = (await db.execute(sql`SELECT COUNT(*) AS total FROM ${schema.usuarios}`)) as any;
     const count = parseInt(result?.total || '0', 10);
 
