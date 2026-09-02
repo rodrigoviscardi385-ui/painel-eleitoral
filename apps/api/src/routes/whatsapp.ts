@@ -1,5 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { nativeWhatsAppService } from '../services/nativeWhatsAppService.js';
+import { db } from '../db/index.js';
+import * as schema from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 export async function whatsappRoutes(fastify: FastifyInstance) {
@@ -80,12 +83,12 @@ export async function whatsappRoutes(fastify: FastifyInstance) {
   });
 
   /**
-   * Criação Customizada de Grupo de WhatsApp
+   * Criação Customizada de Grupo de WhatsApp por Líder
    */
   fastify.post('/api/whatsapp/groups/create', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body: any = request.body || {};
-      const { groupName, leaderNumber = '' } = body;
+      const { groupName, leaderNumber = '', leaderId = '' } = body;
 
       if (!groupName) {
         return reply.status(400).send({ error: 'Nome do grupo é obrigatório' });
@@ -93,10 +96,41 @@ export async function whatsappRoutes(fastify: FastifyInstance) {
 
       const groupResult = await nativeWhatsAppService.createBaseGroup(groupName, leaderNumber);
 
+      const groupId = groupResult?.groupId || `simulated_${Date.now()}@g.us`;
+      const inviteLink = groupResult?.inviteLink || `https://chat.whatsapp.com/invite-${Date.now()}`;
+
+      // Se informou o líder, vincula o grupo e link diretamente no registro dele no banco
+      if (leaderId || leaderNumber) {
+        const cleanLeader = String(leaderNumber).replace(/\D/g, '');
+        try {
+          if (leaderId) {
+            await db
+              .update(schema.usuarios)
+              .set({
+                grupo_whatsapp_id: groupId,
+                grupo_link_convite: inviteLink,
+                updated_at: new Date(),
+              })
+              .where(eq(schema.usuarios.id, leaderId));
+          } else if (cleanLeader) {
+            await db
+              .update(schema.usuarios)
+              .set({
+                grupo_whatsapp_id: groupId,
+                grupo_link_convite: inviteLink,
+                updated_at: new Date(),
+              })
+              .where(eq(schema.usuarios.whatsapp, cleanLeader));
+          }
+        } catch (dbErr) {
+          console.warn('Aviso ao vincular grupo ao líder no banco:', dbErr);
+        }
+      }
+
       return reply.send({
         success: true,
-        groupId: groupResult?.groupId,
-        inviteLink: groupResult?.inviteLink,
+        groupId,
+        inviteLink,
       });
     } catch (error) {
       console.error('Erro ao criar grupo customizado:', error);

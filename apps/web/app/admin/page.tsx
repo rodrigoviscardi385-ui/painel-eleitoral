@@ -114,6 +114,7 @@ export default function AdminPage() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [unmaskReason, setUnmaskReason] = useState('');
   const [unmaskAuditStatus, setUnmaskAuditStatus] = useState<string | null>(null);
+  const [selectedLeaderForGroup, setSelectedLeaderForGroup] = useState<{ id: string; nome: string; whatsapp: string } | null>(null);
 
   // Verificação de Autenticação na montagem
   useEffect(() => {
@@ -643,7 +644,10 @@ export default function AdminPage() {
                 metas={metas}
                 onOpenModalMeta={() => setIsModalMetaOpen(true)}
                 onExportPdf={handleExportPdf}
-                onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
+                onOpenCreateGroup={(leader) => {
+                  setSelectedLeaderForGroup(leader || null);
+                  setIsModalCriarGrupoOpen(true);
+                }}
               />
             </ErrorBoundary>
           </div>
@@ -660,7 +664,10 @@ export default function AdminPage() {
                   else setIsMasked(true);
                 }}
                 apiBaseUrl={API_BASE_URL}
-                onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
+                onOpenCreateGroup={(leader) => {
+                  setSelectedLeaderForGroup(leader || null);
+                  setIsModalCriarGrupoOpen(true);
+                }}
                 onRefresh={refreshData}
               />
             </ErrorBoundary>
@@ -796,8 +803,12 @@ export default function AdminPage() {
       {/* Modal de Criação de Grupo Oficial de WhatsApp */}
       <ModalCriarGrupo
         isOpen={isModalCriarGrupoOpen}
-        onClose={() => setIsModalCriarGrupoOpen(false)}
+        onClose={() => {
+          setIsModalCriarGrupoOpen(false);
+          setSelectedLeaderForGroup(null);
+        }}
         apiBaseUrl={API_BASE_URL}
+        initialLeader={selectedLeaderForGroup}
         onGroupCreated={refreshData}
       />
 

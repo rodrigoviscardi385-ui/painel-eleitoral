@@ -51,7 +51,7 @@ interface CockpitMetasProps {
   metas: MetaItem[];
   onOpenModalMeta: () => void;
   onExportPdf: () => void;
-  onOpenCreateGroup?: () => void;
+  onOpenCreateGroup?: (leader?: any) => void;
   isLoading?: boolean;
 }
 

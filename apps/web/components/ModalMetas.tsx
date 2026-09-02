@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Target, Calendar, Award, CheckCircle2 } from 'lucide-react';
 
 interface ModalMetasProps {
@@ -14,18 +14,54 @@ export const ModalMetas: React.FC<ModalMetasProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
 }) => {
   const [titulo, setTitulo] = useState('');
-  const [tipo, setTipo] = useState<'GLOBAL' | 'ZONA' | 'BAIRRO' | 'LIDER'>('ZONA');
+  const [tipo, setTipo] = useState<'GLOBAL' | 'ZONA' | 'BAIRRO' | 'LIDER'>('LIDER');
   const [alvoReferencia, setAlvoReferencia] = useState('');
-  const [quantidadeMeta, setQuantidadeMeta] = useState<number>(500);
-  const [metaDiariaCadencia, setMetaDiariaCadencia] = useState<number>(15);
+  const [leaders, setLeaders] = useState<any[]>([]);
+  const [quantidadeMeta, setQuantidadeMeta] = useState<number>(300);
+  const [metaDiariaCadencia, setMetaDiariaCadencia] = useState<number>(10);
   const [dataFim, setDataFim] = useState(
     new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Carregar lista de líderes para seleção
+  useEffect(() => {
+    if (!isOpen) return;
+
+    fetch(`${apiBaseUrl}/api/liderancas/tree?maskLGPD=false`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.lideres && Array.isArray(data.lideres)) {
+          const extract = (arr: any[]): any[] => {
+            let res: any[] = [];
+            for (const item of arr) {
+              res.push({
+                id: item.id,
+                nome: item.nome,
+                cargo: item.cargo,
+                zona_eleitoral: item.zona_eleitoral,
+                bairro: item.bairro,
+              });
+              if (item.subordinados?.length) {
+                res = res.concat(extract(item.subordinados));
+              }
+            }
+            return res;
+          };
+          const all = extract(data.lideres);
+          setLeaders(all);
+          if (all.length > 0 && !alvoReferencia) {
+            setAlvoReferencia(all[0].nome);
+            setTitulo(`Meta de Mobilização - ${all[0].nome}`);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, apiBaseUrl]);
 
   if (!isOpen) return null;
 
@@ -114,26 +150,67 @@ export const ModalMetas: React.FC<ModalMetasProps> = ({
               <label className="block text-xs font-medium text-slate-300 mb-1">Tipo de Meta</label>
               <select
                 value={tipo}
-                onChange={(e: any) => setTipo(e.target.value)}
+                onChange={(e: any) => {
+                  const newTipo = e.target.value;
+                  setTipo(newTipo);
+                  if (newTipo === 'LIDER' && leaders.length > 0) {
+                    setAlvoReferencia(leaders[0].nome);
+                    setTitulo(`Meta de Mobilização - ${leaders[0].nome}`);
+                  } else if (newTipo === 'ZONA') {
+                    setAlvoReferencia('Zona 120');
+                    setTitulo('Meta de Mobilização - Zona 120');
+                  } else if (newTipo === 'BAIRRO') {
+                    setAlvoReferencia('Centro');
+                    setTitulo('Meta de Mobilização - Centro');
+                  } else {
+                    setAlvoReferencia('Campanha Geral');
+                    setTitulo('Meta Geral de Votos da Campanha');
+                  }
+                }}
                 className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500"
               >
-                <option value="GLOBAL">Global (Campanha)</option>
-                <option value="ZONA">Por Zona Eleitoral</option>
-                <option value="BAIRRO">Por Bairro</option>
-                <option value="LIDER">Por Liderança</option>
+                <option value="LIDER">👤 Por Liderança</option>
+                <option value="ZONA">📍 Por Zona Eleitoral</option>
+                <option value="BAIRRO">🏙️ Por Bairro</option>
+                <option value="GLOBAL">🌐 Global (Campanha)</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Referência Territorial</label>
-              <input
-                type="text"
-                placeholder="Ex: Zona 120 ou Centro"
-                value={alvoReferencia}
-                onChange={(e) => setAlvoReferencia(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-              />
-            </div>
+            {tipo === 'LIDER' ? (
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Selecione o Líder *</label>
+                <select
+                  value={alvoReferencia}
+                  onChange={(e) => {
+                    const lNome = e.target.value;
+                    setAlvoReferencia(lNome);
+                    if (lNome) {
+                      setTitulo(`Meta de Mobilização - ${lNome}`);
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500"
+                  required
+                >
+                  <option value="">-- Selecione o Líder --</option>
+                  {leaders.map((l) => (
+                    <option key={l.id} value={l.nome}>
+                      👤 {l.nome} ({l.cargo}) {l.zona_eleitoral ? `• Z:${l.zona_eleitoral}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Referência Territorial / Alvo</label>
+                <input
+                  type="text"
+                  placeholder={tipo === 'ZONA' ? 'Ex: Zona 120' : tipo === 'BAIRRO' ? 'Ex: Centro ou Santana' : 'Ex: Campanha Geral'}
+                  value={alvoReferencia}
+                  onChange={(e) => setAlvoReferencia(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -43,7 +43,7 @@ interface ArvoreLiderancaProps {
   isMasked: boolean;
   onToggleMask: () => void;
   apiBaseUrl?: string;
-  onOpenCreateGroup?: () => void;
+  onOpenCreateGroup?: (leader?: TreeNode) => void;
   onRefresh?: () => void;
 }
 
@@ -277,6 +277,18 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
               <button
                 onClick={() => {
+                  if (onOpenCreateGroup) {
+                    onOpenCreateGroup(node);
+                  }
+                }}
+                className="p-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/30 text-emerald-400 transition-colors cursor-pointer"
+                title={`Criar Grupo Oficial de WhatsApp para ${node.nome}`}
+              >
+                <Users className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                onClick={() => {
                   setSelectedEditNode(node);
                   setIsEditModalOpen(true);
                 }}
@@ -349,7 +361,7 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
           {/* Botão de Criar Grupo de Base */}
           {onOpenCreateGroup && (
             <button
-              onClick={onOpenCreateGroup}
+              onClick={() => onOpenCreateGroup()}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-md shadow-indigo-600/20 transition-all cursor-pointer whitespace-nowrap"
               title="Criar novo grupo oficial de WhatsApp para qualquer líder ou bairro"
             >

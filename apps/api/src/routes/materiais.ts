@@ -8,7 +8,7 @@ const materialSchema = z.object({
   titulo: z.string().min(2).max(200),
   descricao: z.string().max(500).optional().nullable(),
   tipo: z.enum(['PDF', 'LINK', 'IMAGEM', 'VIDEO']).default('LINK'),
-  url: z.string().url('URL inválida'),
+  url: z.string().min(1, 'URL é obrigatória'),
   tags: z.array(z.string()).default([]),
   ativo: z.enum(['SIM', 'NAO']).default('SIM'),
   ordem: z.number().int().min(0).default(0),

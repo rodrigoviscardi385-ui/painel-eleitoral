@@ -45,6 +45,8 @@ export function MateriaisOnline({ apiBaseUrl = '' }: MateriaisOnlineProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const fetchMateriais = async () => {
@@ -160,6 +162,64 @@ export function MateriaisOnline({ apiBaseUrl = '' }: MateriaisOnlineProps) {
           {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Box de Upload de Arquivo no Servidor */}
+            <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500/60 transition-all text-center">
+              <input
+                type="file"
+                id="file-upload-input"
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.mp4,.mov,.avi"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploading(true);
+                  setUploadProgress(`Enviando ${file.name}...`);
+                  setError('');
+                  try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await fetch(`${apiBaseUrl}/api/materiais/upload`, {
+                      method: 'POST',
+                      body: formData,
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.url) {
+                      setForm((prev) => ({
+                        ...prev,
+                        url: data.url,
+                        tipo: data.tipo || 'PDF',
+                        titulo: prev.titulo || file.name.replace(/\.[^/.]+$/, ''),
+                      }));
+                      setUploadProgress(`✓ Arquivo salvo no servidor: ${data.filename}`);
+                    } else {
+                      setError(data.error || 'Erro ao enviar arquivo para o servidor');
+                    }
+                  } catch (err: any) {
+                    setError('Falha de rede ao fazer upload: ' + (err.message || ''));
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+              />
+              <label
+                htmlFor="file-upload-input"
+                className="cursor-pointer flex flex-col items-center justify-center gap-1.5 py-2"
+              >
+                <Upload className={`w-6 h-6 text-emerald-600 dark:text-emerald-400 ${uploading ? 'animate-bounce' : ''}`} />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {uploading ? uploadProgress : 'Clique para selecionar arquivo do seu computador'}
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Suporta PDF (Santinho/Proposta), Imagens (PNG/JPG) e Vídeos (MP4) • Fica armazenado no servidor oficial da campanha
+                </span>
+              </label>
+              {uploadProgress && (
+                <div className="mt-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                  {uploadProgress}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Título *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
@@ -177,10 +237,10 @@ export function MateriaisOnline({ apiBaseUrl = '' }: MateriaisOnlineProps) {
               </select>
             </div>
             <div className="sm:col-span-2 space-y-1">
-              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">URL *</label>
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">URL / Caminho do Arquivo *</label>
               <input value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
                 className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
-                placeholder="https://..." />
+                placeholder="https://... ou /uploads/materiais/..." />
             </div>
             <div className="sm:col-span-2 space-y-1">
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Descrição (opcional)</label>
