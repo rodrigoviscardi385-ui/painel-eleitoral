@@ -14,7 +14,8 @@
     "dev:web": "cd apps/web && npm run dev",
     "build:api": "cd apps/api && npm run build",
     "build:web": "cd apps/web && npm run build",
-    "test:nasa": "npx tsx scripts/nasa_master_test_suite.ts"
+    "test:nasa": "npx tsx scripts/nasa_master_test_suite.ts",
+    "db:reset:prod": "npx tsx scripts/reset_database_for_production.ts"
   },
   "dependencies": {
     "next": "^15.2.1",
