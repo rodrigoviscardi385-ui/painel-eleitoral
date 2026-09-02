@@ -177,29 +177,29 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-white overflow-y-auto">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white overflow-y-auto transition-colors duration-200">
       {/* Top Header com Botão Salvar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-800 bg-slate-900/90 sticky top-0 z-20 backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/90 sticky top-0 z-20 backdrop-blur-md shadow-sm dark:shadow-none">
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-slate-950 shadow-lg"
+            className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-slate-950 shadow-lg shrink-0"
             style={{ backgroundColor: config.cor_primaria }}
           >
             <Vote className="w-5 h-5 text-slate-950" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-black text-white uppercase tracking-tight">
+              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
                 Personalização da Campanha (White-Label)
               </h2>
               <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full text-slate-950"
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full text-slate-950 font-mono shadow-sm"
                 style={{ backgroundColor: config.cor_primaria }}
               >
                 {config.numero_candidato}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Configure os dados do candidato, identidade visual, cérebro da IA e contatos do comitê.
             </p>
           </div>
@@ -238,49 +238,49 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
         {/* Painel de Configuração (8 Colunas) */}
         <div className="lg:col-span-8 space-y-5">
           {/* Menu de Sub-Abas */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveTab('urna')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'urna'
-                  ? 'bg-slate-800 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
               }`}
             >
-              <Vote className="w-3.5 h-3.5 text-emerald-400" />
+              <Vote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               1. Candidato & Urna
             </button>
             <button
               onClick={() => setActiveTab('visual')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'visual'
-                  ? 'bg-slate-800 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
               }`}
             >
-              <Palette className="w-3.5 h-3.5 text-blue-400" />
+              <Palette className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
               2. Cores & Logotipo
             </button>
             <button
               onClick={() => setActiveTab('ia')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'ia'
-                  ? 'bg-slate-800 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
               }`}
             >
-              <Bot className="w-3.5 h-3.5 text-purple-400" />
+              <Bot className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               3. Cérebro da IA (Propostas)
             </button>
             <button
               onClick={() => setActiveTab('comite')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'comite'
-                  ? 'bg-slate-800 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
               }`}
             >
-              <MapPin className="w-3.5 h-3.5 text-orange-400" />
+              <MapPin className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
               4. Comitê & Localidade
             </button>
           </div>
@@ -684,13 +684,13 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
 
         {/* Card de Visualização em Tempo Real (4 Colunas) */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             Visualização ao Vivo da Campanha
           </div>
 
           {/* Card do Candidato */}
-          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-2xl overflow-hidden relative space-y-4">
+          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-xl overflow-hidden relative space-y-4">
             {/* Faixa de cor partidária no topo */}
             <div
               className="absolute top-0 left-0 right-0 h-2.5"
@@ -716,15 +716,15 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                     {config.partido}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                     {config.cidade}-{config.estado}
                   </span>
                 </div>
-                <h3 className="text-base font-black text-white truncate mt-1">{config.nome_urna}</h3>
-                <p className="text-xs text-slate-400 font-medium">{config.cargo}</p>
+                <h3 className="text-base font-black text-slate-900 dark:text-white truncate mt-1">{config.nome_urna}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{config.cargo}</p>
               </div>
             </div>
 

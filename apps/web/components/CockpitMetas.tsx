@@ -61,19 +61,19 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
     switch (status) {
       case 'VERDE':
         return {
-          bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+          bg: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400',
           dot: 'bg-emerald-500',
           text: 'Meta no Ritmo Ideal',
         };
       case 'AMARELO':
         return {
-          bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+          bg: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400',
           dot: 'bg-amber-500',
           text: 'Atenção / Acelerar',
         };
       default:
         return {
-          bg: 'bg-rose-500/10 border-rose-500/30 text-rose-400',
+          bg: 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-400',
           dot: 'bg-rose-500',
           text: 'Abaixo da Cadência',
         };
@@ -85,13 +85,13 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Barra de Ações Rápidas do Cockpit */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Target className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <Target className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
             Cockpit de Metas & Cadência Eleitoral
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Acompanhamento em tempo real de velocímetro, metas territoriais e ritmo diário de adesão.
           </p>
         </div>
@@ -100,17 +100,17 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
           {onOpenCreateGroup && (
             <button
               onClick={onOpenCreateGroup}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-sm shadow-indigo-600/20 transition-all cursor-pointer"
               title="Criar novo grupo oficial de WhatsApp para qualquer líder ou bairro"
             >
-              <Users className="w-4 h-4 text-indigo-200" />
+              <Users className="w-4 h-4 text-indigo-100" />
               Criar Grupo Base
             </button>
           )}
 
           <button
             onClick={onOpenModalMeta}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg shadow-lg shadow-cyan-600/20 transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl shadow-sm shadow-cyan-600/20 transition-all cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
             Nova Meta
@@ -118,9 +118,9 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
 
           <button
             onClick={onExportPdf}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg shadow-sm transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700"
           >
-            <FileDown className="w-4 h-4 text-emerald-400" />
+            <FileDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             Relatório PDF
           </button>
         </div>
@@ -129,56 +129,56 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
       {/* Grid de KPIs Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Líderes */}
-        <div className="glass-panel rounded-xl p-5 relative overflow-hidden group hover:border-cyan-500/40 transition-all">
+        <div className="glass-panel rounded-2xl p-5 relative overflow-hidden group hover:border-cyan-400/60 dark:hover:border-cyan-500/40 transition-all bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Lideranças Ativas</span>
-            <div className="p-2.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Lideranças Ativas</span>
+            <div className="p-2.5 rounded-xl bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20">
               <Users className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{kpis.total_lideres}</span>
-            <span className="text-xs text-cyan-400 font-medium flex items-center">
+            <span className="text-3xl font-black text-slate-900 dark:text-white">{kpis.total_lideres}</span>
+            <span className="text-xs text-cyan-600 dark:text-cyan-400 font-bold flex items-center">
               <Sparkles className="w-3 h-3 mr-0.5" /> Coordenadores & Líderes
             </span>
           </div>
-          <div className="mt-3 text-xs text-slate-400">
+          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Responsáveis diretos pela formação dos grupos de base.
           </div>
         </div>
 
         {/* Card 2: Total Apoiadores */}
-        <div className="glass-panel rounded-xl p-5 relative overflow-hidden group hover:border-emerald-500/40 transition-all">
+        <div className="glass-panel rounded-2xl p-5 relative overflow-hidden group hover:border-emerald-400/60 dark:hover:border-emerald-500/40 transition-all bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Apoiadores Cadastrados</span>
-            <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Apoiadores Cadastrados</span>
+            <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
               <UserCheck className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{kpis.total_apoiadores}</span>
-            <span className="text-xs text-emerald-400 font-medium">+{kpis.cadastros_hoje} hoje</span>
+            <span className="text-3xl font-black text-slate-900 dark:text-white">{kpis.total_apoiadores}</span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">+{kpis.cadastros_hoje} hoje</span>
           </div>
-          <div className="mt-3 text-xs text-slate-400">
+          <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Eleitores confirmados na árvore de fidelização.
           </div>
         </div>
 
         {/* Card 3: Meta Geral & Progresso */}
-        <div className="glass-panel rounded-xl p-5 relative overflow-hidden group hover:border-indigo-500/40 transition-all">
+        <div className="glass-panel rounded-2xl p-5 relative overflow-hidden group hover:border-indigo-400/60 dark:hover:border-indigo-500/40 transition-all bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Meta Geral Campanha</span>
-            <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Meta Geral Campanha</span>
+            <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20">
               <Target className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-white">{kpis.progresso_percentual.toFixed(1)}%</span>
-            <span className="text-xs text-slate-400">
+            <span className="text-3xl font-black text-slate-900 dark:text-white">{kpis.progresso_percentual.toFixed(1)}%</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
               {kpis.total_apoiadores} / {kpis.meta_global}
             </span>
           </div>
-          <div className="mt-3 w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div className="mt-3 w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
             <div
               className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-emerald-400 h-full rounded-full transition-all duration-500"
               style={{ width: `${Math.min(100, Math.max(2, kpis.progresso_percentual))}%` }}
@@ -187,21 +187,21 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
         </div>
 
         {/* Card 4: Semáforo e Ritmo Diário */}
-        <div className={`glass-panel rounded-xl p-5 border ${semaforoInfo.bg} relative overflow-hidden transition-all`}>
+        <div className={`glass-panel rounded-2xl p-5 border ${semaforoInfo.bg} relative overflow-hidden transition-all shadow-sm`}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider">Semáforo de Cadência</span>
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-900/80 border border-slate-700">
+            <span className="text-xs font-bold uppercase tracking-wider">Semáforo de Cadência</span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 shadow-sm">
               <span className={`w-2.5 h-2.5 rounded-full ${semaforoInfo.dot} animate-ping`} />
-              <span className="text-[10px] font-bold">{kpis.status_semaforo}</span>
+              <span className="text-[10px] font-black">{kpis.status_semaforo}</span>
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">{kpis.cadencia_diaria_atual}</span>
-            <span className="text-xs text-slate-300">/ {kpis.cadencia_diaria_meta} meta diária</span>
+            <span className="text-3xl font-black text-slate-900 dark:text-white">{kpis.cadencia_diaria_atual}</span>
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">/ {kpis.cadencia_diaria_meta} meta diária</span>
           </div>
-          <div className="mt-3 text-xs text-slate-300 flex items-center justify-between">
+          <div className="mt-3 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between">
             <span>Necessário p/ bater meta:</span>
-            <span className="font-bold text-white">{kpis.cadencia_diaria_necessaria}/dia</span>
+            <span className="font-bold text-slate-900 dark:text-white">{kpis.cadencia_diaria_necessaria}/dia</span>
           </div>
         </div>
       </div>
@@ -209,40 +209,40 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
       {/* Seção Central: Velocímetro de Metas Territoriais e Detalhamento */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Painel do Velocímetro de Campanha */}
-        <div className="glass-panel rounded-xl p-6 lg:col-span-1 flex flex-col justify-between">
+        <div className="glass-panel rounded-2xl p-6 lg:col-span-1 flex flex-col justify-between bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                 Velocímetro de Mobilização
               </h3>
-              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1">
-                <Clock className="w-3 h-3 text-cyan-400" /> {kpis.dias_restantes} dias restantes
+              <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1 font-medium">
+                <Clock className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" /> {kpis.dias_restantes} dias restantes
               </span>
             </div>
 
-            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
               O velocímetro calcula a velocidade de captação de apoiadores comparando os cadastros recebidos via WhatsApp com o tempo restante até a eleição.
             </p>
 
             {/* Visual Gauge Radial / Progress representation */}
-            <div className="relative flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-xl border border-slate-800">
+            <div className="relative flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800">
               <div className="text-center space-y-1">
-                <div className="text-4xl font-black tracking-tight text-white">
-                  {kpis.cadencia_diaria_atual} <span className="text-lg font-normal text-slate-400">cadastros/dia</span>
+                <div className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+                  {kpis.cadencia_diaria_atual} <span className="text-base font-normal text-slate-500 dark:text-slate-400">cadastros/dia</span>
                 </div>
-                <div className="text-xs font-medium text-emerald-400 flex items-center justify-center gap-1">
+                <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   {kpis.cadencia_diaria_atual >= kpis.cadencia_diaria_meta ? 'Acima da meta estabelecida' : 'Abaixo do ritmo recomendado'}
                 </div>
               </div>
 
               <div className="w-full mt-6 space-y-2">
-                <div className="flex justify-between text-xs text-slate-400 font-medium">
+                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
                   <span>Ritmo Mínimo: {kpis.cadencia_diaria_meta}/dia</span>
                   <span>Ideal: {Math.ceil(kpis.cadencia_diaria_meta * 1.5)}/dia</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
+                <div className="w-full bg-slate-200/80 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${
                       kpis.cadencia_diaria_atual >= kpis.cadencia_diaria_meta
@@ -260,27 +260,27 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>Última atualização:</span>
-            <span className="text-slate-200 font-mono">Tempo Real</span>
+            <span className="text-slate-800 dark:text-slate-200 font-mono font-medium">Tempo Real</span>
           </div>
         </div>
 
         {/* Lista de Metas por Zona e Bairro */}
-        <div className="glass-panel rounded-xl p-6 lg:col-span-2">
+        <div className="glass-panel rounded-2xl p-6 lg:col-span-2 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               Metas Territoriais e Zonas Estratégicas
             </h3>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
               {metas.length} meta(s) monitorada(s)
             </span>
           </div>
 
           <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
             {metas.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+              <div className="p-8 text-center text-slate-400 dark:text-slate-500 text-xs border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                 Nenhuma meta cadastrada ainda. Clique em "Nova Meta" para definir objetivos de campanha.
               </div>
             ) : (
@@ -291,17 +291,17 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
                 return (
                   <div
                     key={meta.id}
-                    className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-100">{meta.titulo}</span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-cyan-500/20">
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{meta.titulo}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-50 dark:bg-slate-800 text-cyan-700 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20">
                           {meta.tipo} {meta.alvo_referencia ? `• ${meta.alvo_referencia}` : ''}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-400 flex items-center gap-3">
-                        <span>Meta Diária: <strong>{meta.meta_diaria_cadencia} apoios</strong></span>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-3">
+                        <span>Meta Diária: <strong className="text-slate-700 dark:text-slate-200">{meta.meta_diaria_cadencia} apoios</strong></span>
                         <span>•</span>
                         <span>Prazo: {new Date(meta.data_fim).toLocaleDateString('pt-BR')}</span>
                       </div>
@@ -309,11 +309,11 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
 
                     <div className="flex items-center gap-4 sm:w-56">
                       <div className="flex-1 space-y-1">
-                        <div className="flex justify-between text-[11px] font-medium text-slate-300">
+                        <div className="flex justify-between text-[11px] font-medium text-slate-600 dark:text-slate-300">
                           <span>{meta.quantidade_atual} votos</span>
-                          <span className="font-bold">{perc.toFixed(0)}%</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{perc.toFixed(0)}%</span>
                         </div>
-                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                           <div
                             className="bg-cyan-500 h-full rounded-full transition-all duration-500"
                             style={{ width: `${Math.min(100, Math.max(3, perc))}%` }}
@@ -321,7 +321,7 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
                         </div>
                       </div>
 
-                      <div className={`px-2.5 py-1 rounded-md text-[10px] font-bold border ${statusTheme.bg}`}>
+                      <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border shadow-sm ${statusTheme.bg}`}>
                         {meta.status_semaforo}
                       </div>
                     </div>

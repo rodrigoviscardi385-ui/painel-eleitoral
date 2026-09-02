@@ -322,9 +322,9 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       {/* Header */}
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-4 py-3 bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md">
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-4 py-3 bg-white/95 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 backdrop-blur-md shadow-sm dark:shadow-none">
         <div className="flex items-center gap-3.5">
           {campanha.foto_url ? (
             <img
@@ -343,7 +343,7 @@ export default function AdminPage() {
           )}
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
+              <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
                 {campanha.nome_urna.toUpperCase()}
               </h1>
               <span
@@ -352,11 +352,11 @@ export default function AdminPage() {
               >
                 {campanha.numero_candidato}
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                 {campanha.partido}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {campanha.cargo} • {campanha.cidade}-{campanha.estado}
               {campanha.slogan && <span className="hidden sm:inline"> • "{campanha.slogan}"</span>}
             </p>
@@ -367,17 +367,17 @@ export default function AdminPage() {
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           {/* Badge de Usuário Logado & Logout */}
           {currentUser && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[11px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-white">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-[11px]">
                 {currentUser.nome.substring(0, 1).toUpperCase()}
               </div>
               <div className="hidden sm:block">
-                <div className="text-white font-bold text-[11px] leading-tight">{currentUser.nome}</div>
-                <div className="text-[9px] text-emerald-400 font-mono">{currentUser.role}</div>
+                <div className="font-bold text-[11px] leading-tight text-slate-800 dark:text-white">{currentUser.nome}</div>
+                <div className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono">{currentUser.role}</div>
               </div>
               <button
                 onClick={handleLogout}
-                className="ml-1 p-1 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                className="ml-1 p-1 text-slate-400 hover:text-red-500 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                 title="Sair do Sistema"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -388,7 +388,7 @@ export default function AdminPage() {
           {/* Botão Alternar Modo Claro / Escuro */}
           <button
             onClick={toggleTheme}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border shadow-sm transition-all cursor-pointer bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700"
             title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
           >
             {theme === 'dark' ? (
@@ -398,7 +398,7 @@ export default function AdminPage() {
               </>
             ) : (
               <>
-                <Moon className="w-4 h-4 text-cyan-600" />
+                <Moon className="w-4 h-4 text-indigo-600" />
                 <span className="hidden sm:inline">Modo Escuro</span>
               </>
             )}
@@ -408,10 +408,10 @@ export default function AdminPage() {
           {(!currentUser || currentUser.role === 'ADMIN') && (
             <button
               onClick={() => setIsModalUsuariosAuthOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white dark:border-slate-700"
               title="Gerenciar acessos, atendentes e coordenadores da campanha"
             >
-              <KeyRound className="w-4 h-4 text-amber-400" />
+              <KeyRound className="w-4 h-4 text-amber-500" />
               <span>Acessos & Logins</span>
             </button>
           )}
@@ -489,16 +489,16 @@ export default function AdminPage() {
           <button
             onClick={handleExportPdf}
             disabled={isExportingPdf}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white dark:border-slate-600"
           >
-            <FileDown className={`w-4 h-4 text-emerald-400 ${isExportingPdf ? 'animate-bounce' : ''}`} />
+            <FileDown className={`w-4 h-4 text-emerald-600 dark:text-emerald-400 ${isExportingPdf ? 'animate-bounce' : ''}`} />
             {isExportingPdf ? 'Gerando Stream...' : 'Baixar PDF'}
           </button>
 
           {/* Atualizar */}
           <button
             onClick={refreshData}
-            className="p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors cursor-pointer"
+            className="p-2 rounded-lg transition-colors cursor-pointer bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm dark:bg-slate-800/80 dark:hover:bg-slate-700 dark:text-slate-400 dark:hover:text-white dark:border-slate-700"
             title="Atualizar Dados"
           >
             <RefreshCw className="w-4 h-4" />
@@ -515,17 +515,17 @@ export default function AdminPage() {
       )}
 
       {/* Navegação por Abas — Mobile-first: ícones + texto, scroll horizontal */}
-      <nav className="flex items-center gap-1 px-3 py-2 bg-slate-900/80 border-b border-slate-800 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 shrink-0">
+      <nav className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-100/90 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 overflow-x-auto scrollbar-thin shrink-0">
         {(!currentUser || currentUser.permissoes.includes('COCKPIT')) && (
           <button
             onClick={() => setActiveTab('cockpit')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'cockpit'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white font-bold shadow-sm border border-slate-200/90 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <Target className="w-4 h-4" />
+            <Target className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
             <span className="hidden sm:inline">Cockpit</span>
           </button>
         )}
@@ -533,13 +533,13 @@ export default function AdminPage() {
         {(!currentUser || currentUser.permissoes.includes('ARVORE')) && (
           <button
             onClick={() => setActiveTab('arvore')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'arvore'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white font-bold shadow-sm border border-slate-200/90 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <GitBranch className="w-4 h-4" />
+            <GitBranch className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
             <span className="hidden sm:inline">Árvore</span>
           </button>
         )}
@@ -547,13 +547,13 @@ export default function AdminPage() {
         {(!currentUser || currentUser.permissoes.includes('DISPAROS')) && (
           <button
             onClick={() => setActiveTab('disparos')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'disparos'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white font-bold shadow-sm border border-slate-200/90 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
             <span className="hidden sm:inline">Disparos</span>
           </button>
         )}
@@ -561,15 +561,15 @@ export default function AdminPage() {
         {(!currentUser || currentUser.permissoes.includes('CHAT')) && (
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'chat'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40'
+                ? 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm border border-emerald-300/80 dark:border-emerald-700/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <MessageSquare className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">Chat ao Vivo</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
           </button>
         )}
 
@@ -577,13 +577,13 @@ export default function AdminPage() {
         {(!currentUser || currentUser.role === 'ADMIN') && (
           <button
             onClick={() => setActiveTab('materiais')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'materiais'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white font-bold shadow-sm border border-slate-200/90 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
+            <BookOpen className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
             <span className="hidden sm:inline">Materiais</span>
           </button>
         )}
@@ -592,13 +592,13 @@ export default function AdminPage() {
         {(!currentUser || currentUser.role === 'ADMIN') && (
           <button
             onClick={() => setActiveTab('bot')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'bot'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white font-bold shadow-sm border border-slate-200/90 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">Config Bot</span>
           </button>
         )}
@@ -607,13 +607,13 @@ export default function AdminPage() {
         {(!currentUser || currentUser.role === 'ADMIN') && (
           <button
             onClick={() => setActiveTab('campanha')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'campanha'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 font-bold shadow-sm border border-emerald-300/80 dark:border-emerald-700/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <Vote className="w-4 h-4 text-emerald-400" />
+            <Vote className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">Personalizar Campanha</span>
           </button>
         )}
@@ -621,13 +621,13 @@ export default function AdminPage() {
         {(!currentUser || currentUser.permissoes.includes('LGPD')) && (
           <button
             onClick={() => setActiveTab('lgpd')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'lgpd'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-white font-bold shadow-sm border border-slate-200/90 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
             }`}
           >
-            <Shield className="w-4 h-4" />
+            <Shield className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />
             <span className="hidden sm:inline">LGPD</span>
           </button>
         )}
