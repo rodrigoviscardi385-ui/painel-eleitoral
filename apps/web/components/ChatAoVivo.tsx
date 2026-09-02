@@ -284,21 +284,21 @@ export function ChatAoVivo({
   });
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden h-full flex flex-col">
+    <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 backdrop-blur-2xl rounded-3xl shadow-xl overflow-hidden h-full flex flex-col text-slate-900 dark:text-white transition-colors duration-200">
       {/* Top Header do Módulo */}
-      <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+          <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400">
             <MessageSquare className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               Chat ao Vivo & Atendimento Multi-Canal
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                 Tempo Real
               </span>
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Receba e responda mensagens do WhatsApp diretamente pelo comitê eleitoral
             </p>
           </div>
@@ -319,9 +319,9 @@ export function ChatAoVivo({
       {/* Grid Principal: sidebar + chat, perfil oculto em mobile */}
       <div className="flex-1 flex flex-col md:grid md:grid-cols-12 overflow-hidden">
         {/* COLUNA 1: LISTA DE CONVERSAS — hidden on mobile when conversation open */}
-        <div className={`${selectedConversa ? 'hidden md:flex' : 'flex'} md:col-span-4 flex-col border-r border-slate-800 bg-slate-950/40 overflow-hidden`}>
+        <div className={`${selectedConversa ? 'hidden md:flex' : 'flex'} md:col-span-4 flex-col border-r border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/40 overflow-hidden`}>
           {/* Busca & Filtros */}
-          <div className="p-3 border-b border-slate-800/80 space-y-2.5">
+          <div className="p-3 border-b border-slate-200 dark:border-slate-800/80 space-y-2.5">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
               <input
@@ -329,7 +329,7 @@ export function ChatAoVivo({
                 placeholder="Buscar eleitor, líder ou bairro..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60"
+                className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 shadow-sm"
               />
             </div>
 
@@ -341,8 +341,8 @@ export function ChatAoVivo({
                   onClick={() => setFiltroTipo(tipo)}
                   className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 cursor-pointer ${
                     filtroTipo === tipo
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800/60'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 font-bold shadow-sm'
+                      : 'bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-800/60 shadow-sm'
                   }`}
                 >
                   {tipo === 'TODOS'
@@ -358,10 +358,10 @@ export function ChatAoVivo({
           </div>
 
           {/* Lista de Contatos com Scroll */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/40">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40">
             {filteredConversas.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                <Users className="w-8 h-8 mx-auto text-slate-600 mb-2 opacity-60" />
+              <div className="p-8 text-center text-xs text-slate-400 dark:text-slate-500">
+                <Users className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600 mb-2 opacity-60" />
                 Nenhuma conversa encontrada
               </div>
             ) : (
@@ -377,19 +377,19 @@ export function ChatAoVivo({
                     }}
                     className={`w-full text-left p-3.5 transition-all flex items-start gap-3 cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-950/40 border-l-4 border-emerald-500'
-                        : 'hover:bg-slate-900/60'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-l-4 border-emerald-500'
+                        : 'hover:bg-slate-100/80 dark:hover:bg-slate-900/60'
                     }`}
                   >
                     {/* Avatar com Iniciais */}
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center font-bold text-white text-xs shrink-0 shadow">
+                    <div className="w-10 h-10 rounded-2xl bg-slate-200 dark:bg-gradient-to-tr dark:from-slate-800 dark:to-slate-700 border border-slate-300 dark:border-slate-700 flex items-center justify-center font-bold text-slate-800 dark:text-white text-xs shrink-0 shadow-sm">
                       {c.nome ? c.nome.substring(0, 2).toUpperCase() : 'WA'}
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h4 className="text-xs font-bold text-white truncate">{c.nome}</h4>
-                        <span className="text-[10px] text-slate-500 font-mono">
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">{c.nome}</h4>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
                           {c.updated_at
                             ? new Date(c.updated_at).toLocaleTimeString('pt-BR', {
                                 hour: '2-digit',
@@ -399,7 +399,7 @@ export function ChatAoVivo({
                         </span>
                       </div>
 
-                      <p className="text-[11px] text-slate-400 truncate mb-1.5">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mb-1.5">
                         {c.ultima_mensagem || 'Clique para abrir conversa'}
                       </p>
 
@@ -408,10 +408,10 @@ export function ChatAoVivo({
                           <span
                             className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                               c.cargo === 'ADMIN'
-                                ? 'bg-purple-950/60 text-purple-400 border border-purple-800/40'
+                                ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40'
                                 : c.cargo === 'LIDER'
-                                ? 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
-                                : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40'
+                                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40'
                             }`}
                           >
                             {c.cargo}
@@ -419,13 +419,13 @@ export function ChatAoVivo({
                         )}
 
                         {c.bairro && (
-                          <span className="text-[9px] text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                          <span className="text-[9px] text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">
                             {c.bairro}
                           </span>
                         )}
 
                         {(c.nao_lidas || 0) > 0 && (
-                          <span className="ml-auto text-[10px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded-full">
+                          <span className="ml-auto text-[10px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm">
                             {c.nao_lidas}
                           </span>
                         )}
@@ -439,26 +439,26 @@ export function ChatAoVivo({
         </div>
 
         {/* COLUNA 2: ÁREA DE CHAT — full width on mobile, 5 cols on desktop */}
-        <div className={`${selectedConversa ? 'flex' : 'hidden md:flex'} md:col-span-5 flex-col border-r border-slate-800 bg-slate-950/20 flex-1`}>
+        <div className={`${selectedConversa ? 'flex' : 'hidden md:flex'} md:col-span-5 flex-col border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex-1`}>
           {selectedConversa ? (
             <>
               {/* Header do Chat Ativo */}
-              <div className="p-3.5 border-b border-slate-800 bg-slate-950/40 flex items-center justify-between">
+              <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 flex items-center justify-between shadow-sm dark:shadow-none">
                 <div className="flex items-center gap-3">
                   {/* Botão Voltar — visível apenas em mobile */}
                   <button
                     onClick={() => setSelectedConversa(null)}
-                    className="md:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                    className="md:hidden p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all"
                     title="Voltar para lista"
                   >
                     <ChevronRight className="w-4 h-4 rotate-180" />
                   </button>
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400 text-xs">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center font-bold text-emerald-700 dark:text-emerald-400 text-xs">
                     {selectedConversa.nome.substring(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-white">{selectedConversa.nome}</h3>
-                    <p className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-white">{selectedConversa.nome}</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5">
                       <span>{selectedConversa.whatsapp}</span>
                       {selectedConversa.bairro && <span>• {selectedConversa.bairro}</span>}
                     </p>
@@ -470,7 +470,7 @@ export function ChatAoVivo({
                     href={`https://wa.me/${selectedConversa.whatsapp.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-1.5 text-xs text-emerald-400 bg-emerald-950/50 hover:bg-emerald-900/50 border border-emerald-800/40 rounded-lg transition-all flex items-center gap-1"
+                    className="p-1.5 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/40 rounded-lg transition-all flex items-center gap-1 font-semibold"
                     title="Abrir no WhatsApp Web Oficial"
                   >
                     <Phone className="w-3.5 h-3.5" />
@@ -502,34 +502,36 @@ export function ChatAoVivo({
                         className={`flex flex-col ${isOutgoing ? 'items-end' : 'items-start'}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-md backdrop-blur-md ${
+                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-sm ${
                             isOutgoing
-                              ? 'bg-gradient-to-tr from-emerald-600 to-teal-600 text-white rounded-tr-none'
-                              : 'bg-slate-800/90 text-slate-100 border border-slate-700/60 rounded-tl-none'
+                              ? 'bg-gradient-to-tr from-emerald-600 to-teal-600 text-white rounded-tr-none shadow-emerald-600/10'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/60 rounded-tl-none'
                           }`}
                         >
                           {/* Nome do Remetente */}
                           {!isOutgoing && msg.remetente_nome && (
-                            <div className="text-[10px] font-bold text-emerald-400 mb-0.5">
+                            <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mb-0.5">
                               {msg.remetente_nome}
                             </div>
                           )}
 
                           {/* Tipo Áudio */}
                           {msg.tipo === 'AUDIO' && (
-                            <div className="flex items-center gap-2 py-1 text-emerald-300 font-semibold">
-                              <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+                            <div className="flex items-center gap-2 py-1 text-emerald-700 dark:text-emerald-300 font-semibold">
+                              <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-pulse" />
                               <span>[Mensagem de Áudio Transcrita]</span>
                             </div>
                           )}
 
                           {/* Conteúdo da Mensagem */}
-                          <p className="whitespace-pre-wrap">{msg.conteudo}</p>
+                          <p className={`whitespace-pre-wrap font-normal ${isOutgoing ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}>
+                            {msg.conteudo}
+                          </p>
 
                           {/* Rodapé do Balão: Hora e Status de Envio */}
                           <div
                             className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${
-                              isOutgoing ? 'text-emerald-200/80' : 'text-slate-400'
+                              isOutgoing ? 'text-emerald-100/90' : 'text-slate-500 dark:text-slate-400'
                             }`}
                           >
                             <span>
@@ -541,9 +543,9 @@ export function ChatAoVivo({
                             {isOutgoing && (
                               <span>
                                 {msg.status === 'ENVIADO' ? (
-                                  <Check className="w-3 h-3" />
+                                  <Check className="w-3 h-3 text-emerald-100" />
                                 ) : (
-                                  <CheckCheck className="w-3 h-3 text-cyan-300" />
+                                  <CheckCheck className="w-3 h-3 text-cyan-200" />
                                 )}
                               </span>
                             )}
@@ -557,14 +559,14 @@ export function ChatAoVivo({
               </div>
 
               {/* Barra de Templates e Copilot IA */}
-              <div className="px-3 pt-2 pb-1 border-t border-slate-800 bg-slate-950/60 space-y-2">
+              <div className="px-3 pt-2 pb-1 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 space-y-2">
                 <div className="flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none text-[10px]">
                   {/* Botão Copilot Groq AI */}
                   <button
                     type="button"
                     onClick={handleGenerateAiResponse}
                     disabled={generatingAi}
-                    className="px-2.5 py-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg shadow transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                    className="px-2.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
                   >
                     <Bot className={`w-3.5 h-3.5 ${generatingAi ? 'animate-spin' : ''}`} />
                     <span>{generatingAi ? 'Gerando Resposta IA...' : 'Sugerir Resposta IA'}</span>
@@ -576,7 +578,7 @@ export function ChatAoVivo({
                       key={idx}
                       type="button"
                       onClick={() => setInputText(t.text)}
-                      className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-lg transition-all shrink-0 cursor-pointer"
+                      className="px-2.5 py-1 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-lg transition-all shrink-0 cursor-pointer shadow-sm"
                     >
                       {t.label}
                     </button>
@@ -590,14 +592,14 @@ export function ChatAoVivo({
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     placeholder="Digite sua resposta ou use os atalhos acima..."
-                    className="flex-1 px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60"
+                    className="flex-1 px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 shadow-sm"
                   />
                   <button
                     type="submit"
                     disabled={!inputText.trim() || sending}
-                    className="p-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-950/50 transition-all flex items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-4 h-4" />
+                    <Send className="w-4 h-4 text-white" />
                   </button>
                 </form>
               </div>
@@ -615,52 +617,50 @@ export function ChatAoVivo({
 
         {/* ========================================================================= */}
         {/* COLUNA 3: INTELIGÊNCIA DO ELEITOR / PERFIL POLÍTICO (3 Colunas) */}
-        {/* ========================================================================= */}
-        {/* COLUNA 3: PERFIL — oculta em mobile */}
-        <div className="hidden md:block md:col-span-3 p-4 overflow-y-auto bg-slate-950/60 space-y-4">
-          <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Vote className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="hidden md:block md:col-span-3 p-4 overflow-y-auto bg-slate-50/40 dark:bg-slate-950/60 space-y-4 border-l border-slate-200 dark:border-transparent">
+          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Vote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             Ficha Eleitoral
           </div>
 
           {selectedConversa ? (
             <div className="space-y-3">
               {/* Card de Identificação */}
-              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
-                <div className="text-xs font-bold text-white">{selectedConversa.nome}</div>
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-sm">
+                <div className="text-xs font-bold text-slate-900 dark:text-white">{selectedConversa.nome}</div>
 
-                <div className="space-y-1.5 text-xs text-slate-400">
+                <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                   <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span className="font-mono text-[11px] text-slate-300">{selectedConversa.whatsapp}</span>
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">{selectedConversa.whatsapp}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>{selectedConversa.bairro || 'Bairro não informado'}</span>
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="text-slate-600 dark:text-slate-300">{selectedConversa.bairro || 'Bairro não informado'}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Vote className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>Zona {selectedConversa.zona_eleitoral || '100'}</span>
+                    <Vote className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="text-slate-600 dark:text-slate-300">Zona {selectedConversa.zona_eleitoral || '100'}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-[10px] text-slate-500">Classificação:</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
                     {selectedConversa.cargo || 'APOIADOR'}
                   </span>
                 </div>
               </div>
 
               {/* Dicas de Atendimento */}
-              <div className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-800/30 text-xs text-emerald-200/90 space-y-2">
-                <div className="font-bold flex items-center gap-1 text-emerald-400">
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 text-xs text-emerald-900 dark:text-emerald-200/90 space-y-2 shadow-sm">
+                <div className="font-bold flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
                   <Sparkles className="w-3.5 h-3.5" />
                   Estratégia de Conversão:
                 </div>
-                <p className="text-[11px] leading-relaxed text-slate-300">
+                <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
                   Responda de forma ágil e mencione o bairro <strong>{selectedConversa.bairro || 'da sua região'}</strong> para gerar proximidade e confiança!
                 </p>
               </div>
