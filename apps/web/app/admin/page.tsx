@@ -635,9 +635,9 @@ export default function AdminPage() {
       </nav>
 
       {/* Conteúdo da Aba Ativa */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-hidden">
         {activeTab === 'cockpit' && (
-          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+          <div className="h-full overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto">
             <ErrorBoundary fallbackTitle="Erro ao carregar o Cockpit de Metas">
               <CockpitMetas
                 kpis={kpis}
@@ -654,7 +654,7 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'arvore' && (
-          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+          <div className="h-full overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto">
             <ErrorBoundary fallbackTitle="Erro ao renderizar a Árvore de Lideranças">
               <ArvoreLideranca
                 nodes={treeNodes}
@@ -675,7 +675,7 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'disparos' && (
-          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+          <div className="h-full overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto">
             <ErrorBoundary fallbackTitle="Erro ao carregar o Disparador">
               <DisparadorWhatsApp apiBaseUrl={API_BASE_URL} />
             </ErrorBoundary>
@@ -725,7 +725,7 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'lgpd' && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="h-full overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-fadeIn">
             <div className="glass-panel rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">

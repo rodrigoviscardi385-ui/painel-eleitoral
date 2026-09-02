@@ -21,17 +21,49 @@ import {
   ShieldAlert
 } from 'lucide-react';
 
+interface RadarLeaderItem {
+  id?: string;
+  nome: string;
+  regiao: string;
+  tel: string;
+  dias: number;
+  apoios: number;
+}
+
+interface TopLeaderItem {
+  id?: string;
+  pos: string;
+  medalha: string;
+  nome: string;
+  regiao: string;
+  votos: number;
+  badge: string;
+}
+
+interface PautaItem {
+  tema: string;
+  perc: number;
+  mencoes: number;
+  cor: string;
+  textCor: string;
+}
+
 interface KpisData {
   total_lideres: number;
   total_apoiadores: number;
   cadastros_hoje: number;
   meta_global: number;
+  meta_lideres?: number;
+  meta_apoiadores_por_lider?: number;
   progresso_percentual: number;
   dias_restantes: number;
   cadencia_diaria_atual: number;
   cadencia_diaria_meta: number;
   cadencia_diaria_necessaria: number;
   status_semaforo: 'VERDE' | 'AMARELO' | 'VERMELHO';
+  radar_abandono?: RadarLeaderItem[];
+  top_lideres?: TopLeaderItem[];
+  termometro_pautas?: PautaItem[];
 }
 
 interface MetaItem {
@@ -341,125 +373,145 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
         {/* ========================================================================= */}
         {/* RADAR ANTI-ABANDONO + RANKING GAMIFICADO + TERMÔMETRO DE PAUTAS           */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* Radar Anti-Abandono de Lideranças */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Radar Anti-Abandono</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Lideranças sem cadastros nos últimos dias</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
-                Atenção
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              {[
-                { nome: 'Cláudia Mendes', regiao: 'Zona Norte', tel: '5511999992222', dias: 8, apoios: 3 },
-                { nome: 'Marcos Oliveira', regiao: 'Zona Sul', tel: '5511999993333', dias: 11, apoios: 2 },
-                { nome: 'Líder Regional Bairro', regiao: 'Centro', tel: '5511999994444', dias: 6, apoios: 0 },
-              ].map((l, i) => (
-                <div key={i} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{l.nome}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{l.regiao} • <span className="text-amber-600 dark:text-amber-400 font-medium">{l.dias} dias inativo</span></p>
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 shrink-0">
+                    <ShieldAlert className="w-5 h-5" />
                   </div>
-                  <a
-                    href={`https://wa.me/${l.tel}?text=${encodeURIComponent(`Olá, ${l.nome.split(' ')[0]}! Tudo bem? Passando para saber como estão as mobilizações na sua região. Conta com a nossa equipe no que precisar! 🗳️🚀`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shrink-0 transition-all shadow-sm cursor-pointer"
-                  >
-                    <MessageCircle className="w-3 h-3 text-white" />
-                    Acordar Líder
-                  </a>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Radar Anti-Abandono</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Lideranças sem novos cadastros</p>
+                  </div>
                 </div>
-              ))}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 shrink-0">
+                  {kpis.radar_abandono && kpis.radar_abandono.length > 0 ? `${kpis.radar_abandono.length} em alerta` : 'Ativo'}
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {!kpis.radar_abandono || kpis.radar_abandono.length === 0 ? (
+                  <div className="py-6 px-4 rounded-xl bg-slate-50/60 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-2">
+                    <CheckCircle2 className="w-7 h-7 mx-auto text-emerald-500" />
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Radar 100% Saudável</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Nenhuma liderança inativa no momento. O robô monitorará cadastros e alertará aqui caso algum líder reduza o ritmo.
+                    </p>
+                  </div>
+                ) : (
+                  kpis.radar_abandono.map((l, i) => (
+                    <div key={i} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{l.nome}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                          {l.regiao} • <span className="text-amber-600 dark:text-amber-400 font-bold">{l.dias} {l.dias === 1 ? 'dia' : 'dias'} inativo</span>
+                        </p>
+                      </div>
+                      {l.tel && (
+                        <a
+                          href={`https://wa.me/${l.tel}?text=${encodeURIComponent(`Olá, ${l.nome.split(' ')[0]}! Tudo bem? Passando para saber como estão as mobilizações na sua região. Conta com a nossa equipe no que precisar! 🗳️🚀`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center gap-1 shrink-0 transition-all shadow-sm cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-white" />
+                          Acordar Líder
+                        </a>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
           {/* Ranking Top Militância (Gamificação) */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30">
-                  <Trophy className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Top 5 Lideranças</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Ranking semanal de mobilização</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30">
-                Gamificado
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {[
-                { pos: '1º', medalha: '💎', nome: 'Carlos Mendes', regiao: 'Zona 120', votos: 148, badge: 'Diamante' },
-                { pos: '2º', medalha: '🥇', nome: 'Mariana Silva', regiao: 'Centro', votos: 96, badge: 'Ouro' },
-                { pos: '3º', medalha: '🥈', nome: 'Pastor Paulo', regiao: 'Zona Sul', votos: 72, badge: 'Prata' },
-                { pos: '4º', medalha: '🥉', nome: 'Dra. Renata', regiao: 'Zona Leste', votos: 54, badge: 'Bronze' },
-                { pos: '5º', medalha: '⭐', nome: 'João da Farmácia', regiao: 'Zona Norte', votos: 41, badge: 'Destaque' },
-              ].map((r, i) => (
-                <div key={i} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base shrink-0">{r.medalha}</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{r.nome}</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{r.regiao} • {r.badge}</p>
-                    </div>
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30 shrink-0">
+                    <Trophy className="w-5 h-5" />
                   </div>
-                  <span className="text-xs font-mono font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-500/20 shrink-0">
-                    {r.votos} apoios
-                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Top 5 Lideranças</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Ranking oficial de mobilização</p>
+                  </div>
                 </div>
-              ))}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30 shrink-0">
+                  Gamificado
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {!kpis.top_lideres || kpis.top_lideres.length === 0 ? (
+                  <div className="py-6 px-4 rounded-xl bg-slate-50/60 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-2">
+                    <Trophy className="w-7 h-7 mx-auto text-purple-400" />
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Ranking Pronto para Iniciar</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Conforme os líderes cadastrarem apoiadores, os 5 maiores destaques da campanha aparecerão aqui no pódio.
+                    </p>
+                  </div>
+                ) : (
+                  kpis.top_lideres.map((r, i) => (
+                    <div key={i} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-base shrink-0">{r.medalha}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{r.nome}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{r.regiao} • {r.badge}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-500/20 shrink-0">
+                        {r.votos} {r.votos === 1 ? 'apoio' : 'apoios'}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
           {/* Termômetro de Pautas (Ouvidoria Popular) */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
-                  <BarChart3 className="w-5 h-5" />
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 shrink-0">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Termômetro de Pautas</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Demandas captadas no WhatsApp</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Termômetro de Pautas</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Demandas mais citadas no WhatsApp</p>
-                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 shrink-0">
+                  IA Ouvidoria
+                </span>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
-                IA Ouvidoria
-              </span>
-            </div>
 
-            <div className="space-y-3">
-              {[
-                { tema: 'Saúde & Fila de Especialistas', perc: 42, mencoes: 312, cor: 'bg-emerald-500', textCor: 'text-emerald-700 dark:text-emerald-400' },
-                { tema: 'Zeladoria Urbana, Asfalto & Buracos', perc: 28, mencoes: 208, cor: 'bg-amber-500', textCor: 'text-amber-700 dark:text-amber-400' },
-                { tema: 'Segurança Pública & Policiamento', perc: 18, mencoes: 134, cor: 'bg-blue-500', textCor: 'text-blue-700 dark:text-blue-400' },
-                { tema: 'Vagas em Creches & Educação', perc: 12, mencoes: 89, cor: 'bg-purple-500', textCor: 'text-purple-700 dark:text-purple-400' },
-              ].map((p, i) => (
-                <div key={i} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">{p.tema}</span>
-                    <span className={`font-bold font-mono ${p.textCor}`}>{p.perc}%</span>
+              <div className="space-y-3">
+                {(kpis.termometro_pautas && kpis.termometro_pautas.length > 0 ? kpis.termometro_pautas : [
+                  { tema: 'Saúde & Atendimento Comunitário', perc: 40, mencoes: 0, cor: 'bg-emerald-500', textCor: 'text-emerald-700 dark:text-emerald-400' },
+                  { tema: 'Zeladoria Urbana, Asfalto & Serviços', perc: 25, mencoes: 0, cor: 'bg-amber-500', textCor: 'text-amber-700 dark:text-amber-400' },
+                  { tema: 'Segurança Pública & Policiamento', perc: 20, mencoes: 0, cor: 'bg-blue-500', textCor: 'text-blue-700 dark:text-blue-400' },
+                  { tema: 'Educação, Creches & Juventude', perc: 15, mencoes: 0, cor: 'bg-purple-500', textCor: 'text-purple-700 dark:text-purple-400' },
+                ]).map((p, i) => (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">{p.tema}</span>
+                      <span className={`font-bold font-mono ${p.textCor}`}>{p.perc}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className={`${p.cor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.max(4, p.perc)}%` }} />
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 text-right">{p.mencoes} {p.mencoes === 1 ? 'menção' : 'menções'}</p>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className={`${p.cor} h-full rounded-full transition-all duration-500`} style={{ width: `${p.perc}%` }} />
-                  </div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 text-right">{p.mencoes} eleitores</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>

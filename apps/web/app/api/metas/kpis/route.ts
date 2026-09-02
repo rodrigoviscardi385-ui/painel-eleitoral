@@ -47,6 +47,108 @@ export async function GET() {
       statusSemaforo = 'AMARELO';
     }
 
+    // 1. Radar Anti-Abandono Real
+    const lideresDb = (await db.execute(sql`
+      SELECT id, nome, whatsapp, bairro, zona_eleitoral, total_indicados_diretos, updated_at, created_at
+      FROM ${schema.usuarios}
+      WHERE cargo IN ('ADMIN', 'GESTOR', 'LIDER')
+      ORDER BY updated_at ASC
+    `)) as any[];
+
+    const radarAbandono = (lideresDb || [])
+      .map((l) => {
+        const lastActivity = new Date(l.updated_at || l.created_at || Date.now()).getTime();
+        const diasInativo = Math.max(0, Math.floor((Date.now() - lastActivity) / (1000 * 60 * 60 * 24)));
+        return {
+          id: l.id,
+          nome: l.nome,
+          regiao: l.bairro || (l.zona_eleitoral ? `Zona ${l.zona_eleitoral}` : 'Região Geral'),
+          tel: String(l.whatsapp || '').replace(/\D/g, ''),
+          dias: diasInativo,
+          apoios: l.total_indicados_diretos || 0,
+        };
+      })
+      .filter((l) => l.dias >= 2 || l.apoios === 0)
+      .slice(0, 5);
+
+    // 2. Top 5 Lideranças (Ranking Gamificado)
+    const topLideresDb = (await db.execute(sql`
+      SELECT id, nome, whatsapp, bairro, zona_eleitoral, total_indicados_diretos, total_indicados_rede
+      FROM ${schema.usuarios}
+      WHERE cargo IN ('ADMIN', 'GESTOR', 'LIDER')
+      ORDER BY total_indicados_diretos DESC, total_indicados_rede DESC
+      LIMIT 5
+    `)) as any[];
+
+    const medalhas = ['💎', '🥇', '🥈', '🥉', '⭐'];
+    const badges = ['Diamante', 'Ouro', 'Prata', 'Bronze', 'Destaque'];
+
+    const topLideres = (topLideresDb || []).map((l, index) => ({
+      id: l.id,
+      pos: `${index + 1}º`,
+      medalha: medalhas[index] || '⭐',
+      nome: l.nome,
+      regiao: l.bairro || (l.zona_eleitoral ? `Zona ${l.zona_eleitoral}` : 'Região Geral'),
+      votos: l.total_indicados_diretos || 0,
+      badge: badges[index] || 'Líder Ativo',
+    }));
+
+    // 3. Termômetro de Pautas Real
+    const setoresDb = (await db.execute(sql`
+      SELECT setor, COUNT(*) as total
+      FROM ${schema.mensagensChat}
+      WHERE direcao = 'ENTRADA'
+      GROUP BY setor
+    `)) as any[];
+
+    const totalMensagensEntrada = setoresDb.reduce((acc, s) => acc + parseInt(s.total || '0', 10), 0);
+
+    const defaultPautas = [
+      {
+        tema: 'Saúde & Atendimento Comunitário',
+        setorKey: 'SAUDE',
+        perc: 40,
+        mencoes: 0,
+        cor: 'bg-emerald-500',
+        textCor: 'text-emerald-700 dark:text-emerald-400',
+      },
+      {
+        tema: 'Zeladoria Urbana, Asfalto & Serviços',
+        setorKey: 'ZELADORIA',
+        perc: 25,
+        mencoes: 0,
+        cor: 'bg-amber-500',
+        textCor: 'text-amber-700 dark:text-amber-400',
+      },
+      {
+        tema: 'Segurança Pública & Policiamento',
+        setorKey: 'SEGURANCA',
+        perc: 20,
+        mencoes: 0,
+        cor: 'bg-blue-500',
+        textCor: 'text-blue-700 dark:text-blue-400',
+      },
+      {
+        tema: 'Educação, Creches & Juventude',
+        setorKey: 'EDUCACAO',
+        perc: 15,
+        mencoes: 0,
+        cor: 'bg-purple-500',
+        textCor: 'text-purple-700 dark:text-purple-400',
+      },
+    ];
+
+    const termometroPautas = defaultPautas.map((p) => {
+      const match = setoresDb.find((s) => s.setor === p.setorKey);
+      const count = match ? parseInt(match.total || '0', 10) : 0;
+      const calculatedPerc = totalMensagensEntrada > 0 ? Math.round((count / totalMensagensEntrada) * 100) : p.perc;
+      return {
+        ...p,
+        mencoes: count,
+        perc: calculatedPerc,
+      };
+    });
+
     const kpis = {
       total_lideres: totalLideres,
       total_apoiadores: totalApoiadores,
@@ -60,6 +162,9 @@ export async function GET() {
       cadencia_diaria_meta: cadenciaMeta,
       cadencia_diaria_necessaria: cadenciaNecessaria,
       status_semaforo: statusSemaforo,
+      radar_abandono: radarAbandono,
+      top_lideres: topLideres,
+      termometro_pautas: termometroPautas,
     };
 
     return NextResponse.json({ kpis, metas, config });
