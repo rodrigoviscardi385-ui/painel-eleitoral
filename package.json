@@ -13,7 +13,8 @@
     "dev:api": "cd apps/api && npm run dev",
     "dev:web": "cd apps/web && npm run dev",
     "build:api": "cd apps/api && npm run build",
-    "build:web": "cd apps/web && npm run build"
+    "build:web": "cd apps/web && npm run build",
+    "test:nasa": "npx tsx scripts/nasa_master_test_suite.ts"
   },
   "dependencies": {
     "next": "^15.2.1",
