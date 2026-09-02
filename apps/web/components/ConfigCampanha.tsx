@@ -19,6 +19,8 @@ import {
   User,
   MessageSquare,
   ChevronRight,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export interface CampanhaConfigData {
@@ -436,6 +438,54 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
                   <p className="text-[10px] text-slate-400 font-mono">
                     Código Hexadecimal selecionado: <strong>{config.cor_primaria}</strong>
                   </p>
+                </div>
+              </div>
+
+              {/* Seletor de Modo Claro / Escuro */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="text-xs font-semibold text-slate-300">
+                  Modo de Exibição do Painel (Claro / Escuro)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        localStorage.setItem('theme', 'dark');
+                        document.documentElement.classList.add('dark');
+                        document.documentElement.classList.remove('light');
+                      } catch {}
+                    }}
+                    className="p-3.5 rounded-xl border border-slate-700 bg-slate-900 text-left flex items-center gap-3 cursor-pointer hover:border-slate-500 transition-all"
+                  >
+                    <div className="p-2 rounded-lg bg-slate-800 text-cyan-400">
+                      <Moon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Modo Escuro (Padrão)</div>
+                      <div className="text-[11px] text-slate-400">Ambiente de comitê, telões e operações noturnas.</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        localStorage.setItem('theme', 'light');
+                        document.documentElement.classList.remove('dark');
+                        document.documentElement.classList.add('light');
+                      } catch {}
+                    }}
+                    className="p-3.5 rounded-xl border border-slate-300 bg-white text-left flex items-center gap-3 cursor-pointer hover:border-slate-400 transition-all text-slate-900 shadow-sm"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
+                      <Sun className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900">Modo Claro</div>
+                      <div className="text-[11px] text-slate-600">Ambientes externos, luz do dia e relatórios impressos.</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 

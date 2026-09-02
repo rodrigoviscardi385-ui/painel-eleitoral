@@ -20,6 +20,8 @@ import {
   KeyRound,
   LogOut,
   User,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { CockpitMetas } from '../../components/CockpitMetas';
 import { ArvoreLideranca, TreeNode } from '../../components/ArvoreLideranca';
@@ -78,6 +80,37 @@ export default function AdminPage() {
   const [isModalCriarGrupoOpen, setIsModalCriarGrupoOpen] = useState(false);
   const [isModalUsuariosAuthOpen, setIsModalUsuariosAuthOpen] = useState(false);
   const [whatsappConnected, setWhatsappConnected] = useState(true);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('theme') as 'dark' | 'light' | null;
+      if (savedTheme === 'light') {
+        setTheme('light');
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      } else {
+        setTheme('dark');
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      }
+    } catch {}
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try {
+      localStorage.setItem('theme', next);
+      if (next === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      }
+    } catch {}
+  };
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [unmaskReason, setUnmaskReason] = useState('');
   const [unmaskAuditStatus, setUnmaskAuditStatus] = useState<string | null>(null);
@@ -351,6 +384,25 @@ export default function AdminPage() {
               </button>
             </div>
           )}
+
+          {/* Botão Alternar Modo Claro / Escuro */}
+          <button
+            onClick={toggleTheme}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg shadow-sm transition-all cursor-pointer"
+            title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">Modo Claro</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-cyan-600" />
+                <span className="hidden sm:inline">Modo Escuro</span>
+              </>
+            )}
+          </button>
 
           {/* Botão Gestão de Logins (Admin Only) */}
           {(!currentUser || currentUser.role === 'ADMIN') && (

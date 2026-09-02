@@ -16,7 +16,7 @@
   }
 }
 
-/* Glassmorphism Classes */
+/* Glassmorphism Classes (Dark Mode Default) */
 .glass-panel {
   background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(16px);
@@ -35,6 +35,112 @@
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================================================= */
+/* MODO CLARO MODERNO & ELEGANTE (LIGHT THEME)                               */
+/* ========================================================================= */
+html.light,
+html.light body {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+html.light .bg-slate-950 {
+  background-color: #F8FAFC !important;
+}
+
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/20 {
+  background-color: #F1F5F9 !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #FFFFFF !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .bg-slate-900\/60 {
+  background-color: #F8FAFC !important;
+}
+
+html.light .bg-slate-800,
+html.light .bg-slate-800\/60 {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/40 {
+  border-color: #E2E8F0 !important;
+}
+
+html.light .border-slate-700,
+html.light .border-slate-700\/80,
+html.light .border-slate-700\/60 {
+  border-color: #CBD5E1 !important;
+}
+
+html.light .text-white {
+  color: #0F172A !important;
+}
+
+html.light .text-slate-100 {
+  color: #1E293B !important;
+}
+
+html.light .text-slate-200 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-300 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748B !important;
+}
+
+html.light .text-slate-500 {
+  color: #94A3B8 !important;
+}
+
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light .glass-panel-subtle {
+  background: rgba(248, 250, 252, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .glass-dropdown {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light input:not([type="color"]):not([type="checkbox"]),
+html.light textarea,
+html.light select {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94A3B8 !important;
 }
 
 /* Custom Scrollbar */
@@ -56,6 +162,18 @@
   background: #334155;
 }
 
+html.light ::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
 /* Subtle Glow Effects */
 .glow-emerald {
   box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
@@ -68,3 +186,4 @@
 .glow-amber {
   box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.25);
 }
+
