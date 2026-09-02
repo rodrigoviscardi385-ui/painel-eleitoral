@@ -150,6 +150,55 @@ export function ChatAoVivo({
     }
   };
 
+  // 2. Conexão em Tempo Real via Server-Sent Events (SSE)
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource('/api/chat/stream');
+
+      eventSource.addEventListener('new_message', (e: MessageEvent) => {
+        try {
+          const newMsg = JSON.parse(e.data);
+          const cleanSender = String(newMsg.conversa_id || newMsg.de_whatsapp || '').replace(/\D/g, '');
+
+          // Se a mensagem for da conversa atualmente aberta, adiciona instantaneamente na tela
+          if (selectedConversa && cleanSender === selectedConversa.whatsapp.replace(/\D/g, '')) {
+            setMensagens((prev) => {
+              const alreadyExists = prev.some((m) => m.id === newMsg.id);
+              if (alreadyExists) return prev;
+              return [...prev, newMsg];
+            });
+            setTimeout(scrollToBottom, 50);
+          }
+
+          // Atualiza o resumo da lista de conversas
+          setConversas((prev) => {
+            return prev.map((c) => {
+              if (c.whatsapp.replace(/\D/g, '') === cleanSender) {
+                return {
+                  ...c,
+                  ultima_mensagem: newMsg.conteudo,
+                  updated_at: newMsg.created_at,
+                  nao_lidas: selectedConversa?.whatsapp === c.whatsapp ? 0 : (c.nao_lidas || 0) + 1,
+                };
+              }
+              return c;
+            });
+          });
+        } catch {}
+      });
+    } catch (err) {
+      console.warn('SSE não suportado ou erro ao inicializar:', err);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [selectedConversa?.whatsapp]);
+
   useEffect(() => {
     fetchConversas();
   }, []);

@@ -29,6 +29,7 @@ class NativeWhatsAppService {
   public isConnected = false;
   private authDir = path.resolve(process.cwd(), 'baileys_auth_info');
   private isInitializing = false;
+  private reconnectAttempts = 0;
 
   constructor() {
     if (!fs.existsSync(this.authDir)) {
@@ -167,7 +168,15 @@ class NativeWhatsAppService {
 
           if (shouldReconnect) {
             this.isInitializing = false;
-            setTimeout(() => this.initialize(), 3000);
+            this.reconnectAttempts++;
+            // Exponential backoff: 2s -> 3s -> 4.5s -> 6.7s -> 10s ... max 30s + jitter aleatório
+            const backoffDelay =
+              Math.min(30000, 2000 * Math.pow(1.5, Math.min(this.reconnectAttempts, 8))) +
+              Math.floor(Math.random() * 1000);
+            console.log(
+              `🔄 [WhatsApp Resiliente] Tentativa de reconexão #${this.reconnectAttempts} agendada em ${(backoffDelay / 1000).toFixed(1)}s...`
+            );
+            setTimeout(() => this.initialize(), backoffDelay);
           } else {
             // Limpa credenciais ao fazer logout
             if (fs.existsSync(this.authDir)) {
@@ -178,12 +187,14 @@ class NativeWhatsAppService {
               .where(eq(schema.whatsappSessions.session_id, 'campanha_2026'))
               .catch(() => {});
             this.isInitializing = false;
+            this.reconnectAttempts = 0;
           }
         } else if (connection === 'open') {
           console.log('🟢 WhatsApp Conectado com Sucesso ao Aparelho Oficial!');
           this.isConnected = true;
           this.currentQrCode = null;
           this.isInitializing = false;
+          this.reconnectAttempts = 0; // Reset on successful handshake
         }
       });
 

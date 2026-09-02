@@ -4,8 +4,27 @@ import { sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
+// Cache em memória com TTL de 5 segundos para suportar 50.000+ eleitores
+interface KpiCacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+let kpiCache: KpiCacheEntry | null = null;
+const CACHE_TTL_MS = 5000; // 5 segundos
+
 export async function GET() {
   try {
+    const now = Date.now();
+    if (kpiCache && now - kpiCache.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json(kpiCache.data, {
+        headers: {
+          'X-Cache-Status': 'HIT',
+          'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
+        },
+      });
+    }
+
     const [totaisResult] = (await db.execute(sql`
       SELECT 
         COUNT(*) AS total_geral,
@@ -167,7 +186,18 @@ export async function GET() {
       termometro_pautas: termometroPautas,
     };
 
-    return NextResponse.json({ kpis, metas, config });
+    const responsePayload = { kpis, metas, config };
+    kpiCache = {
+      data: responsePayload,
+      timestamp: Date.now(),
+    };
+
+    return NextResponse.json(responsePayload, {
+      headers: {
+        'X-Cache-Status': 'MISS',
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
+      },
+    });
   } catch (error: any) {
     console.error('Erro em /api/metas/kpis:', error);
     return NextResponse.json({ error: 'Falha ao buscar KPIs', detalhe: error?.message }, { status: 500 });

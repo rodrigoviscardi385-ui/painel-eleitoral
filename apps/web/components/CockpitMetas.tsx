@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Users, 
   UserCheck, 
@@ -18,8 +18,10 @@ import {
   Flame,
   MessageCircle,
   BarChart3,
-  ShieldAlert
+  ShieldAlert,
+  HardDrive
 } from 'lucide-react';
+import { ModalBackup } from './ModalBackup';
 
 interface RadarLeaderItem {
   id?: string;
@@ -95,6 +97,8 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
   onOpenCreateGroup,
   isLoading = false,
 }) => {
+  const [showBackupModal, setShowBackupModal] = useState(false);
+
   const getSemaforoColor = (status: string) => {
     switch (status) {
       case 'VERDE':
@@ -152,6 +156,15 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
           >
             <PlusCircle className="w-4 h-4" />
             Nova Meta
+          </button>
+
+          <button
+            onClick={() => setShowBackupModal(true)}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-emerald-600/20"
+            title="Download do banco para Pendrive/HD e Relatório Oficial TSE"
+          >
+            <HardDrive className="w-4 h-4 text-emerald-400 dark:text-white" />
+            Backup & TSE
           </button>
 
           <button
@@ -516,6 +529,14 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal de Backup para Pendrive/HD e Relatório TSE */}
+      <ModalBackup
+        isOpen={showBackupModal}
+        onClose={() => setShowBackupModal(false)}
+        campanhaNome="Gustavo Reis"
+        cnpjCampanha="55.955.000/0001-26"
+      />
     </div>
   );
 };
