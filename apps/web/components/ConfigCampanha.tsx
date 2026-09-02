@@ -21,6 +21,11 @@ import {
   ChevronRight,
   Sun,
   Moon,
+  Target,
+  TrendingUp,
+  Users,
+  Flame,
+  Zap,
 } from 'lucide-react';
 
 export interface CampanhaConfigData {
@@ -44,6 +49,10 @@ export interface CampanhaConfigData {
   tom_voz_ia: 'POPULAR' | 'FORMAL' | 'DESCONTRAIDO' | 'TECNICO';
   link_grupo_geral?: string;
   whatsapp_comite?: string;
+  meta_votos_global?: number;
+  meta_lideres_global?: number;
+  meta_apoiadores_por_lider?: number;
+  meta_captacao_diaria?: number;
 }
 
 interface ConfigCampanhaProps {
@@ -105,11 +114,15 @@ const defaultCampanha: CampanhaConfigData = {
   tom_voz_ia: 'POPULAR',
   link_grupo_geral: 'https://chat.whatsapp.com/convite-campanha',
   whatsapp_comite: '5511999990000',
+  meta_votos_global: 50000,
+  meta_lideres_global: 100,
+  meta_apoiadores_por_lider: 15,
+  meta_captacao_diaria: 50,
 };
 
 export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampanhaProps) {
   const [config, setConfig] = useState<CampanhaConfigData>(defaultCampanha);
-  const [activeTab, setActiveTab] = useState<'urna' | 'visual' | 'ia' | 'comite'>('urna');
+  const [activeTab, setActiveTab] = useState<'urna' | 'visual' | 'ia' | 'comite' | 'metricas'>('urna');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -282,6 +295,17 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
             >
               <MapPin className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
               4. Comitê & Localidade
+            </button>
+            <button
+              onClick={() => setActiveTab('metricas')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'metricas'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-emerald-500" />
+              5. Metas & Métricas
             </button>
           </div>
 
@@ -677,6 +701,169 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-orange-500"
                   />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ABA 5: Metas, Captação & Métricas Eleitorais */}
+          {activeTab === 'metricas' && (
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-5 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  <Target className="w-4 h-4 text-emerald-400" />
+                  Definição de Metas & Métricas da Campanha
+                </div>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
+                  Sincronizado com Cockpit
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Meta Global de Votos */}
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Target className="w-4 h-4 text-emerald-400" />
+                      Meta Global de Votos
+                    </label>
+                    <span className="text-xs font-mono font-bold text-emerald-400">
+                      {(config.meta_votos_global || 50000).toLocaleString('pt-BR')} votos
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="100"
+                    step="500"
+                    value={config.meta_votos_global || 50000}
+                    onChange={(e) =>
+                      setConfig({ ...config, meta_votos_global: parseInt(e.target.value, 10) || 0 })
+                    }
+                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Meta oficial calculada para atingir o quociente eleitoral e garantir a eleição.
+                  </p>
+                </div>
+
+                {/* Meta de Líderes a Cadastrar */}
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-blue-400" />
+                      Meta de Líderes na Base
+                    </label>
+                    <span className="text-xs font-mono font-bold text-blue-400">
+                      {config.meta_lideres_global || 100} líderes
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="5"
+                    step="5"
+                    value={config.meta_lideres_global || 100}
+                    onChange={(e) =>
+                      setConfig({ ...config, meta_lideres_global: parseInt(e.target.value, 10) || 0 })
+                    }
+                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Quantidade de lideranças comunitárias e regionais a serem recrutadas.
+                  </p>
+                </div>
+
+                {/* Meta de Apoiadores por Líder */}
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-purple-400" />
+                      Média de Apoiadores por Líder
+                    </label>
+                    <span className="text-xs font-mono font-bold text-purple-400">
+                      {config.meta_apoiadores_por_lider || 15} por líder
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={config.meta_apoiadores_por_lider || 15}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        meta_apoiadores_por_lider: parseInt(e.target.value, 10) || 0,
+                      })
+                    }
+                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-purple-500"
+                  />
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Meta de indicação direta e mobilização exigida para cada liderança da rede.
+                  </p>
+                </div>
+
+                {/* Meta de Captação Diária */}
+                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-amber-400" />
+                      Meta Diária de Captação
+                    </label>
+                    <span className="text-xs font-mono font-bold text-amber-400">
+                      {config.meta_captacao_diaria || 50} cadastros/dia
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    step="5"
+                    value={config.meta_captacao_diaria || 50}
+                    onChange={(e) =>
+                      setConfig({ ...config, meta_captacao_diaria: parseInt(e.target.value, 10) || 0 })
+                    }
+                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Velocidade mínima de cadastros diários para manter o velocímetro do Cockpit no verde.
+                  </p>
+                </div>
+              </div>
+
+              {/* Simulador de Projeção de Rede */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 to-slate-900 border border-emerald-500/30 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black text-emerald-300 uppercase">
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  Simulador de Alcance da Rede Comunitária
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Líderes Previstos</span>
+                    <span className="text-lg font-black text-white font-mono">
+                      {config.meta_lideres_global || 100}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Apoiadores Diretos</span>
+                    <span className="text-lg font-black text-white font-mono">
+                      {((config.meta_lideres_global || 100) * (config.meta_apoiadores_por_lider || 15)).toLocaleString(
+                        'pt-BR'
+                      )}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/40">
+                    <span className="text-[10px] text-emerald-300 block font-semibold">
+                      Potencial Total na Urna (1º Nível)
+                    </span>
+                    <span className="text-lg font-black text-emerald-400 font-mono">
+                      {(
+                        (config.meta_lideres_global || 100) +
+                        (config.meta_lideres_global || 100) * (config.meta_apoiadores_por_lider || 15)
+                      ).toLocaleString('pt-BR')}{' '}
+                      votos
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 text-center">
+                  💡 Os administradores e coordenadores podem ajustar esses valores a qualquer momento para recalibrar o Cockpit de Metas e os alertas de cadência eleitoral.
+                </p>
               </div>
             </div>
           )}

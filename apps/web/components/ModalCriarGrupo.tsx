@@ -19,7 +19,7 @@ interface ModalCriarGrupoProps {
   onClose: () => void;
   apiBaseUrl?: string;
   initialLeader?: { id: string; nome: string; whatsapp: string } | null;
-  onGroupCreated?: (result: { groupId: string; inviteLink: string }) => void;
+  onGroupCreated?: (result?: { groupId: string; inviteLink: string }) => void;
 }
 
 interface LeaderOption {
@@ -39,56 +39,107 @@ export function ModalCriarGrupo({
   onGroupCreated,
 }: ModalCriarGrupoProps) {
   const [nomeGrupo, setNomeGrupo] = useState('');
+  const [descricaoGrupo, setDescricaoGrupo] = useState('');
   const [numeroLider, setNumeroLider] = useState('');
   const [selectedLeaderId, setSelectedLeaderId] = useState('');
   const [leaders, setLeaders] = useState<LeaderOption[]>([]);
+  const [campanhaInfo, setCampanhaInfo] = useState<{ nome_urna: string; numero_candidato: string; partido: string; slogan: string }>({
+    nome_urna: 'Rodrigo da Saúde',
+    numero_candidato: '2026',
+    partido: 'AVANTE',
+    slogan: 'Trabalho, honestidade e compromisso com você',
+  });
   const [submitting, setSubmitting] = useState(false);
   const [createdGroup, setCreatedGroup] = useState<{ groupId: string; inviteLink: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Carregar lista de líderes ao abrir
+  // Carregar dados da campanha e lista de líderes ao abrir
   useEffect(() => {
     if (!isOpen) return;
 
-    fetch(`${apiBaseUrl}/api/liderancas/tree?maskLGPD=false`)
+    // 1. Carregar Config da Campanha
+    fetch(`${apiBaseUrl}/api/campanha/config`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.lideres && Array.isArray(data.lideres)) {
-          // Extrair nós da árvore recursivamente
-          const extractNodes = (nodes: any[]): LeaderOption[] => {
-            let list: LeaderOption[] = [];
-            for (const n of nodes) {
-              list.push({
-                id: n.id,
-                nome: n.nome,
-                whatsapp: n.whatsapp,
-                cargo: n.cargo,
-                zona_eleitoral: n.zona_eleitoral,
-                bairro: n.bairro,
-              });
-              if (n.subordinados && n.subordinados.length > 0) {
-                list = list.concat(extractNodes(n.subordinados));
+        if (data?.config) {
+          const cfg = {
+            nome_urna: data.config.nome_urna || 'Rodrigo da Saúde',
+            numero_candidato: data.config.numero_candidato || '2026',
+            partido: data.config.partido || 'AVANTE',
+            slogan: data.config.slogan || 'Trabalho, honestidade e compromisso com você',
+          };
+          setCampanhaInfo(cfg);
+          return cfg;
+        }
+        return null;
+      })
+      .then((cfg) => {
+        const cNome = cfg?.nome_urna || campanhaInfo.nome_urna;
+        const cNum = cfg?.numero_candidato || campanhaInfo.numero_candidato;
+        const cPart = cfg?.partido || campanhaInfo.partido;
+        const cSlog = cfg?.slogan || campanhaInfo.slogan;
+
+        // 2. Carregar Líderes
+        fetch(`${apiBaseUrl}/api/liderancas/tree?maskLGPD=false`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data?.lideres && Array.isArray(data.lideres)) {
+              const extractNodes = (nodes: any[]): LeaderOption[] => {
+                let list: LeaderOption[] = [];
+                for (const n of nodes) {
+                  list.push({
+                    id: n.id,
+                    nome: n.nome,
+                    whatsapp: n.whatsapp,
+                    cargo: n.cargo,
+                    zona_eleitoral: n.zona_eleitoral,
+                    bairro: n.bairro,
+                  });
+                  if (n.subordinados && n.subordinados.length > 0) {
+                    list = list.concat(extractNodes(n.subordinados));
+                  }
+                }
+                return list;
+              };
+              const allLeaders = extractNodes(data.lideres);
+              setLeaders(allLeaders);
+
+              const leaderTarget = initialLeader || (allLeaders.length > 0 ? allLeaders[0] : null);
+              if (leaderTarget) {
+                setSelectedLeaderId(leaderTarget.id);
+                setNumeroLider(leaderTarget.whatsapp);
+                setNomeGrupo(`${leaderTarget.nome} • ${cNome} ${cNum}`);
+                setDescricaoGrupo(
+                  `🗳️ Grupo Oficial de Apoio Comunitário • Campanha 2026\n` +
+                  `👤 Liderança Responsável: ${leaderTarget.nome}\n` +
+                  `🏛️ Candidato: ${cNome} (${cNum}) - ${cPart}\n` +
+                  `📣 ${cSlog}\n\n` +
+                  `Espaço oficial para divulgação de propostas, materiais e mobilização da base.`
+                );
               }
             }
-            return list;
-          };
-          const allLeaders = extractNodes(data.lideres);
-          setLeaders(allLeaders);
-
-          if (initialLeader) {
-            setSelectedLeaderId(initialLeader.id);
-            setNumeroLider(initialLeader.whatsapp);
-            setNomeGrupo(`[Base Oficial] ${initialLeader.nome} • Campanha 2026`);
-          } else if (allLeaders.length > 0 && !selectedLeaderId) {
-            setSelectedLeaderId(allLeaders[0].id);
-            setNumeroLider(allLeaders[0].whatsapp);
-            setNomeGrupo(`[Base Oficial] ${allLeaders[0].nome} • Campanha 2026`);
-          }
-        }
+          })
+          .catch(() => {});
       })
       .catch(() => {});
   }, [isOpen, initialLeader, apiBaseUrl]);
+
+  const handleSelectLeader = (liderId: string) => {
+    setSelectedLeaderId(liderId);
+    const found = leaders.find((l) => l.id === liderId);
+    if (found) {
+      setNumeroLider(found.whatsapp);
+      setNomeGrupo(`${found.nome} • ${campanhaInfo.nome_urna} ${campanhaInfo.numero_candidato}`);
+      setDescricaoGrupo(
+        `🗳️ Grupo Oficial de Apoio Comunitário • Campanha 2026\n` +
+        `👤 Liderança Responsável: ${found.nome}\n` +
+        `🏛️ Candidato: ${campanhaInfo.nome_urna} (${campanhaInfo.numero_candidato}) - ${campanhaInfo.partido}\n` +
+        `📣 ${campanhaInfo.slogan}\n\n` +
+        `Espaço oficial para divulgação de propostas, materiais e mobilização da base.`
+      );
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -107,6 +158,7 @@ export function ModalCriarGrupo({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           groupName: nomeGrupo.trim(),
+          description: descricaoGrupo.trim(),
           leaderNumber: numeroLider.replace(/\D/g, ''),
           leaderId: selectedLeaderId || undefined,
         }),
@@ -119,14 +171,12 @@ export function ModalCriarGrupo({
           inviteLink: data.inviteLink,
           name: nomeGrupo.trim(),
         });
-        if (onGroupCreated) {
-          onGroupCreated(data);
-        }
+        if (onGroupCreated) onGroupCreated();
       } else {
-        setError(data.error || 'Falha ao criar grupo de WhatsApp.');
+        setError(data.error || 'Falha ao criar grupo no WhatsApp.');
       }
-    } catch (err) {
-      setError('Erro de comunicação com o servidor.');
+    } catch (err: any) {
+      setError('Erro de conexão ao criar grupo.');
     } finally {
       setSubmitting(false);
     }
@@ -192,21 +242,10 @@ export function ModalCriarGrupo({
                 </label>
                 <select
                   value={selectedLeaderId}
-                  onChange={(e) => {
-                    const lId = e.target.value;
-                    setSelectedLeaderId(lId);
-                    const l = leaders.find((x) => x.id === lId);
-                    if (l) {
-                      setNumeroLider(l.whatsapp);
-                      setNomeGrupo(`[Base Oficial] ${l.nome} • Campanha 2026`);
-                    } else {
-                      setNumeroLider('');
-                      setNomeGrupo('Grupo Geral da Campanha 2026');
-                    }
-                  }}
+                  onChange={(e) => handleSelectLeader(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-emerald-500 transition-colors"
                 >
-                  <option value="">-- Grupo Geral da Campanha (Sem líder específico) --</option>
+                  <option value="">-- Selecione o Líder --</option>
                   {leaders.map((l) => (
                     <option key={l.id} value={l.id}>
                       👤 {l.nome} ({l.cargo}) {l.zona_eleitoral ? `• Zona ${l.zona_eleitoral}` : ''} {l.bairro ? `• ${l.bairro}` : ''}
@@ -217,28 +256,41 @@ export function ModalCriarGrupo({
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Nome do Grupo *
+                  Nome do Grupo (Líder + Candidato + Número) *
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: [Base] Carlos • Campanha 2026"
+                  placeholder="Ex: Carlos Mendes • Rodrigo da Saúde 2026"
                   value={nomeGrupo}
                   onChange={(e) => setNomeGrupo(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full px-3.5 py-2.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors font-bold"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  WhatsApp do Líder Responsável (Opcional)
+                  Descrição Oficial do Grupo (Informações da Campanha) *
+                </label>
+                <textarea
+                  rows={4}
+                  value={descricaoGrupo}
+                  onChange={(e) => setDescricaoGrupo(e.target.value)}
+                  placeholder="Descrição da campanha e regras do grupo..."
+                  className="w-full px-3.5 py-2.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors leading-relaxed font-sans"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  WhatsApp do Líder Responsável (Receberá Administração do Grupo)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: 11999998888 (deixe em branco se for grupo geral)"
+                  placeholder="Ex: 11999998888"
                   value={numeroLider}
                   onChange={(e) => setNumeroLider(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full px-3.5 py-2.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors font-mono"
                 />
               </div>
 

@@ -152,5 +152,55 @@ export const campanhaConfig = pgTable('campanha_config', {
   tom_voz_ia: text('tom_voz_ia').default('POPULAR').notNull(),
   link_grupo_geral: text('link_grupo_geral').default('https://chat.whatsapp.com/convite-campanha'),
   whatsapp_comite: text('whatsapp_comite').default(''),
+  meta_votos_global: integer('meta_votos_global').default(50000),
+  meta_lideres_global: integer('meta_lideres_global').default(100),
+  meta_apoiadores_por_lider: integer('meta_apoiadores_por_lider').default(15),
+  meta_captacao_diaria: integer('meta_captacao_diaria').default(50),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const disparosCampanha = pgTable(
+  'disparos_campanha',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    titulo: text('titulo').notNull(),
+    mensagem_template: text('mensagem_template').notNull(),
+    url_midia_pdf: text('url_midia_pdf'),
+    filtro_tipo: text('filtro_tipo', { enum: ['TODOS', 'ZONA', 'BAIRRO', 'LIDER'] }).default('TODOS').notNull(),
+    filtro_valor: text('filtro_valor'),
+    total_alvos: integer('total_alvos').default(0).notNull(),
+    total_enviados: integer('total_enviados').default(0).notNull(),
+    total_erros: integer('total_erros').default(0).notNull(),
+    status: text('status', { enum: ['PENDENTE', 'EM_ANDAMENTO', 'CONCLUIDO', 'FALHA'] }).default('PENDENTE').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+
+export const disparosItens = pgTable(
+  'disparos_itens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    disparo_id: uuid('disparo_id').notNull(),
+    usuario_id: uuid('usuario_id').notNull(),
+    whatsapp_destino: text('whatsapp_destino').notNull(),
+    status: text('status', { enum: ['PENDENTE', 'ENVIADO', 'ERRO'] }).default('PENDENTE').notNull(),
+    mensagem_final: text('mensagem_final'),
+    erro_detalhe: text('erro_detalhe'),
+    enviado_em: timestamp('enviado_em', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+
+export const logsAuditoriaLGPD = pgTable(
+  'logs_auditoria_lgpd',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    usuario_responsavel: text('usuario_responsavel').notNull(),
+    acao: text('acao').notNull(),
+    ip: text('ip'),
+    detalhes: text('detalhes'),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+

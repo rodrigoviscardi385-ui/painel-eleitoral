@@ -14,7 +14,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function saveConfig(request: Request) {
   try {
     const body = await request.json();
     const [existing] = await db.select().from(schema.campanhaConfig).limit(1);
@@ -39,7 +39,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, config: novo });
     }
   } catch (error: any) {
-    console.error('Erro na rota POST /api/campanha/config:', error);
+    console.error('Erro ao salvar /api/campanha/config:', error);
     return NextResponse.json({ error: 'Falha ao salvar configurações de campanha', detalhe: error?.message }, { status: 500 });
   }
+}
+
+export async function POST(request: Request) {
+  return saveConfig(request);
+}
+
+export async function PUT(request: Request) {
+  return saveConfig(request);
 }
