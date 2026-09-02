@@ -18,28 +18,9 @@ export async function POST(request: Request) {
     }
 
     const convId = conversa_id ? String(conversa_id) : cleanPhone;
-
-    // 1. Gravar imediatamente no banco de dados PostgreSQL (Supabase)
-    const [novaMensagem] = await db
-      .insert(schema.mensagensChat)
-      .values({
-        conversa_id: convId,
-        de_whatsapp: 'painel_central',
-        para_whatsapp: cleanPhone,
-        remetente_nome: atendente_nome,
-        conteudo: String(conteudo).trim(),
-        tipo: tipo as any,
-        direcao: 'SAIDA',
-        status: 'ENVIADO',
-        atendente_nome,
-        setor: 'GERAL',
-      })
-      .returning();
-
-    // 2. Tentar despachar para o serviço de WhatsApp Baileys (se o servidor backend estiver ativo)
-    let sendSuccess = true;
     const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+    // 1. Tentar despachar pelo servidor Fastify/Baileys (que faz o disparo real e persiste no banco)
     try {
       const apiRes = await fetch(`${backendUrl}/api/chat/enviar`, {
         method: 'POST',
@@ -55,15 +36,34 @@ export async function POST(request: Request) {
 
       if (apiRes.ok) {
         const apiData = await apiRes.json();
-        sendSuccess = apiData.success ?? true;
+        return NextResponse.json(apiData);
       }
     } catch (forwardErr) {
-      console.warn('Backend Baileys offline ou inacessível no momento, mensagem persistida no banco:', forwardErr);
+      console.warn('Servidor Baileys offline na porta 3001. Gravando diretamente no banco Supabase:', forwardErr);
     }
 
+    // 2. Fallback: Se o backend Fastify estiver inacessível, grava no PostgreSQL Supabase
+    const [novaMensagem] = await db
+      .insert(schema.mensagensChat)
+      .values({
+        conversa_id: convId,
+        de_whatsapp: 'painel_central',
+        para_whatsapp: cleanPhone,
+        remetente_nome: atendente_nome,
+        conteudo: String(conteudo).trim(),
+        tipo: tipo as any,
+        direcao: 'SAIDA',
+        status: 'PENDENTE',
+        atendente_nome,
+        setor: 'GERAL',
+      })
+      .returning();
+
     return NextResponse.json({
-      success: sendSuccess,
+      success: false,
+      offline: true,
       mensagem: novaMensagem,
+      aviso: 'Mensagem salva no histórico. Conecte o WhatsApp do servidor para entrega instantânea no celular do eleitor.',
     });
   } catch (error: any) {
     console.error('Erro na rota /api/chat/enviar:', error);

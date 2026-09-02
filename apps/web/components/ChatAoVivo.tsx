@@ -65,7 +65,7 @@ interface ChatAoVivoProps {
 }
 
 export function ChatAoVivo({
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
   currentUser = { nome: 'Operador', role: 'ADMIN' },
 }: ChatAoVivoProps) {
   const [conversas, setConversas] = useState<Conversa[]>([]);
@@ -79,12 +79,39 @@ export function ChatAoVivo({
   const [sending, setSending] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [waStatus, setWaStatus] = useState<{ connected: boolean; status: string; phoneNumber?: string } | null>(null);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [newChatPhone, setNewChatPhone] = useState('');
+  const [newChatName, setNewChatName] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // 0. Verificar Status de Conexão do WhatsApp
+  const checkWaStatus = async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/whatsapp/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setWaStatus({
+          connected: data.connected ?? false,
+          status: data.status || 'DISCONNECTED',
+          phoneNumber: data.phoneNumber,
+        });
+      }
+    } catch {
+      setWaStatus({ connected: false, status: 'DISCONNECTED' });
+    }
+  };
+
+  useEffect(() => {
+    checkWaStatus();
+    const interval = setInterval(checkWaStatus, 15000);
+    return () => clearInterval(interval);
+  }, [apiBaseUrl]);
 
   // 1. Buscar lista de conversas
   const fetchConversas = async () => {
@@ -132,6 +159,36 @@ export function ChatAoVivo({
       fetchMensagens(selectedConversa.whatsapp);
     }
   }, [selectedConversa?.whatsapp]);
+
+  // Criar nova conversa manual com qualquer número
+  const handleCreateNewChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    let clean = newChatPhone.replace(/\D/g, '');
+    if (!clean) return;
+    if (clean.length === 10 || clean.length === 11) clean = `55${clean}`;
+
+    const nova: Conversa = {
+      id: clean,
+      nome: newChatName.trim() || `Contato (${clean})`,
+      whatsapp: clean,
+      cargo: 'APOIADOR',
+      ultima_mensagem: 'Toque para enviar mensagem',
+      updated_at: new Date().toISOString(),
+      nao_lidas: 0,
+      tags: [],
+    };
+
+    setConversas((prev) => {
+      const exists = prev.find((c) => c.whatsapp.replace(/\D/g, '') === clean);
+      if (exists) return prev;
+      return [nova, ...prev];
+    });
+
+    setSelectedConversa(nova);
+    setNewChatPhone('');
+    setNewChatName('');
+    setShowNewChatModal(false);
+  };
 
   // 3. Conexão SSE em Tempo Real para novas mensagens
   useEffect(() => {
@@ -322,10 +379,31 @@ export function ChatAoVivo({
         </div>
 
         <div className="flex items-center gap-2">
+          {waStatus?.connected ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>WhatsApp Conectado {waStatus.phoneNumber ? `(${waStatus.phoneNumber})` : ''}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>WhatsApp Desconectado</span>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowNewChatModal(true)}
+            className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Iniciar conversa com qualquer número"
+          >
+            <Zap className="w-3.5 h-3.5 text-emerald-200" />
+            <span>+ Nova Conversa</span>
+          </button>
+
           <button
             onClick={fetchConversas}
             disabled={loadingConversas}
-            className="p-2 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl transition-all"
+            className="p-2 text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl transition-all cursor-pointer"
             title="Atualizar Conversas"
           >
             <RefreshCw className={`w-4 h-4 ${loadingConversas ? 'animate-spin text-emerald-400' : ''}`} />
@@ -572,11 +650,13 @@ export function ChatAoVivo({
                               })}
                             </span>
                             {isOutgoing && (
-                              <span>
-                                {msg.status === 'ENVIADO' ? (
-                                  <Check className="w-3 h-3 text-emerald-100" />
+                              <span className="flex items-center gap-1">
+                                {msg.status === 'ENVIADO' || msg.status === 'ENTREGUE' || msg.status === 'LIDO' ? (
+                                  <CheckCheck className="w-3 h-3 text-emerald-200" />
+                                ) : msg.status === 'PENDENTE' ? (
+                                  <Clock className="w-3 h-3 text-amber-200" />
                                 ) : (
-                                  <CheckCheck className="w-3 h-3 text-cyan-200" />
+                                  <AlertCircle className="w-3 h-3 text-rose-300" />
                                 )}
                               </span>
                             )}
@@ -706,6 +786,77 @@ export function ChatAoVivo({
           )}
         </div>
       </div>
+
+      {/* Modal de Nova Conversa Manual */}
+      {showNewChatModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Iniciar Nova Conversa</h3>
+                  <p className="text-[11px] text-slate-500">Envie mensagem para qualquer número de WhatsApp</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNewChatModal(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewChat} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Número de WhatsApp *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: (11) 98765-4321 ou 11987654321"
+                  value={newChatPhone}
+                  onChange={(e) => setNewChatPhone(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nome do Contato / Eleitor (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: João da Silva"
+                  value={newChatName}
+                  onChange={(e) => setNewChatName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewChatModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  Abrir Conversa
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
