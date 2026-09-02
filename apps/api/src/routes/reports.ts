@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { db, getLeadershipHierarchy } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { createLeadershipReportStream, ReportData } from '../services/pdfService.js';
+import { getCampanhaConfigFromDb } from './campanha.js';
 import { sql } from 'drizzle-orm';
 
 export async function reportsRoutes(fastify: FastifyInstance) {
@@ -77,10 +78,15 @@ export async function reportsRoutes(fastify: FastifyInstance) {
         status: parseInt(zr.total || '0', 10) >= 300 ? 'VERDE' : parseInt(zr.total || '0', 10) >= 100 ? 'AMARELO' : 'VERMELHO',
       }));
 
+      const campanha = await getCampanhaConfigFromDb().catch(() => null);
+      const subtituloCampanha = campanha
+        ? `Campanha Oficial • ${campanha.nome_urna} (${campanha.partido} - ${campanha.numero_candidato}) | ${campanha.cidade}-${campanha.estado}`
+        : 'Painel Eleitoral 2026 - Estrutura Territorial e Rede de Apoiadores';
+
       // Dados para o PDF
       const reportPayload: ReportData = {
         titulo: 'Mapeamento Geral de Lideranças e Metas',
-        subtitulo: 'Painel Eleitoral 2026 - Estrutura Territorial e Rede de Apoiadores',
+        subtitulo: subtituloCampanha,
         totalLideres: totalLideres || 1,
         totalApoiadores: totalApoiadores || 0,
         metaGlobal,
@@ -111,9 +117,12 @@ export async function reportsRoutes(fastify: FastifyInstance) {
       return reply.send(pdfStream);
     } catch (error) {
       console.warn('Aviso: Falha ao consultar banco para relatório PDF (gerando com dados padrão de demonstração):', error);
+      const campanha = await getCampanhaConfigFromDb().catch(() => null);
       const fallbackReportPayload: ReportData = {
         titulo: 'Mapeamento Geral de Lideranças e Metas',
-        subtitulo: 'Painel Eleitoral 2026 - Estrutura Territorial e Rede de Apoiadores',
+        subtitulo: campanha
+          ? `Campanha Oficial • ${campanha.nome_urna} (${campanha.partido} - ${campanha.numero_candidato})`
+          : 'Painel Eleitoral 2026 - Estrutura Territorial e Rede de Apoiadores',
         totalLideres: 4,
         totalApoiadores: 6,
         metaGlobal: 3500,

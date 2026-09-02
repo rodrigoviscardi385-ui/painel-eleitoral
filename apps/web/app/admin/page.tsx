@@ -27,6 +27,7 @@ import { DisparadorWhatsApp } from '../../components/DisparadorWhatsApp';
 import { ChatAoVivo } from '../../components/ChatAoVivo';
 import { MateriaisOnline } from '../../components/MateriaisOnline';
 import { ConfigBot } from '../../components/ConfigBot';
+import { ConfigCampanha, CampanhaConfigData } from '../../components/ConfigCampanha';
 import { ModalMetas } from '../../components/ModalMetas';
 import { ModalConectarWhatsApp } from '../../components/ModalConectarWhatsApp';
 import { ModalQRCodeComite } from '../../components/ModalQRCodeComite';
@@ -48,7 +49,26 @@ export default function AdminPage() {
     permissoes: string[];
   } | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'materiais' | 'bot' | 'lgpd'>('cockpit');
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'materiais' | 'bot' | 'campanha' | 'lgpd'>('cockpit');
+  const [campanha, setCampanha] = useState<CampanhaConfigData>({
+    nome_urna: 'Rodrigo da Saúde',
+    nome_completo: 'Rodrigo Viscardi',
+    numero_candidato: '2026',
+    cargo: 'Deputado Federal',
+    partido: 'AVANTE',
+    coligacao: 'Coligação Por Dias Melhores',
+    slogan: 'Trabalho, honestidade e compromisso com você',
+    foto_url: '',
+    logo_url: '',
+    cor_primaria: '#10b981',
+    cidade: 'São Paulo',
+    estado: 'SP',
+    data_eleicao: '2026-10-04',
+    cnpj_campanha: '00.000.000/0001-00',
+    biografia_ia: '',
+    propostas_ia: '',
+    tom_voz_ia: 'POPULAR',
+  });
   const [isMasked, setIsMasked] = useState(true);
   const [showUnmaskModal, setShowUnmaskModal] = useState(false);
   const [isModalMetaOpen, setIsModalMetaOpen] = useState(false);
@@ -84,6 +104,14 @@ export default function AdminPage() {
         // ignora
       }
     }
+
+    // Carregar dados de personalização da campanha
+    fetch(`${API_BASE_URL}/api/campanha/config`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.config) setCampanha(data.config);
+      })
+      .catch(() => {});
   }, [router]);
 
   const handleLogout = () => {
@@ -265,18 +293,39 @@ export default function AdminPage() {
       {/* Header */}
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-4 py-3 bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-600 to-emerald-600 text-white shadow-lg shadow-cyan-600/30">
-            <Vote className="w-7 h-7" />
-          </div>
+          {campanha.foto_url ? (
+            <img
+              src={campanha.foto_url}
+              alt={campanha.nome_urna}
+              className="w-12 h-12 rounded-2xl object-cover border-2 shadow-lg shadow-black/40"
+              style={{ borderColor: campanha.cor_primaria }}
+            />
+          ) : (
+            <div
+              className="p-3 rounded-xl text-slate-950 font-black shadow-lg"
+              style={{ backgroundColor: campanha.cor_primaria }}
+            >
+              <Vote className="w-6 h-6 text-slate-950" />
+            </div>
+          )}
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black text-white tracking-tight">SISTEMA ELEITORAL 2026</h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Free-Tier Ativo
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                {campanha.nome_urna.toUpperCase()}
+              </h1>
+              <span
+                className="text-[11px] font-black px-2 py-0.5 rounded-full text-slate-950 font-mono shadow-sm"
+                style={{ backgroundColor: campanha.cor_primaria }}
+              >
+                {campanha.numero_candidato}
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                {campanha.partido}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Cockpit de Campanha, Árvore de Lideranças, Ingestão Groq WhatsApp e Disparador
+              {campanha.cargo} • {campanha.cidade}-{campanha.estado}
+              {campanha.slogan && <span className="hidden sm:inline"> • "{campanha.slogan}"</span>}
             </p>
           </div>
         </div>
@@ -502,6 +551,21 @@ export default function AdminPage() {
           </button>
         )}
 
+        {/* Nova aba: Personalização da Campanha (White-Label) */}
+        {(!currentUser || currentUser.role === 'ADMIN') && (
+          <button
+            onClick={() => setActiveTab('campanha')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'campanha'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Vote className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Personalizar Campanha</span>
+          </button>
+        )}
+
         {(!currentUser || currentUser.permissoes.includes('LGPD')) && (
           <button
             onClick={() => setActiveTab('lgpd')}
@@ -585,6 +649,18 @@ export default function AdminPage() {
           <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
             <ErrorBoundary fallbackTitle="Erro ao carregar Configuração do Bot">
               <ConfigBot apiBaseUrl={API_BASE_URL} />
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {/* Personalização da Campanha (White-Label) */}
+        {activeTab === 'campanha' && (
+          <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
+            <ErrorBoundary fallbackTitle="Erro ao carregar Personalização da Campanha">
+              <ConfigCampanha
+                apiBaseUrl={API_BASE_URL}
+                onConfigUpdated={(cfg) => setCampanha(cfg)}
+              />
             </ErrorBoundary>
           </div>
         )}

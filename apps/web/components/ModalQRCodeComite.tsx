@@ -25,13 +25,22 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
   const [tipoConvite, setTipoConvite] = useState<'lider' | 'apoiador' | 'voluntario'>('lider');
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [campanha, setCampanha] = useState<any>({
+    nome_urna: 'Rodrigo da Saúde',
+    numero_candidato: '2026',
+    cargo: 'Deputado Federal',
+    partido: 'AVANTE',
+    slogan: 'Trabalho, honestidade e compromisso com você',
+    cor_primaria: '#10b981',
+    foto_url: '',
+  });
   const printRef = useRef<HTMLDivElement>(null);
 
   // Mensagens pré-configuradas para o Onboarding
   const mensagens = {
-    lider: '🗳️ Olá Comitê Eleitoral 2026! Gostaria de me credenciar como Líder Comunitário.',
-    apoiador: '🤝 Olá! Quero apoiar a Campanha 2026 e acompanhar as propostas.',
-    voluntario: '⭐ Olá! Quero me cadastrar como Voluntário de Campanha no meu bairro.',
+    lider: `🗳️ Olá Comitê de ${campanha.nome_urna}! Gostaria de me credenciar como Líder Comunitário.`,
+    apoiador: `🤝 Olá! Quero apoiar a campanha de ${campanha.nome_urna} (${campanha.numero_candidato}) e receber novidades.`,
+    voluntario: `⭐ Olá! Quero me cadastrar como Voluntário de Campanha de ${campanha.nome_urna}.`,
   };
 
   const selectedMessage = mensagens[tipoConvite];
@@ -39,23 +48,27 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
   const encodedText = encodeURIComponent(selectedMessage);
   const fullWhatsAppLink = `https://wa.me/${cleanPhone}?text=${encodedText}`;
 
-  // Buscar número do WhatsApp conectado na API
+  // Buscar número do WhatsApp conectado e dados da campanha na API
   useEffect(() => {
     if (!isOpen) return;
-    const fetchStatus = async () => {
+    const fetchDados = async () => {
       try {
-        const res = await fetch(`${apiBaseUrl}/api/whatsapp/status`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.phone) {
-            setWhatsappNumber(data.phone);
-          }
+        const resWa = await fetch(`${apiBaseUrl}/api/whatsapp/status`);
+        if (resWa.ok) {
+          const data = await resWa.json();
+          if (data.phone) setWhatsappNumber(data.phone);
         }
-      } catch (e) {
-        // Ignora
-      }
+      } catch (e) {}
+
+      try {
+        const resCamp = await fetch(`${apiBaseUrl}/api/campanha/config`);
+        if (resCamp.ok) {
+          const data = await resCamp.json();
+          if (data.config) setCampanha(data.config);
+        }
+      } catch (e) {}
     };
-    fetchStatus();
+    fetchDados();
   }, [isOpen, apiBaseUrl]);
 
   // Gerar QR Code via Google Charts API / QuickChart SVG para alta resolução
@@ -81,7 +94,7 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Cartaz de Credenciamento - Campanha 2026</title>
+          <title>Cartaz Oficial - ${campanha.nome_urna} ${campanha.numero_candidato}</title>
           <style>
             body {
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -98,30 +111,36 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
               color: #0f172a;
             }
             .card {
-              border: 3px solid #0284c7;
-              border-radius: 24px;
+              border: 4px solid ${campanha.cor_primaria || '#10b981'};
+              border-radius: 28px;
               padding: 48px;
-              max-width: 500px;
-              box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+              max-width: 520px;
+              box-shadow: 0 25px 30px -5px rgba(0, 0, 0, 0.15);
             }
-            h1 { font-size: 28px; margin: 0 0 12px 0; color: #0284c7; }
-            h2 { font-size: 18px; margin: 0 0 24px 0; color: #475569; font-weight: 500; }
-            img { width: 280px; height: 280px; border-radius: 12px; margin: 16px 0; }
-            .instructions { font-size: 15px; line-height: 1.5; color: #334155; margin-top: 20px; }
-            .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 6px 16px; border-radius: 9999px; font-weight: bold; font-size: 13px; margin-bottom: 16px; }
+            .badge { display: inline-block; background: #0f172a; color: #fff; padding: 6px 18px; border-radius: 9999px; font-weight: 800; font-size: 13px; margin-bottom: 16px; letter-spacing: 0.5px; }
+            h1 { font-size: 32px; font-weight: 900; margin: 0 0 4px 0; color: #0f172a; }
+            .candidate-number { font-size: 42px; font-weight: 900; font-family: monospace; color: ${campanha.cor_primaria || '#10b981'}; margin: 4px 0 8px 0; }
+            .cargo-party { font-size: 16px; font-weight: 700; color: #64748b; margin-bottom: 12px; }
+            .slogan { font-size: 14px; font-style: italic; color: #475569; margin-bottom: 20px; }
+            img.qr { width: 280px; height: 280px; border-radius: 16px; margin: 12px 0; border: 1px solid #e2e8f0; }
+            .instructions { font-size: 15px; line-height: 1.6; color: #334155; margin-top: 20px; }
+            .footer { margin-top: 20px; font-size: 11px; color: #94a3b8; font-family: monospace; }
           </style>
         </head>
         <body>
           <div class="card">
-            <span class="badge">COMITÊ ELEITORAL OFICIAL 2026</span>
-            <h1>CREDENCIAMENTO DE LIDERANÇAS</h1>
-            <h2>Aponte a câmera do seu celular para iniciar pelo WhatsApp</h2>
-            <img src="${qrDataUrl}" alt="QR Code Onboarding" />
+            <span class="badge">COMITÊ ELEITORAL OFICIAL • ${campanha.cidade || ''}</span>
+            <h1>${campanha.nome_urna.toUpperCase()}</h1>
+            <div class="candidate-number">${campanha.numero_candidato}</div>
+            <div class="cargo-party">${campanha.cargo} • ${campanha.partido}</div>
+            ${campanha.slogan ? `<div class="slogan">"${campanha.slogan}"</div>` : ''}
+            <img class="qr" src="${qrDataUrl}" alt="QR Code" />
             <div class="instructions">
-              <strong>1.</strong> Abra a câmera do seu celular ou o WhatsApp.<br/>
-              <strong>2.</strong> Aponte para este QR Code.<br/>
-              <strong>3.</strong> Envie a mensagem automática para cadastrar sua base territorial.
+              <strong>1.</strong> Aponte a câmera do seu celular para este QR Code.<br/>
+              <strong>2.</strong> Envie a mensagem automática no WhatsApp.<br/>
+              <strong>3.</strong> Faça parte da nossa equipe oficial de lideranças!
             </div>
+            ${campanha.cnpj_campanha ? `<div class="footer">CNPJ Campanha: ${campanha.cnpj_campanha}</div>` : ''}
           </div>
           <script>
             window.onload = function() { window.print(); }
