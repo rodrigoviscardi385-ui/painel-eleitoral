@@ -284,7 +284,7 @@ export function ChatAoVivo({
   });
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden h-[780px] flex flex-col">
+    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl shadow-2xl overflow-hidden h-full flex flex-col">
       {/* Top Header do Módulo */}
       <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -316,12 +316,10 @@ export function ChatAoVivo({
         </div>
       </div>
 
-      {/* Grid Principal: 3 Colunas */}
-      <div className="flex-1 grid grid-cols-12 overflow-hidden">
-        {/* ========================================================================= */}
-        {/* COLUNA 1: LISTA DE CONVERSAS (4 Colunas) */}
-        {/* ========================================================================= */}
-        <div className="col-span-4 border-r border-slate-800 flex flex-col bg-slate-950/40">
+      {/* Grid Principal: sidebar + chat, perfil oculto em mobile */}
+      <div className="flex-1 flex flex-col md:grid md:grid-cols-12 overflow-hidden">
+        {/* COLUNA 1: LISTA DE CONVERSAS — hidden on mobile when conversation open */}
+        <div className={`${selectedConversa ? 'hidden md:flex' : 'flex'} md:col-span-4 flex-col border-r border-slate-800 bg-slate-950/40 overflow-hidden`}>
           {/* Busca & Filtros */}
           <div className="p-3 border-b border-slate-800/80 space-y-2.5">
             <div className="relative">
@@ -440,15 +438,21 @@ export function ChatAoVivo({
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* COLUNA 2: ÁREA DE CHAT & MENSAGENS (5 Colunas) */}
-        {/* ========================================================================= */}
-        <div className="col-span-5 border-r border-slate-800 flex flex-col bg-slate-950/20">
+        {/* COLUNA 2: ÁREA DE CHAT — full width on mobile, 5 cols on desktop */}
+        <div className={`${selectedConversa ? 'flex' : 'hidden md:flex'} md:col-span-5 flex-col border-r border-slate-800 bg-slate-950/20 flex-1`}>
           {selectedConversa ? (
             <>
               {/* Header do Chat Ativo */}
               <div className="p-3.5 border-b border-slate-800 bg-slate-950/40 flex items-center justify-between">
                 <div className="flex items-center gap-3">
+                  {/* Botão Voltar — visível apenas em mobile */}
+                  <button
+                    onClick={() => setSelectedConversa(null)}
+                    className="md:hidden p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                    title="Voltar para lista"
+                  >
+                    <ChevronRight className="w-4 h-4 rotate-180" />
+                  </button>
                   <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400 text-xs">
                     {selectedConversa.nome.substring(0, 2).toUpperCase()}
                   </div>
@@ -612,7 +616,8 @@ export function ChatAoVivo({
         {/* ========================================================================= */}
         {/* COLUNA 3: INTELIGÊNCIA DO ELEITOR / PERFIL POLÍTICO (3 Colunas) */}
         {/* ========================================================================= */}
-        <div className="col-span-3 p-4 overflow-y-auto bg-slate-950/60 space-y-4">
+        {/* COLUNA 3: PERFIL — oculta em mobile */}
+        <div className="hidden md:block md:col-span-3 p-4 overflow-y-auto bg-slate-950/60 space-y-4">
           <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
             <Vote className="w-3.5 h-3.5 text-emerald-400" />
             Ficha Eleitoral

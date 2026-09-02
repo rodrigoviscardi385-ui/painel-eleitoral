@@ -25,6 +25,8 @@ import { CockpitMetas } from '../../components/CockpitMetas';
 import { ArvoreLideranca, TreeNode } from '../../components/ArvoreLideranca';
 import { DisparadorWhatsApp } from '../../components/DisparadorWhatsApp';
 import { ChatAoVivo } from '../../components/ChatAoVivo';
+import { MateriaisOnline } from '../../components/MateriaisOnline';
+import { ConfigBot } from '../../components/ConfigBot';
 import { ModalMetas } from '../../components/ModalMetas';
 import { ModalConectarWhatsApp } from '../../components/ModalConectarWhatsApp';
 import { ModalQRCodeComite } from '../../components/ModalQRCodeComite';
@@ -32,7 +34,7 @@ import { ModalGestores } from '../../components/ModalGestores';
 import { ModalCriarGrupo } from '../../components/ModalCriarGrupo';
 import { ModalUsuariosAuth } from '../../components/ModalUsuariosAuth';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Smartphone, QrCode, UserCheck, Users } from 'lucide-react';
+import { Smartphone, QrCode, UserCheck, Users, BookOpen, Settings } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -46,7 +48,7 @@ export default function AdminPage() {
     permissoes: string[];
   } | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'lgpd'>('cockpit');
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'materiais' | 'bot' | 'lgpd'>('cockpit');
   const [isMasked, setIsMasked] = useState(true);
   const [showUnmaskModal, setShowUnmaskModal] = useState(false);
   const [isModalMetaOpen, setIsModalMetaOpen] = useState(false);
@@ -259,9 +261,9 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Topo / Header Principal */}
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 glass-panel rounded-2xl border border-slate-700/80">
+    <div className="min-h-screen flex flex-col bg-slate-950">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 px-4 py-3 bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md">
         <div className="flex items-center gap-3.5">
           <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-600 to-emerald-600 text-white shadow-lg shadow-cyan-600/30">
             <Vote className="w-7 h-7" />
@@ -403,131 +405,188 @@ export default function AdminPage() {
         </div>
       </header>
 
-      {/* Alerta de Auditoria LGPD */}
+      {/* Alerta LGPD */}
       {unmaskAuditStatus && (
-        <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2 animate-fadeIn">
+        <div className="px-4 py-2 bg-cyan-500/10 border-b border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-cyan-400 flex-shrink-0" />
           <span>{unmaskAuditStatus}</span>
         </div>
       )}
 
-      {/* Navegação por Abas */}
-      <nav className="flex items-center gap-2 p-1.5 glass-panel rounded-xl border border-slate-800 overflow-x-auto">
+      {/* Navegação por Abas — Mobile-first: ícones + texto, scroll horizontal */}
+      <nav className="flex items-center gap-1 px-3 py-2 bg-slate-900/80 border-b border-slate-800 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 shrink-0">
         {(!currentUser || currentUser.permissoes.includes('COCKPIT')) && (
           <button
             onClick={() => setActiveTab('cockpit')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'cockpit'
                 ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
             <Target className="w-4 h-4" />
-            Cockpit de Metas & Velocímetro
+            <span className="hidden sm:inline">Cockpit</span>
           </button>
         )}
 
         {(!currentUser || currentUser.permissoes.includes('ARVORE')) && (
           <button
             onClick={() => setActiveTab('arvore')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'arvore'
                 ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
             <GitBranch className="w-4 h-4" />
-            Árvore de Lideranças
+            <span className="hidden sm:inline">Árvore</span>
           </button>
         )}
 
         {(!currentUser || currentUser.permissoes.includes('DISPAROS')) && (
           <button
             onClick={() => setActiveTab('disparos')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'disparos'
                 ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
             <Send className="w-4 h-4" />
-            Disparador em Massa
+            <span className="hidden sm:inline">Disparos</span>
           </button>
         )}
 
         {(!currentUser || currentUser.permissoes.includes('CHAT')) && (
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'chat'
                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-500/20'
+                : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40'
             }`}
           >
             <MessageSquare className="w-4 h-4" />
-            <span>Chat ao Vivo (WhatsApp)</span>
+            <span className="hidden sm:inline">Chat ao Vivo</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </button>
+        )}
+
+        {/* Nova aba: Materiais Online */}
+        {(!currentUser || currentUser.role === 'ADMIN') && (
+          <button
+            onClick={() => setActiveTab('materiais')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'materiais'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Materiais</span>
+          </button>
+        )}
+
+        {/* Nova aba: Config Bot */}
+        {(!currentUser || currentUser.role === 'ADMIN') && (
+          <button
+            onClick={() => setActiveTab('bot')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'bot'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline">Config Bot</span>
           </button>
         )}
 
         {(!currentUser || currentUser.permissoes.includes('LGPD')) && (
           <button
             onClick={() => setActiveTab('lgpd')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'lgpd'
                 ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
             <Shield className="w-4 h-4" />
-            Auditoria & Segurança LGPD
+            <span className="hidden sm:inline">LGPD</span>
           </button>
         )}
       </nav>
 
       {/* Conteúdo da Aba Ativa */}
-      <main>
+      <main className="flex-1 overflow-hidden">
         {activeTab === 'cockpit' && (
-          <ErrorBoundary fallbackTitle="Erro ao carregar o Cockpit de Metas">
-            <CockpitMetas
-              kpis={kpis}
-              metas={metas}
-              onOpenModalMeta={() => setIsModalMetaOpen(true)}
-              onExportPdf={handleExportPdf}
-              onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
-            />
-          </ErrorBoundary>
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+            <ErrorBoundary fallbackTitle="Erro ao carregar o Cockpit de Metas">
+              <CockpitMetas
+                kpis={kpis}
+                metas={metas}
+                onOpenModalMeta={() => setIsModalMetaOpen(true)}
+                onExportPdf={handleExportPdf}
+                onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
+              />
+            </ErrorBoundary>
+          </div>
         )}
 
         {activeTab === 'arvore' && (
-          <ErrorBoundary fallbackTitle="Erro ao renderizar a Árvore de Lideranças">
-            <ArvoreLideranca
-              nodes={treeNodes}
-              isMasked={isMasked}
-              onToggleMask={() => {
-                if (isMasked) setShowUnmaskModal(true);
-                else setIsMasked(true);
-              }}
-              apiBaseUrl={API_BASE_URL}
-              onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
-              onRefresh={refreshData}
-            />
-          </ErrorBoundary>
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+            <ErrorBoundary fallbackTitle="Erro ao renderizar a Árvore de Lideranças">
+              <ArvoreLideranca
+                nodes={treeNodes}
+                isMasked={isMasked}
+                onToggleMask={() => {
+                  if (isMasked) setShowUnmaskModal(true);
+                  else setIsMasked(true);
+                }}
+                apiBaseUrl={API_BASE_URL}
+                onOpenCreateGroup={() => setIsModalCriarGrupoOpen(true)}
+                onRefresh={refreshData}
+              />
+            </ErrorBoundary>
+          </div>
         )}
 
         {activeTab === 'disparos' && (
-          <ErrorBoundary fallbackTitle="Erro ao carregar o Disparador">
-            <DisparadorWhatsApp apiBaseUrl={API_BASE_URL} />
-          </ErrorBoundary>
+          <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+            <ErrorBoundary fallbackTitle="Erro ao carregar o Disparador">
+              <DisparadorWhatsApp apiBaseUrl={API_BASE_URL} />
+            </ErrorBoundary>
+          </div>
         )}
 
+        {/* Chat ao Vivo - ocupa 100% da altura disponível */}
         {activeTab === 'chat' && (
-          <ErrorBoundary fallbackTitle="Erro ao carregar o Chat ao Vivo">
-            <ChatAoVivo
-              apiBaseUrl={API_BASE_URL}
-              currentUser={currentUser || { nome: 'Operador', role: 'ADMIN' }}
-            />
-          </ErrorBoundary>
+          <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
+            <ErrorBoundary fallbackTitle="Erro ao carregar o Chat ao Vivo">
+              <ChatAoVivo
+                apiBaseUrl={API_BASE_URL}
+                currentUser={currentUser || { nome: 'Operador', role: 'ADMIN' }}
+              />
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {/* Materiais Online */}
+        {activeTab === 'materiais' && (
+          <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
+            <ErrorBoundary fallbackTitle="Erro ao carregar Materiais Online">
+              <MateriaisOnline apiBaseUrl={API_BASE_URL} />
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {/* Config Bot */}
+        {activeTab === 'bot' && (
+          <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
+            <ErrorBoundary fallbackTitle="Erro ao carregar Configuração do Bot">
+              <ConfigBot apiBaseUrl={API_BASE_URL} />
+            </ErrorBoundary>
+          </div>
         )}
 
         {activeTab === 'lgpd' && (

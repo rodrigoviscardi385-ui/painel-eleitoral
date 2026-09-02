@@ -5,6 +5,8 @@ import { eq, desc } from 'drizzle-orm';
 import { transcribeAudioWithWhisper, extractSupportersFromText } from '../services/groqExtractor.js';
 import { evolutionService } from '../services/evolutionService.js';
 import { nativeWhatsAppService } from '../services/nativeWhatsAppService.js';
+import { processarMensagemBot } from '../services/botService.js';
+import { broadcastChatMessage } from './chat.js';
 import axios from 'axios';
 import crypto from 'crypto';
 
@@ -212,7 +214,70 @@ export async function webhookRoutes(fastify: FastifyInstance) {
           return reply.status(200).send({ status: 'menu_lider_enviado' });
         }
 
+        // 2.5. CHATBOT: Processar mensagem com bot para usuários NÃO líderes ou conversas gerais
+        // Líderes completos que enviaram gatilho de liderança já foram tratados acima.
+        // Para todos os outros (apoiadores, novos contatos), ativar chatbot.
+        const naoEhLider = !existingUser || existingUser.cargo === 'APOIADOR';
+        const naoEhGatilhoLideranca = !(
+          textMessage.toLowerCase().includes('iniciar') ||
+          textMessage.toLowerCase().includes('começar') ||
+          textMessage.toLowerCase().includes('meta') ||
+          (existingUser?.status_onboarding === 'COMPLETO' && /^\d{1,4}$/.test(textMessage.trim()))
+        );
+
+        if (naoEhLider && naoEhGatilhoLideranca && textMessage.trim()) {
+          const botResp = await processarMensagemBot(
+            rawNumber,
+            textMessage,
+            existingUser?.nome
+          ).catch(() => null);
+
+          if (botResp) {
+            // Salvar mensagem de entrada no chat
+            await db.insert(schema.mensagensChat).values({
+              conversa_id: rawNumber,
+              de_whatsapp: rawNumber,
+              para_whatsapp: 'bot',
+              remetente_nome: existingUser?.nome || 'Eleitor',
+              conteudo: textMessage,
+              tipo: 'TEXTO',
+              direcao: 'ENTRADA',
+              status: 'LIDO',
+            }).catch(() => {});
+
+            // Enviar resposta do bot
+            await sendWhatsAppMessage(rawNumber, botResp.mensagem).catch(() => {});
+
+            // Salvar resposta do bot no chat
+            await db.insert(schema.mensagensChat).values({
+              conversa_id: rawNumber,
+              de_whatsapp: 'bot',
+              para_whatsapp: rawNumber,
+              remetente_nome: botResp.acao === 'TRANSFERIR_HUMANO' ? '🤖 Bot → 👤 Atendente' : '🤖 Bot',
+              conteudo: botResp.mensagem,
+              tipo: 'TEXTO',
+              direcao: 'SAIDA',
+              status: 'ENVIADO',
+            }).catch(() => {});
+
+            // Broadcast SSE para o painel
+            broadcastChatMessage({
+              conversa_id: rawNumber,
+              conteudo: textMessage,
+              direcao: 'ENTRADA',
+              remetente_nome: existingUser?.nome || 'Eleitor',
+              tipo: 'TEXTO',
+              status: 'LIDO',
+              created_at: new Date().toISOString(),
+              bot_acao: botResp.acao,
+            });
+
+            return reply.status(200).send({ status: 'bot_respondeu', acao: botResp.acao });
+          }
+        }
+
         // 3. ESTADO 1: ONBOARDING DO LÍDER (COLETA EM 2 PASSOS)
+
         if (!existingUser || existingUser.status_onboarding !== 'COMPLETO') {
           const [tempState] = await db
             .select()

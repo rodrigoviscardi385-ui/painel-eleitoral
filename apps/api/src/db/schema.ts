@@ -192,3 +192,55 @@ export const whatsappSessions = pgTable(
   }
 );
 
+// ─── Biblioteca de Materiais Online ────────────────────────────────────────
+export const materiaisOnline = pgTable(
+  'materiais_online',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    titulo: text('titulo').notNull(),
+    descricao: text('descricao'),
+    tipo: text('tipo', { enum: ['PDF', 'LINK', 'IMAGEM', 'VIDEO'] }).default('LINK').notNull(),
+    url: text('url').notNull(),
+    tags: text('tags').default('[]').notNull(), // JSON array de strings
+    ativo: text('ativo').default('SIM').notNull(),
+    ordem: integer('ordem').default(0).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_materiais_ativo').on(table.ativo),
+    index('idx_materiais_tipo').on(table.tipo),
+  ]
+);
+
+// ─── Configuração do Chatbot ────────────────────────────────────────────────
+export const botConfig = pgTable('bot_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  modo: text('modo', { enum: ['BOT_ATIVO', 'HUMANO', 'HIBRIDO'] }).default('BOT_ATIVO').notNull(),
+  mensagem_boas_vindas: text('mensagem_boas_vindas').default(
+    'Olá! 👋 Sou o assistente virtual da campanha. Como posso ajudar?\n\n1️⃣ Conhecer as propostas\n2️⃣ Receber material de campanha\n3️⃣ Falar com um atendente\n\nDigite o número da opção desejada.'
+  ).notNull(),
+  menu_opcoes: text('menu_opcoes').default(
+    '[{"numero":1,"texto":"Conhecer as propostas","acao":"INFO"},{"numero":2,"texto":"Receber material","acao":"MATERIAL"},{"numero":3,"texto":"Falar com atendente","acao":"HUMANO"}]'
+  ).notNull(),
+  mensagem_encerramento_bot: text('mensagem_encerramento_bot').default(
+    '✅ Obrigado pelo contato! Qualquer dúvida, estamos aqui.'
+  ).notNull(),
+  mensagem_transferencia: text('mensagem_transferencia').default(
+    '⏳ Aguarde um momento! Vou conectar você com um atendente da nossa equipe. 🙋'
+  ).notNull(),
+  horario_inicio: text('horario_inicio').default('08:00').notNull(),
+  horario_fim: text('horario_fim').default('18:00').notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─── Status de Atendimento por Conversa ────────────────────────────────────
+export const conversaStatus = pgTable(
+  'conversa_status',
+  {
+    conversa_id: text('conversa_id').primaryKey(),
+    modo: text('modo', { enum: ['BOT', 'HUMANO', 'AGUARDANDO'] }).default('BOT').notNull(),
+    atendente_nome: text('atendente_nome'),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);

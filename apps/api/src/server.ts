@@ -13,6 +13,8 @@ import { reportsRoutes } from './routes/reports.js';
 import { metasRoutes } from './routes/metas.js';
 import { liderancasRoutes } from './routes/liderancas.js';
 import { whatsappRoutes } from './routes/whatsapp.js';
+import { materiaisRoutes } from './routes/materiais.js';
+import { botConfigRoutes } from './routes/botConfig.js';
 import { nativeWhatsAppService } from './services/nativeWhatsAppService.js';
 import { db, recalculateNetworkMetrics } from './db/index.js';
 import * as schema from './db/schema.js';
@@ -234,6 +236,8 @@ async function bootstrap() {
     await fastify.register(metasRoutes);
     await fastify.register(liderancasRoutes);
     await fastify.register(whatsappRoutes);
+    await fastify.register(materiaisRoutes);
+    await fastify.register(botConfigRoutes);
 
     // 5. Iniciar Servidor Imediatamente
     await fastify.listen({ port, host });
