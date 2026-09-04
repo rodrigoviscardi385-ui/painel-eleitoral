@@ -4,12 +4,16 @@
  * Em produção respeita INTERNAL_API_URL ou NEXT_PUBLIC_API_URL.
  */
 export function getBackendUrl(): string {
-  // 1. URL explícita via variável interna (serviço-a-serviço ou docker)
+  // 1. URL explícita via variável interna ou padrão do servidor
+  if (process.env.API_URL?.trim()) {
+    return process.env.API_URL.trim().replace(/\/+$/, '');
+  }
+
   if (process.env.INTERNAL_API_URL?.trim()) {
     return process.env.INTERNAL_API_URL.trim().replace(/\/+$/, '');
   }
 
-  // 2. URL pública configurada
+  // 2. URL pública configurada (se houver)
   if (process.env.NEXT_PUBLIC_API_URL?.trim()) {
     return process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, '');
   }
