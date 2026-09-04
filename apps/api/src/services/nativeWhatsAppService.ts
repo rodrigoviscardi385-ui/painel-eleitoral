@@ -4,6 +4,7 @@ import makeWASocket, {
   WASocket,
   proto,
   downloadMediaMessage,
+  Browsers,
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import pino from 'pino';
@@ -12,7 +13,7 @@ import fs from 'fs';
 import { extractSupportersFromText, transcribeAudioWithWhisper } from './groqExtractor.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 export interface WhatsAppStatus {
   connected: boolean;
@@ -106,8 +107,14 @@ class NativeWhatsAppService {
       this.sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: true,
-        browser: ['Painel Eleitoral 2026', 'Chrome', '1.0.0'],
+        printQRInTerminal: false,
+        // Emulação canônica do WhatsApp Web no Chrome / Ubuntu (elimina flag de cliente não oficial)
+        browser: Browsers.ubuntu('Chrome'),
+        markOnlineOnConnect: false, // Stealth mode: não dispara presença de bot em massa ao logar
+        generateHighQualityLinkPreview: true,
+        connectTimeoutMs: 60_000,
+        keepAliveIntervalMs: 30_000,
+        defaultQueryTimeoutMs: 60_000,
         syncFullHistory: false,
       });
 
@@ -832,6 +839,12 @@ class NativeWhatsAppService {
           console.warn('Aviso ao resolver JID via onWhatsApp:', checkErr);
         }
 
+        // Anti-Ban: Simulação de Presença Humana (composing) antes do envio
+        await this.sock.sendPresenceUpdate('composing', targetJid).catch(() => {});
+        const typingDuration = Math.min(Math.max(message.length * 35, 1200), 3800) + Math.floor(Math.random() * 600);
+        await new Promise((r) => setTimeout(r, typingDuration));
+        await this.sock.sendPresenceUpdate('paused', targetJid).catch(() => {});
+
         await this.sock.sendMessage(targetJid, { text: message });
         console.log(`📤 Mensagem enviada com sucesso via Baileys para ${targetJid}`);
         return true;
@@ -980,6 +993,58 @@ class NativeWhatsAppService {
     } catch (err) {
       console.warn(`Aviso: Não foi possível adicionar ${participantNumber} diretamente no grupo (privacidade):`, err);
       return false;
+    }
+  }
+
+  /**
+   * Promove automaticamente um Gestor ou Administrador a Administrador de TODOS os grupos de WhatsApp oficiais
+   */
+  async promoteGestorToAllGroups(gestorNumber: string): Promise<{ success: boolean; groupsCount: number; promotedCount: number }> {
+    try {
+      let clean = gestorNumber.replace(/\D/g, '');
+      if (clean.length === 10 || clean.length === 11) {
+        clean = `55${clean}`;
+      }
+      if (clean.length < 12) {
+        console.warn(`Número de gestor inválido para promoção de grupos: ${gestorNumber}`);
+        return { success: false, groupsCount: 0, promotedCount: 0 };
+      }
+
+      const jid = `${clean}@s.whatsapp.net`;
+
+      // 1. Buscar todos os grupos cadastrados no banco
+      const groups = await db
+        .select({ grupoId: schema.usuarios.grupo_whatsapp_id })
+        .from(schema.usuarios)
+        .where(sql`${schema.usuarios.grupo_whatsapp_id} IS NOT NULL AND ${schema.usuarios.grupo_whatsapp_id} != ''`);
+
+      const uniqueGroups = Array.from(new Set(groups.map((g) => g.grupoId).filter(Boolean))) as string[];
+      console.log(`👑 Promovendo Gestor ${clean} a Administrador em ${uniqueGroups.length} grupo(s) de WhatsApp...`);
+
+      if (!this.sock || !this.isConnected) {
+        console.log(`ℹ️ WhatsApp offline no momento. O gestor ${clean} terá acesso registrado no banco e será vinculado aos novos grupos.`);
+        return { success: true, groupsCount: uniqueGroups.length, promotedCount: 0 };
+      }
+
+      let promotedCount = 0;
+      for (const gid of uniqueGroups) {
+        if (!gid || gid.startsWith('mock_') || gid.startsWith('simulated_')) continue;
+        try {
+          // Tenta adicionar caso não esteja no grupo
+          await this.sock.groupParticipantsUpdate(gid, [jid], 'add').catch(() => {});
+          // Promove a Administrador
+          await this.sock.groupParticipantsUpdate(gid, [jid], 'promote').catch(() => {});
+          promotedCount++;
+          console.log(`✅ Gestor ${clean} promovido a ADM no grupo ${gid}`);
+        } catch (groupErr) {
+          console.warn(`⚠️ Aviso ao promover gestor ${clean} no grupo ${gid}:`, groupErr);
+        }
+      }
+
+      return { success: true, groupsCount: uniqueGroups.length, promotedCount };
+    } catch (err) {
+      console.error('Erro ao promover gestor para todos os grupos:', err);
+      return { success: false, groupsCount: 0, promotedCount: 0 };
     }
   }
 

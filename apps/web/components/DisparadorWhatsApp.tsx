@@ -13,8 +13,10 @@ import {
   RefreshCw,
   Layers,
   Filter,
-  Paperclip
+  Paperclip,
+  Flame,
 } from 'lucide-react';
+import { AquecedorChipAntiBan } from './AquecedorChipAntiBan';
 
 interface CampaignItem {
   id: string;
@@ -50,6 +52,7 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
   const [campanhas, setCampanhas] = useState<CampaignItem[]>([]);
   const [isLoadingCampanhas, setIsLoadingCampanhas] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [modoAba, setModoAba] = useState<'disparos' | 'aquecedor'>('disparos');
 
   // Calcular prévia de público-alvo
   useEffect(() => {
@@ -166,6 +169,36 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
           Proteção Anti-Ban Ativa
         </div>
       </div>
+
+      {/* Seletor de Modo: Campanhas vs Aquecedor de Chip */}
+      <div className="flex items-center gap-2 p-1 bg-slate-900/90 rounded-xl border border-slate-800 w-fit">
+        <button
+          onClick={() => setModoAba('disparos')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            modoAba === 'disparos'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          📢 Campanhas de Disparo
+        </button>
+        <button
+          onClick={() => setModoAba('aquecedor')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            modoAba === 'aquecedor'
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Flame className="w-3.5 h-3.5 animate-pulse" />
+          Aquecedor de Chip (Anti-Ban)
+        </button>
+      </div>
+
+      {modoAba === 'aquecedor' ? (
+        <AquecedorChipAntiBan apiBaseUrl={apiBaseUrl} />
+      ) : (
+        <>
 
       {statusMessage && (
         <div
@@ -430,6 +463,8 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

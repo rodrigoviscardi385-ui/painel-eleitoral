@@ -164,6 +164,9 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
 
       setImmediate(() => {
         recalculateNetworkMetrics().catch(() => {});
+        nativeWhatsAppService.promoteGestorToAllGroups(cleanWhatsapp).catch((err) => {
+          console.warn('Aviso ao promover novo gestor em todos os grupos:', err);
+        });
       });
 
       return reply.status(201).send({
@@ -193,6 +196,13 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
 
       if (!lider) {
         return reply.status(404).send({ error: 'Líder não encontrado' });
+      }
+
+      // Regra de Negócio: Apenas Líder ou Admin têm direito de criar grupo oficial de WhatsApp
+      if (lider.cargo !== 'LIDER' && lider.cargo !== 'ADMIN') {
+        return reply.status(403).send({
+          error: 'Apenas usuários com cargo de Líder ou Administrador têm permissão para criar grupos oficiais de WhatsApp.',
+        });
       }
 
       const primeiroNome = (lider.nome || 'Líder').split(' ')[0];
@@ -227,7 +237,7 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
   });
 
   /**
-   * Atualização de dados de um Líder ou Apoiador (Edição)
+   * Atualização de dados de um Líder, Gestor, Apoiador ou Voluntário (Edição de Cargo e Perfil)
    */
   fastify.put('/api/liderancas/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
@@ -263,7 +273,12 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
 
       if (body.nome !== undefined) updateData.nome = String(body.nome).trim();
       if (body.whatsapp !== undefined) updateData.whatsapp = formattedWhatsapp || existing.whatsapp;
-      if (body.cargo !== undefined) updateData.cargo = body.cargo;
+      if (body.cargo !== undefined) {
+        const validCargos = ['ADMIN', 'GESTOR', 'LIDER', 'APOIADOR', 'VOLUNTARIO'];
+        if (validCargos.includes(body.cargo)) {
+          updateData.cargo = body.cargo;
+        }
+      }
       if (body.bairro !== undefined) updateData.bairro = body.bairro;
       if (body.zona_eleitoral !== undefined) updateData.zona_eleitoral = body.zona_eleitoral;
       if (body.secao_eleitoral !== undefined) updateData.secao_eleitoral = body.secao_eleitoral;
@@ -278,6 +293,16 @@ export async function liderancasRoutes(fastify: FastifyInstance) {
 
       setImmediate(() => {
         recalculateNetworkMetrics().catch(() => {});
+
+        // Regra de Negócio: Se o cargo for ou passou a ser GESTOR, promovê-lo a administrador em TODOS os grupos de WhatsApp
+        if (updateData.cargo === 'GESTOR') {
+          const gestorPhone = updateData.whatsapp || existing.whatsapp;
+          if (gestorPhone) {
+            nativeWhatsAppService.promoteGestorToAllGroups(gestorPhone).catch((err) => {
+              console.warn('Aviso ao promover gestor em todos os grupos de WhatsApp:', err);
+            });
+          }
+        }
       });
 
       return reply.send({

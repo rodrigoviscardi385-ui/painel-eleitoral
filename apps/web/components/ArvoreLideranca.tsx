@@ -24,7 +24,7 @@ export interface TreeNode {
   id: string;
   nome: string;
   whatsapp: string;
-  cargo: 'ADMIN' | 'GESTOR' | 'LIDER' | 'APOIADOR';
+  cargo: 'ADMIN' | 'GESTOR' | 'LIDER' | 'APOIADOR' | 'VOLUNTARIO';
   lider_acima_id?: string | null;
   bairro?: string | null;
   zona_eleitoral?: string | null;
@@ -160,6 +160,8 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
         return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30';
       case 'LIDER':
         return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+      case 'VOLUNTARIO':
+        return 'bg-amber-500/10 text-amber-300 border-amber-500/30';
       default:
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
     }
@@ -226,12 +228,16 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
                 className={`p-2 rounded-lg ${
                   node.cargo === 'ADMIN'
                     ? 'bg-purple-500/20 text-purple-400'
+                    : node.cargo === 'GESTOR'
+                    ? 'bg-indigo-500/20 text-indigo-400'
                     : node.cargo === 'LIDER'
                     ? 'bg-cyan-500/20 text-cyan-400'
+                    : node.cargo === 'VOLUNTARIO'
+                    ? 'bg-amber-500/20 text-amber-400'
                     : 'bg-emerald-500/20 text-emerald-400'
                 }`}
               >
-                {node.cargo === 'LIDER' || node.cargo === 'ADMIN' ? (
+                {node.cargo === 'LIDER' || node.cargo === 'ADMIN' || node.cargo === 'GESTOR' ? (
                   <Users className="w-4 h-4" />
                 ) : (
                   <User className="w-4 h-4" />
@@ -275,17 +281,20 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
-              <button
-                onClick={() => {
-                  if (onOpenCreateGroup) {
-                    onOpenCreateGroup(node);
-                  }
-                }}
-                className="p-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/30 text-emerald-400 transition-colors cursor-pointer"
-                title={`Criar Grupo Oficial de WhatsApp para ${node.nome}`}
-              >
-                <Users className="w-3.5 h-3.5" />
-              </button>
+              {/* Regra de Negócio: Apenas Líder ou Admin têm direito de criar Grupo Oficial de WhatsApp */}
+              {(node.cargo === 'LIDER' || node.cargo === 'ADMIN') && (
+                <button
+                  onClick={() => {
+                    if (onOpenCreateGroup) {
+                      onOpenCreateGroup(node);
+                    }
+                  }}
+                  className="p-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/30 text-emerald-400 transition-colors cursor-pointer"
+                  title={`Criar Grupo Oficial de WhatsApp para ${node.nome}`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                </button>
+              )}
 
               <button
                 onClick={() => {

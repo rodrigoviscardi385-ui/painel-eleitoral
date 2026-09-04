@@ -13,6 +13,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome do grupo é obrigatório' }, { status: 400 });
     }
 
+    // Regra de Negócio: Validar se o solicitante/responsável é Líder ou Administrador
+    if (leaderId || leaderNumber) {
+      const cleanLeader = String(leaderNumber).replace(/\D/g, '');
+      let targetUser = null;
+      if (leaderId) {
+        const [u] = await db.select().from(schema.usuarios).where(eq(schema.usuarios.id, leaderId)).limit(1);
+        targetUser = u;
+      } else if (cleanLeader) {
+        const [u] = await db.select().from(schema.usuarios).where(eq(schema.usuarios.whatsapp, cleanLeader)).limit(1);
+        targetUser = u;
+      }
+
+      if (targetUser && targetUser.cargo !== 'LIDER' && targetUser.cargo !== 'ADMIN') {
+        return NextResponse.json({
+          error: 'Apenas usuários com cargo de Líder ou Administrador têm permissão para criar grupos oficiais de WhatsApp.',
+        }, { status: 403 });
+      }
+    }
+
     let groupId = `base_${Date.now()}@g.us`;
     let inviteLink = `https://chat.whatsapp.com/convite-${Date.now().toString(36)}`;
 

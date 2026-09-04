@@ -1,12 +1,20 @@
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from './schema';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Carrega variáveis se executado fora do runtime do Next.js (ex: scripts, cron, workers)
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+  dotenv.config({ path: path.resolve(process.cwd(), 'apps/web/.env.local') });
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+}
 
 function getConnectionString(): string {
-  const envUrl = process.env.DATABASE_URL || '';
-  // Se a variável na Vercel estiver com a URL antiga direta (IPv6 db.xxx.supabase.co:5432), converte para o pooler IPv4
-  if (!envUrl || envUrl.includes('db.irpjyfoykknhlevmedig.supabase.co') || envUrl.includes('.supabase.co:5432')) {
-    return 'postgresql://postgres.irpjyfoykknhlevmedig:030210.Gege%40@aws-0-us-west-2.pooler.supabase.com:6543/postgres';
+  const envUrl = process.env.DATABASE_URL;
+  if (!envUrl) {
+    throw new Error('❌ [Web] DATABASE_URL não configurada nas variáveis de ambiente (.env.local / .env).');
   }
   return envUrl;
 }

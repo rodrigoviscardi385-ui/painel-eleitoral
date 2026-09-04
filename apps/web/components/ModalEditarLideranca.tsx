@@ -21,7 +21,7 @@ export const ModalEditarLideranca: React.FC<ModalEditarLiderancaProps> = ({
 }) => {
   const [nome, setNome] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
-  const [cargo, setCargo] = useState<'ADMIN' | 'GESTOR' | 'LIDER' | 'APOIADOR'>('APOIADOR');
+  const [cargo, setCargo] = useState<'ADMIN' | 'GESTOR' | 'LIDER' | 'APOIADOR' | 'VOLUNTARIO'>('APOIADOR');
   const [bairro, setBairro] = useState('');
   const [zona, setZona] = useState('');
   const [secao, setSecao] = useState('');
@@ -144,11 +144,54 @@ export const ModalEditarLideranca: React.FC<ModalEditarLiderancaProps> = ({
                 onChange={(e) => setCargo(e.target.value as any)}
                 className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer"
               >
-                <option value="APOIADOR">Apoiador</option>
-                <option value="LIDER">Líder</option>
-                <option value="GESTOR">Gestor</option>
-                <option value="ADMIN">Admin</option>
+                <option value="LIDER">🚀 Líder (Cria Grupos de Base)</option>
+                <option value="GESTOR">👑 Gestor (ADM de Todos os Grupos)</option>
+                <option value="VOLUNTARIO">🌟 Voluntário</option>
+                <option value="APOIADOR">🤝 Apoiador</option>
+                <option value="ADMIN">🛡️ Admin Geral</option>
               </select>
+            </div>
+          </div>
+
+          {/* Destaque das Regras de Negócio e Permissões do Cargo */}
+          <div className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${
+            cargo === 'GESTOR'
+              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+              : cargo === 'LIDER'
+              ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+              : cargo === 'VOLUNTARIO'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              : cargo === 'ADMIN'
+              ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+          }`}>
+            <Shield className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              {cargo === 'GESTOR' && (
+                <span>
+                  <strong>Regra de Gestor:</strong> Ao salvar como Gestor, este contato será automaticamente adicionado e promovido a <strong>Administrador (ADM) de TODOS os grupos oficiais de WhatsApp</strong> da campanha.
+                </span>
+              )}
+              {cargo === 'LIDER' && (
+                <span>
+                  <strong>Regra de Líder:</strong> Como Líder, terá o direito exclusivo de <strong>criar e liderar o Grupo Oficial de WhatsApp</strong> da sua própria base eleitoral.
+                </span>
+              )}
+              {cargo === 'VOLUNTARIO' && (
+                <span>
+                  <strong>Regra de Voluntário:</strong> Integrante ativo no trabalho de campo, mobilização comunitária e eventos da campanha.
+                </span>
+              )}
+              {cargo === 'APOIADOR' && (
+                <span>
+                  <strong>Regra de Apoiador:</strong> Eleitor cadastrado na base comunitária que apoia as propostas do candidato.
+                </span>
+              )}
+              {cargo === 'ADMIN' && (
+                <span>
+                  <strong>Regra de Administrador:</strong> Acesso total a relatórios, configurações globais e gestão de todos os grupos.
+                </span>
+              )}
             </div>
           </div>
 

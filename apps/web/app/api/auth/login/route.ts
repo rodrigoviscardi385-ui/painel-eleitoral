@@ -4,10 +4,14 @@ import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'painel_eleitoral_jwt_secret_campanha_2026_super_key';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? 'painel_eleitoral_jwt_secret_campanha_2026_super_key' : '');
 
 export async function POST(request: Request) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ error: 'JWT_SECRET não configurado no servidor' }, { status: 500 });
+    }
+
     const body = await request.json();
     const { email, senha } = body || {};
 
@@ -41,8 +45,8 @@ export async function POST(request: Request) {
       .where(eq(schema.usuariosAuth.email, cleanEmail))
       .limit(1);
 
-    // Auto-recuperação do Admin padrão se não existir
-    if (!user && cleanEmail === 'admin@painel.com') {
+    // Auto-recuperação do Admin padrão se não existir (apenas ambiente dev/staging)
+    if (!user && cleanEmail === 'admin@painel.com' && process.env.NODE_ENV !== 'production') {
       const salt = await bcrypt.genSalt(10);
       const defaultHash = await bcrypt.hash('admin123', salt);
       const [createdAdmin] = await db
@@ -74,7 +78,7 @@ export async function POST(request: Request) {
       isValid = false;
     }
 
-    if (!isValid && cleanEmail === 'admin@painel.com' && senha === 'admin123') {
+    if (!isValid && cleanEmail === 'admin@painel.com' && senha === 'admin123' && process.env.NODE_ENV !== 'production') {
       const salt = await bcrypt.genSalt(10);
       const newHash = await bcrypt.hash('admin123', salt);
       await db

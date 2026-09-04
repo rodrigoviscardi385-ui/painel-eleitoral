@@ -16,6 +16,7 @@ import { whatsappRoutes } from './routes/whatsapp.js';
 import { materiaisRoutes } from './routes/materiais.js';
 import { botConfigRoutes } from './routes/botConfig.js';
 import { campanhaRoutes } from './routes/campanha.js';
+import { gastosRoutes } from './routes/gastos.js';
 import { nativeWhatsAppService } from './services/nativeWhatsAppService.js';
 import { db, recalculateNetworkMetrics } from './db/index.js';
 import * as schema from './db/schema.js';
@@ -94,6 +95,30 @@ async function seedInitialDataIfEmpty() {
         conversa_id TEXT PRIMARY KEY,
         modo TEXT NOT NULL DEFAULT 'BOT',
         atendente_nome TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+        session_id TEXT PRIMARY KEY,
+        creds_data TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS gastos_campanha (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        descricao TEXT NOT NULL,
+        categoria TEXT NOT NULL DEFAULT 'OUTROS',
+        valor NUMERIC(12, 2) NOT NULL,
+        data_gasto TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        forma_pagamento TEXT NOT NULL DEFAULT 'PIX',
+        fornecedor_nome TEXT,
+        fornecedor_documento TEXT,
+        numero_documento TEXT,
+        comprovante_url TEXT,
+        responsavel_nome TEXT,
+        status_auditoria TEXT NOT NULL DEFAULT 'PENDENTE',
+        observacoes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
@@ -306,6 +331,7 @@ async function bootstrap() {
     await fastify.register(materiaisRoutes);
     await fastify.register(botConfigRoutes);
     await fastify.register(campanhaRoutes);
+    await fastify.register(gastosRoutes);
 
     // 5. Iniciar Servidor Imediatamente
     await fastify.listen({ port, host });

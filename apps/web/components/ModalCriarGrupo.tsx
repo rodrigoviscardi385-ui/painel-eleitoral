@@ -80,30 +80,40 @@ export function ModalCriarGrupo({
         const cPart = cfg?.partido || campanhaInfo.partido;
         const cSlog = cfg?.slogan || campanhaInfo.slogan;
 
-        // 2. Carregar Líderes
+        // 2. Carregar Líderes (Apenas perfis LIDER e ADMIN têm direito de criar grupo)
         fetch(`${apiBaseUrl}/api/liderancas/tree?maskLGPD=false`)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
-            if (data?.lideres && Array.isArray(data.lideres)) {
+            const rawList = Array.isArray(data?.tree) ? data.tree : Array.isArray(data?.lideres) ? data.lideres : [];
+            if (rawList.length > 0) {
               const extractNodes = (nodes: any[]): LeaderOption[] => {
                 let list: LeaderOption[] = [];
                 for (const n of nodes) {
-                  list.push({
-                    id: n.id,
-                    nome: n.nome,
-                    whatsapp: n.whatsapp,
-                    cargo: n.cargo,
-                    zona_eleitoral: n.zona_eleitoral,
-                    bairro: n.bairro,
-                  });
+                  // Regra de Negócio: Apenas Líderes e Administradores podem criar grupos de base
+                  if (n.cargo === 'LIDER' || n.cargo === 'ADMIN') {
+                    list.push({
+                      id: n.id,
+                      nome: n.nome,
+                      whatsapp: n.whatsapp,
+                      cargo: n.cargo,
+                      zona_eleitoral: n.zona_eleitoral,
+                      bairro: n.bairro,
+                    });
+                  }
                   if (n.subordinados && n.subordinados.length > 0) {
                     list = list.concat(extractNodes(n.subordinados));
                   }
                 }
                 return list;
               };
-              const allLeaders = extractNodes(data.lideres);
+              const allLeaders = extractNodes(rawList);
               setLeaders(allLeaders);
+
+              // Se o líder inicial for um apoiador ou voluntário, avisar que não pode criar grupo
+              if (initialLeader && (initialLeader as any).cargo && (initialLeader as any).cargo !== 'LIDER' && (initialLeader as any).cargo !== 'ADMIN') {
+                setError(`Apenas usuários com cargo de Líder têm permissão para criar grupos. ${initialLeader.nome} possui o cargo de ${(initialLeader as any).cargo}. Altere o cargo para Líder na Árvore antes de criar o grupo.`);
+                return;
+              }
 
               const leaderTarget = initialLeader || (allLeaders.length > 0 ? allLeaders[0] : null);
               if (leaderTarget) {

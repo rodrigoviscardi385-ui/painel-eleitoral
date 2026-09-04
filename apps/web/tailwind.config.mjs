@@ -19,6 +19,9 @@ export default {
         accentWarning: '#F59E0B',
         accentDanger: '#EF4444',
       },
+      animation: {
+        'pulse-subtle': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
     },
   },
   plugins: [],

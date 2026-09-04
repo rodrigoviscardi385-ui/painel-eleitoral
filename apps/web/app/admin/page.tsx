@@ -30,6 +30,7 @@ import { ChatAoVivo } from '../../components/ChatAoVivo';
 import { MateriaisOnline } from '../../components/MateriaisOnline';
 import { ConfigBot } from '../../components/ConfigBot';
 import { ConfigCampanha, CampanhaConfigData } from '../../components/ConfigCampanha';
+import { ControleGastos } from '../../components/ControleGastos';
 import { ModalMetas } from '../../components/ModalMetas';
 import { ModalConectarWhatsApp } from '../../components/ModalConectarWhatsApp';
 import { ModalQRCodeComite } from '../../components/ModalQRCodeComite';
@@ -37,7 +38,7 @@ import { ModalGestores } from '../../components/ModalGestores';
 import { ModalCriarGrupo } from '../../components/ModalCriarGrupo';
 import { ModalUsuariosAuth } from '../../components/ModalUsuariosAuth';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Smartphone, QrCode, UserCheck, Users, BookOpen, Settings } from 'lucide-react';
+import { Smartphone, QrCode, UserCheck, Users, BookOpen, Settings, Receipt } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -51,7 +52,7 @@ export default function AdminPage() {
     permissoes: string[];
   } | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'materiais' | 'bot' | 'campanha' | 'lgpd'>('cockpit');
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'materiais' | 'gastos' | 'bot' | 'campanha' | 'lgpd'>('cockpit');
   const [campanha, setCampanha] = useState<CampanhaConfigData>({
     nome_urna: 'Rodrigo da Saúde',
     nome_completo: 'Rodrigo Viscardi',
@@ -589,6 +590,21 @@ export default function AdminPage() {
           </button>
         )}
 
+        {/* Nova aba: Controle de Gastos & Finanças */}
+        {(!currentUser || currentUser.role === 'ADMIN' || currentUser.permissoes.includes('GASTOS')) && (
+          <button
+            onClick={() => setActiveTab('gastos')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'gastos'
+                ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold shadow-sm border border-amber-300/80 dark:border-amber-700/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <span className="hidden sm:inline">Gastos & Finanças</span>
+          </button>
+        )}
+
         {/* Nova aba: Config Bot */}
         {(!currentUser || currentUser.role === 'ADMIN') && (
           <button
@@ -699,6 +715,15 @@ export default function AdminPage() {
           <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
             <ErrorBoundary fallbackTitle="Erro ao carregar Materiais Online">
               <MateriaisOnline apiBaseUrl={API_BASE_URL} />
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {/* Controle de Gastos & Prestação de Contas */}
+        {activeTab === 'gastos' && (
+          <div className="h-full overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto">
+            <ErrorBoundary fallbackTitle="Erro ao carregar o Controle de Gastos">
+              <ControleGastos />
             </ErrorBoundary>
           </div>
         )}

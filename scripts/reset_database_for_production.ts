@@ -25,6 +25,9 @@ async function resetDatabaseForProduction() {
     await db.execute(sql`DELETE FROM ${schema.materiaisOnline};`);
     console.log('   🟢 Tabela materiais_online: Limpa (0 registros)');
 
+    await db.execute(sql`DELETE FROM ${schema.gastosCampanha};`);
+    console.log('   🟢 Tabela gastos_campanha: Limpa (0 registros)');
+
     // Limpar usuarios (apoiadores e lideranças mock)
     await db.execute(sql`DELETE FROM ${schema.usuarios};`);
     console.log('   🟢 Tabela usuarios (Líderes e Apoiadores): Limpa (0 registros)');

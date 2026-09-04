@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, index, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, index, boolean, numeric } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const usuarios = pgTable(
@@ -7,7 +7,7 @@ export const usuarios = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     nome: text('nome').notNull(),
     whatsapp: text('whatsapp').notNull().unique(),
-    cargo: text('cargo', { enum: ['ADMIN', 'GESTOR', 'LIDER', 'APOIADOR'] }).default('APOIADOR').notNull(),
+    cargo: text('cargo', { enum: ['ADMIN', 'GESTOR', 'LIDER', 'APOIADOR', 'VOLUNTARIO'] }).default('APOIADOR').notNull(),
     lider_acima_id: uuid('lider_acima_id'),
     bairro: text('bairro'),
     zona_eleitoral: text('zona_eleitoral'),
@@ -111,9 +111,7 @@ export const logsAuditoriaLGPD = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     usuario_responsavel: text('usuario_responsavel').notNull(),
-    acao: text('acao', {
-      enum: ['DESMASCARAR_DADOS', 'EXPORTAR_RELATORIO_PDF', 'DISPARO_MASSA', 'ALTERAR_META'],
-    }).notNull(),
+    acao: text('acao').notNull(),
     ip: text('ip'),
     detalhes: text('detalhes'),
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -276,3 +274,68 @@ export const campanhaConfig = pgTable('campanha_config', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Controle Financeiro e Gastos da Campanha ──────────────────────────────
+export const gastosCampanha = pgTable(
+  'gastos_campanha',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    descricao: text('descricao').notNull(),
+    categoria: text('categoria', {
+      enum: [
+        'COMBUSTIVEL',
+        'ALIMENTACAO',
+        'MATERIAL_GRAFICO',
+        'EVENTOS',
+        'IMPULSIONAMENTO',
+        'PESSOAL',
+        'JURIDICO_CONTABIL',
+        'TRANSPORTE',
+        'OUTROS',
+      ],
+    }).default('OUTROS').notNull(),
+    valor: numeric('valor', { precision: 12, scale: 2 }).notNull(),
+    data_gasto: timestamp('data_gasto', { withTimezone: true }).defaultNow().notNull(),
+    forma_pagamento: text('forma_pagamento', {
+      enum: ['PIX', 'CARTAO', 'TRANSFERENCIA', 'DINHEIRO', 'BOLETO'],
+    }).default('PIX').notNull(),
+    fornecedor_nome: text('fornecedor_nome'),
+    fornecedor_documento: text('fornecedor_documento'), // CNPJ ou CPF
+    numero_documento: text('numero_documento'), // NF / Cupom / Recibo
+    comprovante_url: text('comprovante_url'), // Link ou caminho da foto
+    responsavel_nome: text('responsavel_nome'),
+    status_auditoria: text('status_auditoria', {
+      enum: ['APROVADO', 'PENDENTE', 'REJEITADO'],
+    }).default('PENDENTE').notNull(),
+    observacoes: text('observacoes'),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_gastos_categoria').on(table.categoria),
+    index('idx_gastos_data_gasto').on(table.data_gasto),
+    index('idx_gastos_status').on(table.status_auditoria),
+  ]
+);
+
+export const chipWarmingConfig = pgTable(
+  'chip_warming_config',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    instance_name: text('instance_name').default('campanha_2026').notNull().unique(),
+    status: text('status', { enum: ['ATIVO', 'PAUSADO', 'CONCLUIDO'] }).default('PAUSADO').notNull(),
+    fase_atual: integer('fase_atual').default(1).notNull(), // 1 a 4
+    dias_ativos: integer('dias_ativos').default(0).notNull(),
+    msgs_enviadas_hoje: integer('msgs_enviadas_hoje').default(0).notNull(),
+    limite_diario_atual: integer('limite_diario_atual').default(10).notNull(),
+    health_score: integer('health_score').default(35).notNull(), // 0 a 100%
+    numeros_parceiros: text('numeros_parceiros').default('[]').notNull(), // JSON string array
+    simular_digitacao: boolean('simular_digitacao').default(true).notNull(),
+    delays_gaussianos: boolean('delays_gaussianos').default(true).notNull(),
+    ultimo_ciclo_em: timestamp('ultimo_ciclo_em', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_chip_warming_instance').on(table.instance_name),
+  ]
+);

@@ -7,9 +7,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 function getConnectionString(): string {
-  const envUrl = process.env.DATABASE_URL || '';
-  if (!envUrl || envUrl.includes('db.irpjyfoykknhlevmedig.supabase.co') || envUrl.includes('.supabase.co:5432')) {
-    return 'postgresql://postgres.irpjyfoykknhlevmedig:030210.Gege%40@aws-0-us-west-2.pooler.supabase.com:6543/postgres';
+  const envUrl = process.env.DATABASE_URL;
+  if (!envUrl) {
+    throw new Error('❌ [API] DATABASE_URL não configurada nas variáveis de ambiente (.env).');
   }
   return envUrl;
 }
