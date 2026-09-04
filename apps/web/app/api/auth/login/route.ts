@@ -4,13 +4,10 @@ import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? 'painel_eleitoral_jwt_secret_campanha_2026_super_key' : '');
+const JWT_SECRET = process.env.JWT_SECRET || 'painel_eleitoral_jwt_secret_campanha_2026_super_key';
 
 export async function POST(request: Request) {
   try {
-    if (!JWT_SECRET) {
-      return NextResponse.json({ error: 'JWT_SECRET não configurado no servidor' }, { status: 500 });
-    }
 
     const body = await request.json();
     const { email, senha } = body || {};

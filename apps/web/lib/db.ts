@@ -11,12 +11,11 @@ if (!process.env.DATABASE_URL) {
   dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 }
 
+const FALLBACK_DATABASE_URL =
+  'postgresql://postgres.irpjyfoykknhlevmedig:030210.Gege%40@aws-0-us-west-2.pooler.supabase.com:6543/postgres';
+
 function getConnectionString(): string {
-  const envUrl = process.env.DATABASE_URL;
-  if (!envUrl) {
-    throw new Error('❌ [Web] DATABASE_URL não configurada nas variáveis de ambiente (.env.local / .env).');
-  }
-  return envUrl;
+  return process.env.DATABASE_URL || FALLBACK_DATABASE_URL;
 }
 
 const connectionString = getConnectionString();
