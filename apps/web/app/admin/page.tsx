@@ -37,8 +37,9 @@ import { ModalQRCodeComite } from '../../components/ModalQRCodeComite';
 import { ModalGestores } from '../../components/ModalGestores';
 import { ModalCriarGrupo } from '../../components/ModalCriarGrupo';
 import { ModalUsuariosAuth } from '../../components/ModalUsuariosAuth';
+import { ModalNovoCadastro } from '../../components/ModalNovoCadastro';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
-import { Smartphone, QrCode, UserCheck, Users, BookOpen, Settings, Receipt } from 'lucide-react';
+import { Smartphone, QrCode, UserCheck, Users, BookOpen, Settings, Receipt, UserPlus } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -80,6 +81,7 @@ export default function AdminPage() {
   const [isModalGestoresOpen, setIsModalGestoresOpen] = useState(false);
   const [isModalCriarGrupoOpen, setIsModalCriarGrupoOpen] = useState(false);
   const [isModalUsuariosAuthOpen, setIsModalUsuariosAuthOpen] = useState(false);
+  const [isModalNovoCadastroOpen, setIsModalNovoCadastroOpen] = useState(false);
   const [whatsappConnected, setWhatsappConnected] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -140,9 +142,15 @@ export default function AdminPage() {
       }
     }
 
-    // Carregar dados de personalização da campanha
-    fetch(`${API_BASE_URL}/api/campanha/config`)
-      .then((res) => (res.ok ? res.json() : null))
+    // Carregar dados de personalização da campanha (prioriza Next.js local)
+    fetch('/api/campanha/config')
+      .then((res) => {
+        if (res.ok) return res.json();
+        if (API_BASE_URL && API_BASE_URL !== 'http://localhost:3001') {
+          return fetch(`${API_BASE_URL}/api/campanha/config`).then((r) => (r.ok ? r.json() : null));
+        }
+        return null;
+      })
       .then((data) => {
         if (data?.config) setCampanha(data.config);
       })
@@ -219,25 +227,35 @@ export default function AdminPage() {
     },
   ]);
 
-  // Carregar dados da API Fastify
+  // Carregar dados da API (Next.js interno com fallback para Fastify/API_BASE_URL)
   const refreshData = async () => {
     try {
       // 1. KPIs de Metas
-      const resKpis = await fetch(`${API_BASE_URL}/api/metas/kpis`);
-      if (resKpis.ok) {
+      let resKpis = await fetch('/api/metas/kpis').catch(() => null);
+      if (!resKpis || !resKpis.ok) {
+        if (API_BASE_URL && API_BASE_URL !== 'http://localhost:3001') {
+          resKpis = await fetch(`${API_BASE_URL}/api/metas/kpis`).catch(() => null);
+        }
+      }
+      if (resKpis && resKpis.ok) {
         const data = await resKpis.json();
         if (data.kpis) setKpis(data.kpis);
         if (data.metas) setMetas(data.metas);
       }
 
-      // 2. Árvore de Lideranças
-      const resTree = await fetch(`${API_BASE_URL}/api/liderancas/tree?maskLGPD=${isMasked}`);
-      if (resTree.ok) {
+      // 2. Árvore de Lideranças (busca direta do Postgres via Next.js)
+      let resTree = await fetch(`/api/liderancas/tree?maskLGPD=${isMasked}`).catch(() => null);
+      if (!resTree || !resTree.ok) {
+        if (API_BASE_URL && API_BASE_URL !== 'http://localhost:3001') {
+          resTree = await fetch(`${API_BASE_URL}/api/liderancas/tree?maskLGPD=${isMasked}`).catch(() => null);
+        }
+      }
+      if (resTree && resTree.ok) {
         const data = await resTree.json();
         if (Array.isArray(data.tree)) setTreeNodes(data.tree);
       }
     } catch (err) {
-      console.warn('API backend offline ou em inicialização. Usando dados locais.', err);
+      console.warn('Erro ao atualizar dados:', err);
     }
   };
 
@@ -446,6 +464,16 @@ export default function AdminPage() {
           >
             <UserCheck className="w-4 h-4 text-purple-200" />
             <span>Gestores & ADMs</span>
+          </button>
+
+          {/* Botão Novo Cadastro Manual (Líder, Gestor, Apoiador, Voluntário) */}
+          <button
+            onClick={() => setIsModalNovoCadastroOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-lg shadow-cyan-600/25 transition-all cursor-pointer"
+            title="Cadastrar manualmente Líder, Gestor, Apoiador ou Voluntário"
+          >
+            <UserPlus className="w-4 h-4 text-cyan-200" />
+            <span>+ Novo Cadastro</span>
           </button>
 
           {/* Botão Criar Grupo de WhatsApp */}
@@ -837,6 +865,14 @@ export default function AdminPage() {
         isOpen={isModalUsuariosAuthOpen}
         onClose={() => setIsModalUsuariosAuthOpen(false)}
         apiBaseUrl={API_BASE_URL}
+      />
+
+      {/* Modal de Novo Cadastro Manual (Líder, Gestor, Apoiador, Voluntário) */}
+      <ModalNovoCadastro
+        isOpen={isModalNovoCadastroOpen}
+        onClose={() => setIsModalNovoCadastroOpen(false)}
+        lideresDisponiveis={treeNodes}
+        onSuccess={refreshData}
       />
 
       {/* Modal de Criação de Grupo Oficial de WhatsApp */}

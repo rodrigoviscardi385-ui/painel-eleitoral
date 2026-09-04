@@ -16,7 +16,7 @@ export const ModalConfirmarExclusao: React.FC<ModalConfirmarExclusaoProps> = ({
   isOpen,
   onClose,
   node,
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
   onSuccess,
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -29,9 +29,19 @@ export const ModalConfirmarExclusao: React.FC<ModalConfirmarExclusaoProps> = ({
     setErrorMsg('');
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/liderancas/${node.id}`, {
+      // Tenta rota interna do Next.js primeiro
+      let res = await fetch(`/api/liderancas/${node.id}`, {
         method: 'DELETE',
       });
+
+      // Fallback para apiBaseUrl se fornecida e não localhost
+      if (!res.ok && apiBaseUrl && apiBaseUrl !== 'http://localhost:3001') {
+        try {
+          res = await fetch(`${apiBaseUrl}/api/liderancas/${node.id}`, {
+            method: 'DELETE',
+          });
+        } catch (_) {}
+      }
 
       const data = await res.json();
 
@@ -43,7 +53,7 @@ export const ModalConfirmarExclusao: React.FC<ModalConfirmarExclusaoProps> = ({
       }
     } catch (err) {
       console.error('Erro ao excluir:', err);
-      setErrorMsg('Falha de conexão com o servidor Fastify.');
+      setErrorMsg('Falha ao excluir cadastro. Verifique sua conexão.');
     } finally {
       setIsDeleting(false);
     }

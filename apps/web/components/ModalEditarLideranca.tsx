@@ -16,7 +16,7 @@ export const ModalEditarLideranca: React.FC<ModalEditarLiderancaProps> = ({
   isOpen,
   onClose,
   node,
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
   onSuccess,
 }) => {
   const [nome, setNome] = useState('');
@@ -55,21 +55,33 @@ export const ModalEditarLideranca: React.FC<ModalEditarLiderancaProps> = ({
     setErrorMsg('');
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/liderancas/${node.id}`, {
+      const payload = {
+        nome: nome.trim(),
+        whatsapp: whatsapp.trim(),
+        cargo,
+        bairro: bairro.trim(),
+        zona_eleitoral: zona.trim(),
+        secao_eleitoral: secao.trim(),
+        grupo_link_convite: grupoLink.trim() || null,
+      };
+
+      // Tenta rota interna do Next.js primeiro (acesso direto e rápido ao Postgres)
+      let res = await fetch(`/api/liderancas/${node.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nome: nome.trim(),
-          whatsapp: whatsapp.trim(),
-          cargo,
-          bairro: bairro.trim(),
-          zona_eleitoral: zona.trim(),
-          secao_eleitoral: secao.trim(),
-          grupo_link_convite: grupoLink.trim() || null,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+
+      // Fallback para apiBaseUrl se fornecida e caso a rota interna falhe
+      if (!res.ok && apiBaseUrl && apiBaseUrl !== 'http://localhost:3001') {
+        try {
+          res = await fetch(`${apiBaseUrl}/api/liderancas/${node.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } catch (_) {}
+      }
 
       const data = await res.json();
 
@@ -81,7 +93,7 @@ export const ModalEditarLideranca: React.FC<ModalEditarLiderancaProps> = ({
       }
     } catch (err) {
       console.error('Erro ao atualizar cadastro:', err);
-      setErrorMsg('Falha de conexão com o servidor Fastify.');
+      setErrorMsg('Falha ao salvar alterações. Verifique sua conexão.');
     } finally {
       setIsSaving(false);
     }

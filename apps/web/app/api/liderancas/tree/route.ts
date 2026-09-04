@@ -57,7 +57,7 @@ export async function GET(request: Request) {
           filho.created_at
         FROM ${schema.usuarios} filho
         INNER JOIN hierarquia_liderancas pai ON filho.lider_acima_id = pai.id
-        WHERE NOT (filho.id = ANY(pai.caminho_arvore)) AND pai.nivel < 10
+        WHERE NOT (filho.id::text = ANY(pai.caminho_arvore)) AND pai.nivel < 10
       )
       SELECT * FROM hierarquia_liderancas ORDER BY nivel ASC, nome ASC;
     `)) as any[];

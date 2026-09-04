@@ -15,10 +15,12 @@ import {
   Loader2, 
   Pencil, 
   Trash2,
-  AlertCircle
+  AlertCircle,
+  UserPlus
 } from 'lucide-react';
 import { ModalEditarLideranca } from './ModalEditarLideranca';
 import { ModalConfirmarExclusao } from './ModalConfirmarExclusao';
+import { ModalNovoCadastro } from './ModalNovoCadastro';
 
 export interface TreeNode {
   id: string;
@@ -65,6 +67,7 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDeleteNode, setSelectedDeleteNode] = useState<TreeNode | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isNovoCadastroOpen, setIsNovoCadastroOpen] = useState(false);
 
   // Lista garantida de nós válidos
   const safeNodes = useMemo(() => {
@@ -367,6 +370,16 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
             />
           </div>
 
+          {/* Botão de Cadastro Manual de Líderes, Gestores, Apoiadores e Voluntários */}
+          <button
+            onClick={() => setIsNovoCadastroOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 rounded-lg shadow-md shadow-cyan-600/20 transition-all cursor-pointer whitespace-nowrap"
+            title="Cadastrar manualmente Líder, Gestor, Apoiador ou Voluntário"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-cyan-200" />
+            <span>+ Novo Cadastro</span>
+          </button>
+
           {/* Botão de Criar Grupo de Base */}
           {onOpenCreateGroup && (
             <button
@@ -415,6 +428,16 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
           rootNodes.map((root) => renderNode(root, 0))
         )}
       </div>
+
+      {/* Modal de Novo Cadastro */}
+      <ModalNovoCadastro
+        isOpen={isNovoCadastroOpen}
+        onClose={() => setIsNovoCadastroOpen(false)}
+        lideresDisponiveis={safeNodes}
+        onSuccess={() => {
+          handleActionSuccess();
+        }}
+      />
 
       {/* Modal de Edição */}
       <ModalEditarLideranca

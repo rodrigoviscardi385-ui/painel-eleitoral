@@ -38,12 +38,32 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const loginUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login';
-      const res = await fetch(loginUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), senha }),
-      });
+      // Tenta a rota de autenticação do Next.js primeiro
+      let res: Response;
+      try {
+        res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), senha }),
+        });
+        if (res.status === 404 && API_BASE_URL) {
+          res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), senha }),
+          });
+        }
+      } catch (fetchLocalErr) {
+        if (API_BASE_URL) {
+          res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), senha }),
+          });
+        } else {
+          throw fetchLocalErr;
+        }
+      }
 
       const data = await res.json();
 
