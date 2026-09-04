@@ -42,6 +42,7 @@ const AVAILABLE_PERMISSIONS = [
   { id: 'ARVORE', label: 'Árvore de Liderança', desc: 'Acesso e gestão de líderes e apoiadores' },
   { id: 'DISPAROS', label: 'Disparos em Massa', desc: 'Criar e executar campanhas de WhatsApp' },
   { id: 'CHAT', label: 'Chat ao Vivo', desc: 'Responder eleitores em tempo real pelo painel' },
+  { id: 'GASTOS', label: 'Gastos & Finanças', desc: 'Controle de despesas, recibos, OCR e prestação de contas' },
   { id: 'LGPD', label: 'Auditoria LGPD', desc: 'Desmascarar telefones e exportar relatórios' },
   { id: 'USUARIOS', label: 'Gestão de Logins', desc: 'Criar novos acessos para a equipe' },
 ];
@@ -90,9 +91,9 @@ export function ModalUsuariosAuth({
   const handleRoleChange = (newRole: 'ADMIN' | 'COORDENADOR' | 'OPERADOR' | 'LIDER') => {
     setRole(newRole);
     if (newRole === 'ADMIN') {
-      setSelectedPerms(['COCKPIT', 'ARVORE', 'DISPAROS', 'CHAT', 'LGPD', 'USUARIOS']);
+      setSelectedPerms(['COCKPIT', 'ARVORE', 'DISPAROS', 'CHAT', 'GASTOS', 'LGPD', 'USUARIOS']);
     } else if (newRole === 'COORDENADOR') {
-      setSelectedPerms(['COCKPIT', 'ARVORE', 'DISPAROS', 'CHAT']);
+      setSelectedPerms(['COCKPIT', 'ARVORE', 'DISPAROS', 'CHAT', 'GASTOS']);
     } else if (newRole === 'OPERADOR') {
       setSelectedPerms(['CHAT', 'DISPAROS']);
     } else {

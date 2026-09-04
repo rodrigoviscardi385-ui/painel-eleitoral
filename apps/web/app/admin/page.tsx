@@ -458,6 +458,20 @@ export default function AdminPage() {
             <span>Criar Grupo</span>
           </button>
 
+          {/* Botão Atalho Gastos & Finanças */}
+          <button
+            onClick={() => setActiveTab('gastos')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+              activeTab === 'gastos'
+                ? 'bg-amber-500 text-white border-amber-400 shadow-lg shadow-amber-500/25'
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+            }`}
+            title="Controle de Gastos & Prestação de Contas (Inserção manual e OCR por foto)"
+          >
+            <Receipt className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <span>Gastos</span>
+          </button>
+
           {/* Botão LGPD */}
           <button
             onClick={() => {
@@ -590,20 +604,19 @@ export default function AdminPage() {
           </button>
         )}
 
-        {/* Nova aba: Controle de Gastos & Finanças */}
-        {(!currentUser || currentUser.role === 'ADMIN' || currentUser.permissoes.includes('GASTOS')) && (
-          <button
-            onClick={() => setActiveTab('gastos')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'gastos'
-                ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-bold shadow-sm border border-amber-300/80 dark:border-amber-700/60'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 font-medium'
-            }`}
-          >
-            <Receipt className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-            <span className="hidden sm:inline">Gastos & Finanças</span>
-          </button>
-        )}
+        {/* Nova aba: Controle de Gastos & Finanças - Sempre visível com destaque */}
+        <button
+          onClick={() => setActiveTab('gastos')}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'gastos'
+              ? 'bg-amber-500 text-white font-bold shadow-md shadow-amber-500/25 border border-amber-400'
+              : 'text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 hover:bg-amber-500/15 font-bold border border-amber-500/40 bg-amber-500/10'
+          }`}
+        >
+          <Receipt className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          <span>Gastos & Finanças</span>
+          <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-white animate-pulse">NOVO</span>
+        </button>
 
         {/* Nova aba: Config Bot */}
         {(!currentUser || currentUser.role === 'ADMIN') && (
@@ -664,6 +677,7 @@ export default function AdminPage() {
                   setSelectedLeaderForGroup(leader || null);
                   setIsModalCriarGrupoOpen(true);
                 }}
+                onOpenGastos={() => setActiveTab('gastos')}
               />
             </ErrorBoundary>
           </div>

@@ -56,7 +56,7 @@ export async function POST(request: Request) {
           email: 'admin@painel.com',
           senha_hash: defaultHash,
           role: 'ADMIN',
-          permissoes: JSON.stringify(['COCKPIT', 'ARVORE', 'DISPAROS', 'CHAT', 'LGPD', 'USUARIOS', 'METAS']),
+          permissoes: JSON.stringify(['COCKPIT', 'ARVORE', 'DISPAROS', 'CHAT', 'GASTOS', 'LGPD', 'USUARIOS', 'METAS']),
           ativo: 'SIM',
         })
         .returning();
@@ -97,6 +97,10 @@ export async function POST(request: Request) {
       permissoes = JSON.parse(user.permissoes);
     } catch {
       permissoes = ['CHAT'];
+    }
+
+    if ((user.role === 'ADMIN' || user.role === 'COORDENADOR') && !permissoes.includes('GASTOS')) {
+      permissoes.push('GASTOS');
     }
 
     const tokenPayload = {

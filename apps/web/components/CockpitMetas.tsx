@@ -19,7 +19,8 @@ import {
   MessageCircle,
   BarChart3,
   ShieldAlert,
-  HardDrive
+  HardDrive,
+  Receipt
 } from 'lucide-react';
 import { ModalBackup } from './ModalBackup';
 
@@ -86,6 +87,7 @@ interface CockpitMetasProps {
   onOpenModalMeta: () => void;
   onExportPdf: () => void;
   onOpenCreateGroup?: (leader?: any) => void;
+  onOpenGastos?: () => void;
   isLoading?: boolean;
 }
 
@@ -95,6 +97,7 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
   onOpenModalMeta,
   onExportPdf,
   onOpenCreateGroup,
+  onOpenGastos,
   isLoading = false,
 }) => {
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -157,6 +160,17 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
             <PlusCircle className="w-4 h-4" />
             Nova Meta
           </button>
+
+          {onOpenGastos && (
+            <button
+              onClick={onOpenGastos}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer bg-amber-500 hover:bg-amber-400 text-white shadow-amber-500/20"
+              title="Acessar Controle de Gastos, Inserção Manual e OCR por foto"
+            >
+              <Receipt className="w-4 h-4 text-white" />
+              Gastos & Finanças
+            </button>
+          )}
 
           <button
             onClick={() => setShowBackupModal(true)}
@@ -256,6 +270,33 @@ export const CockpitMetas: React.FC<CockpitMetasProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Banner de Destaque & Acesso Rápido a Gastos */}
+      {onOpenGastos && (
+        <div className="rounded-2xl p-4 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30 shrink-0">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Controle de Gastos & Prestação de Contas TSE</h4>
+                <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-amber-500 text-white uppercase tracking-wider">Disponível</span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Lançamento manual de despesas, envio de notas fiscais por foto com OCR de IA automático e exportação em planilha oficial.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onOpenGastos}
+            className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-white bg-amber-500 hover:bg-amber-400 rounded-xl shadow-sm shadow-amber-500/25 transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            Abrir Gestão de Gastos
+            <span className="text-amber-200">→</span>
+          </button>
+        </div>
+      )}
 
       {/* Seção Central: Velocímetro de Metas Territoriais e Detalhamento */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -36,6 +36,10 @@ export async function GET(request: Request) {
       permissoes = ['CHAT'];
     }
 
+    if ((user.role === 'ADMIN' || user.role === 'COORDENADOR') && !permissoes.includes('GASTOS')) {
+      permissoes.push('GASTOS');
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
