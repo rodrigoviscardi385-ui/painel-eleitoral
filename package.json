@@ -18,6 +18,8 @@
     "db:reset:prod": "npx tsx scripts/reset_database_for_production.ts"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
+    "groq-sdk": "^0.15.0",
     "next": "^15.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
