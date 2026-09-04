@@ -39,13 +39,15 @@ interface DisparadorWhatsAppProps {
 export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
   apiBaseUrl = 'http://localhost:3001',
 }) => {
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl === 'http://localhost:3001' ? '' : apiBaseUrl;
   const [titulo, setTitulo] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ZONA' | 'BAIRRO' | 'LIDER'>('TODOS');
   const [filtroValor, setFiltroValor] = useState('');
   const [mensagemTemplate, setMensagemTemplate] = useState(
-    'Olá, {nome}! Tudo bem?\n\nPassando para compartilhar nossa cartilha de propostas para o bairro {bairro}. Contamos com seu apoio!\n\nJuntos pela nossa cidade!'
+    '{Olá|Oi|Tudo bem}, {nome}!\n\nPassando para compartilhar nossa cartilha de propostas para o bairro {bairro}. Contamos com seu apoio!\n\nJuntos pela nossa cidade!'
   );
   const [urlMidiaPdf, setUrlMidiaPdf] = useState('');
+  const [incluirOptOut, setIncluirOptOut] = useState(true);
   const [previewAlvos, setPreviewAlvos] = useState<number>(0);
   const [isCalculatingPreview, setIsCalculatingPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +61,7 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
     const fetchPreview = async () => {
       setIsCalculatingPreview(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/api/disparos/preview`, {
+        const res = await fetch(`${effectiveBaseUrl}/api/disparos/preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filtro_tipo: filtroTipo, filtro_valor: filtroValor }),
@@ -77,13 +79,13 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
 
     const timer = setTimeout(fetchPreview, 300);
     return () => clearTimeout(timer);
-  }, [filtroTipo, filtroValor, apiBaseUrl]);
+  }, [filtroTipo, filtroValor, effectiveBaseUrl]);
 
   // Carregar histórico de campanhas
   const loadCampanhas = async () => {
     setIsLoadingCampanhas(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/disparos`);
+      const res = await fetch(`${effectiveBaseUrl}/api/disparos`);
       if (res.ok) {
         const data = await res.json();
         setCampanhas(data || []);
@@ -99,7 +101,7 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
     loadCampanhas();
     const interval = setInterval(loadCampanhas, 5000); // Polling suave para acompanhar progresso
     return () => clearInterval(interval);
-  }, [apiBaseUrl]);
+  }, [effectiveBaseUrl]);
 
   const insertVariable = (tag: string) => {
     setMensagemTemplate((prev) => `${prev} ${tag}`);
@@ -115,13 +117,18 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
     setIsSubmitting(true);
     setStatusMessage(null);
 
+    let finalTemplate = mensagemTemplate.trim();
+    if (incluirOptOut && !finalTemplate.toUpperCase().includes('SAIR') && !finalTemplate.toUpperCase().includes('CANCELAR')) {
+      finalTemplate += '\n\nResponda SAIR para não receber mais mensagens.';
+    }
+
     try {
-      const res = await fetch(`${apiBaseUrl}/api/disparos`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/disparos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titulo,
-          mensagem_template: mensagemTemplate,
+          mensagem_template: finalTemplate,
           url_midia_pdf: urlMidiaPdf.trim() || null,
           filtro_tipo: filtroTipo,
           filtro_valor: filtroValor.trim() || null,
@@ -134,7 +141,7 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
       if (res.ok) {
         setStatusMessage({
           type: 'success',
-          text: `Campanha "${titulo}" enfileirada com sucesso! ${data.total_enfileirados} mensagens serão enviadas com intervalos anti-ban.`,
+          text: `Campanha "${titulo}" enfileirada com sucesso! ${data.total_enfileirados || previewAlvos} mensagens com Spintax anti-ban e Opt-Out ativados.`,
         });
         setTitulo('');
         loadCampanhas();
@@ -298,7 +305,9 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
                   { tag: '{zona}', label: 'Zona' },
                   { tag: '{secao}', label: 'Seção' },
                   { tag: '{Olá|Oi|Tudo bem}', label: 'Saudação Variável' },
+                  { tag: '{Como vai?|Espero que esteja bem}', label: 'Acolhimento Variável' },
                   { tag: '{Confira|Veja as novidades}', label: 'Ação Variável' },
+                  { tag: '{Contamos com você!|Um forte abraço!}', label: 'Fechamento Variável' },
                 ].map((item) => (
                   <button
                     key={item.tag}
@@ -319,6 +328,23 @@ export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
                 className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
                 required
               />
+
+              {/* Checkbox Opt-Out TSE Anti-Ban */}
+              <div className="mt-2.5 flex items-start gap-2.5 p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-500/20">
+                <input
+                  type="checkbox"
+                  id="optout-toggle"
+                  checked={incluirOptOut}
+                  onChange={(e) => setIncluirOptOut(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                />
+                <label htmlFor="optout-toggle" className="text-xs text-slate-300 cursor-pointer">
+                  <span className="font-semibold text-emerald-400">Incluir rodapé de Opt-Out TSE ("Responda SAIR")</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Fundamental contra bans: destinatários respondem SAIR em vez de clicar no botão "Denunciar/Bloquear" do WhatsApp.
+                  </p>
+                </label>
+              </div>
 
               {/* Dica de Spintax Anti-Ban & Compliance TSE */}
               <div className="mt-2 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 space-y-1 text-[11px]">

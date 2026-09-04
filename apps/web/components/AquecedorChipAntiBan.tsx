@@ -39,6 +39,8 @@ interface WarmingState {
 export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
   apiBaseUrl = '',
 }) => {
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl === 'http://localhost:3001' ? '' : apiBaseUrl;
+
   const [data, setData] = useState<WarmingState>({
     status: 'PAUSADO',
     fase_atual: 1,
@@ -59,7 +61,7 @@ export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`${apiBaseUrl}/api/whatsapp/aquecedor`);
+      const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/aquecedor`);
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -79,7 +81,7 @@ export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
     setLoading(true);
     setFeedback(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/whatsapp/aquecedor?action=toggle`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/aquecedor?action=toggle`, {
         method: 'POST',
       });
       const resData = await res.json();
@@ -115,7 +117,7 @@ export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
 
     const updated = [...data.numeros_parceiros, fullNumber];
     try {
-      const res = await fetch(`${apiBaseUrl}/api/whatsapp/aquecedor?action=config`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/aquecedor?action=config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ numeros_parceiros: updated }),
@@ -133,7 +135,7 @@ export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
   const handleRemoveNumero = async (phone: string) => {
     const updated = data.numeros_parceiros.filter((p) => p !== phone);
     try {
-      await fetch(`${apiBaseUrl}/api/whatsapp/aquecedor?action=config`, {
+      await fetch(`${effectiveBaseUrl}/api/whatsapp/aquecedor?action=config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ numeros_parceiros: updated }),
@@ -148,7 +150,7 @@ export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
     setLoading(true);
     setFeedback(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/whatsapp/aquecedor?action=ciclo`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/aquecedor?action=ciclo`, {
         method: 'POST',
       });
       const resJson = await res.json();

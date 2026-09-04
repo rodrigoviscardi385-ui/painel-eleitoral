@@ -24,6 +24,22 @@ export interface WhatsAppStatus {
   name?: string | null;
 }
 
+/**
+ * Resolve Spintax recursivamente ({Olá|Oi|Tudo bem}) para evitar hash idêntico de mensagens
+ */
+export function parseSpintax(text: string): string {
+  if (!text) return '';
+  const spintaxRegex = /\{([^{}]+)\}/;
+  let match = spintaxRegex.exec(text);
+  while (match) {
+    const options = match[1].split('|');
+    const chosen = options[Math.floor(Math.random() * options.length)];
+    text = text.replace(match[0], chosen);
+    match = spintaxRegex.exec(text);
+  }
+  return text;
+}
+
 class NativeWhatsAppService {
   private sock: WASocket | null = null;
   private currentQrCode: string | null = null;
@@ -839,13 +855,16 @@ class NativeWhatsAppService {
           console.warn('Aviso ao resolver JID via onWhatsApp:', checkErr);
         }
 
+        // Anti-Ban: Resolução de Spintax caso contenha variantes {Olá|Oi}
+        const resolvedMessage = parseSpintax(message);
+
         // Anti-Ban: Simulação de Presença Humana (composing) antes do envio
         await this.sock.sendPresenceUpdate('composing', targetJid).catch(() => {});
-        const typingDuration = Math.min(Math.max(message.length * 35, 1200), 3800) + Math.floor(Math.random() * 600);
+        const typingDuration = Math.min(Math.max(resolvedMessage.length * 35, 1200), 3800) + Math.floor(Math.random() * 600);
         await new Promise((r) => setTimeout(r, typingDuration));
         await this.sock.sendPresenceUpdate('paused', targetJid).catch(() => {});
 
-        await this.sock.sendMessage(targetJid, { text: message });
+        await this.sock.sendMessage(targetJid, { text: resolvedMessage });
         console.log(`📤 Mensagem enviada com sucesso via Baileys para ${targetJid}`);
         return true;
       } catch (err) {

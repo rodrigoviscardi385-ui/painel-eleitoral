@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db, schema } from '../../../../lib/db';
+import { parseSpintax } from '../../../../lib/antiBan';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     }
 
     const convId = conversa_id ? String(conversa_id) : cleanPhone;
+    const resolvedConteudo = parseSpintax(String(conteudo).trim());
     const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
     // 1. Tentar despachar pelo servidor Fastify/Baileys (que faz o disparo real e persiste no banco)
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           para_whatsapp: cleanPhone,
           conversa_id: convId,
-          conteudo: String(conteudo).trim(),
+          conteudo: resolvedConteudo,
           tipo,
           atendente_nome,
         }),
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
         de_whatsapp: 'painel_central',
         para_whatsapp: cleanPhone,
         remetente_nome: atendente_nome,
-        conteudo: String(conteudo).trim(),
+        conteudo: resolvedConteudo,
         tipo: tipo as any,
         direcao: 'SAIDA',
         status: 'PENDENTE',

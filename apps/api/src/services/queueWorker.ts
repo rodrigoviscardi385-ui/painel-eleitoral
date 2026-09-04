@@ -28,8 +28,20 @@ export function parseSpintax(text: string): string {
   return text;
 }
 
-function getRandomDelay(min = 3000, max = 7500): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+/**
+ * Gera delay com distribuição Gaussiana (Box-Muller) e jitter orgânico.
+ * A distribuição normal imita com fidelidade o ritmo e pausas humanas,
+ * neutralizando a heurística de detecção por séries temporais da Meta.
+ */
+function getRandomDelay(min = 3500, max = 8500): number {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  const mean = (min + max) / 2;
+  const stdDev = (max - min) / 6;
+  const delay = Math.round(mean + num * stdDev);
+  return Math.min(Math.max(delay, min), max);
 }
 
 export class DisparoQueueWorker {
