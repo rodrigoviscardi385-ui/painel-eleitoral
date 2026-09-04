@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const renderUrl = process.env.NEXT_PUBLIC_API_URL || 'https://painel-eleitoral-api.onrender.com';
+  const renderUrl = process.env.NEXT_PUBLIC_API_URL || 'https://painel-eleitoral-4cee.onrender.com';
   
   // Keep-alive não-bloqueante para o Render não hibernar
   if (renderUrl && renderUrl.includes('onrender.com')) {

@@ -19,7 +19,7 @@ export function getBackendUrl(): string {
     return 'http://localhost:3001';
   }
 
-  // 4. Fallback em produção
-  return 'https://painel-eleitoral-api.onrender.com';
+  // 4. Fallback em produção (Serviço ativo no Render)
+  return 'https://painel-eleitoral-4cee.onrender.com';
 }
 
