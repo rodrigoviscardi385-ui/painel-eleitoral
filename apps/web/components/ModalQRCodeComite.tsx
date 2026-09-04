@@ -21,15 +21,16 @@ interface ModalQRCodeComiteProps {
 }
 
 export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeComiteProps) {
-  const [whatsappNumber, setWhatsappNumber] = useState('5511999998888');
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
+  const [whatsappNumber, setWhatsappNumber] = useState('5513955513838');
   const [tipoConvite, setTipoConvite] = useState<'lider' | 'apoiador' | 'voluntario'>('lider');
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [campanha, setCampanha] = useState<any>({
-    nome_urna: 'Rodrigo da Saúde',
-    numero_candidato: '2026',
+    nome_urna: 'Gustavo Reis',
+    numero_candidato: '55955',
     cargo: 'Deputado Federal',
-    partido: 'AVANTE',
+    partido: 'PSD',
     slogan: 'Trabalho, honestidade e compromisso com você',
     cor_primaria: '#10b981',
     foto_url: '',
@@ -38,9 +39,9 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
 
   // Mensagens pré-configuradas para o Onboarding
   const mensagens = {
-    lider: `🗳️ Olá Comitê de ${campanha.nome_urna}! Gostaria de me credenciar como Líder Comunitário.`,
-    apoiador: `🤝 Olá! Quero apoiar a campanha de ${campanha.nome_urna} (${campanha.numero_candidato}) e receber novidades.`,
-    voluntario: `⭐ Olá! Quero me cadastrar como Voluntário de Campanha de ${campanha.nome_urna}.`,
+    lider: `Olá comitê do candidato Gustavo Reis 55955! Quero me cadastrar como *Líder Comunitário* da campanha.`,
+    apoiador: `Olá! Quero manifestar meu *Apoio Oficial* à campanha de Gustavo Reis 55955!`,
+    voluntario: `Olá! Gostaria de me voluntariar para ajudar na campanha de Gustavo Reis 55955!`,
   };
 
   const selectedMessage = mensagens[tipoConvite];
@@ -53,7 +54,7 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
     if (!isOpen) return;
     const fetchDados = async () => {
       try {
-        const resWa = await fetch(`${apiBaseUrl}/api/whatsapp/status`);
+        const resWa = await fetch(`${effectiveBaseUrl}/api/whatsapp/status`);
         if (resWa.ok) {
           const data = await resWa.json();
           if (data.phone) setWhatsappNumber(data.phone);
@@ -61,7 +62,7 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
       } catch (e) {}
 
       try {
-        const resCamp = await fetch(`${apiBaseUrl}/api/campanha/config`);
+        const resCamp = await fetch(`${effectiveBaseUrl}/api/campanha/config`);
         if (resCamp.ok) {
           const data = await resCamp.json();
           if (data.config) setCampanha(data.config);
@@ -69,7 +70,7 @@ export function ModalQRCodeComite({ isOpen, onClose, apiBaseUrl }: ModalQRCodeCo
       } catch (e) {}
     };
     fetchDados();
-  }, [isOpen, apiBaseUrl]);
+  }, [isOpen, effectiveBaseUrl]);
 
   // Gerar QR Code via Google Charts API / QuickChart SVG para alta resolução
   useEffect(() => {

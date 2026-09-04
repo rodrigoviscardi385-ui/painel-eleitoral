@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, schema } from '../../../../../lib/db';
 import { eq } from 'drizzle-orm';
+import { getBackendUrl } from '../../../../../lib/backendUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     let inviteLink = `https://chat.whatsapp.com/convite-${Date.now().toString(36)}`;
 
     // Tentar criar no backend Baileys se disponível
-    const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
     try {
       const apiRes = await fetch(`${backendUrl}/api/whatsapp/groups/create`, {
         method: 'POST',

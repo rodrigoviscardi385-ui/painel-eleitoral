@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, schema } from '../../../../lib/db';
 import { parseSpintax } from '../../../../lib/antiBan';
+import { getBackendUrl } from '../../../../lib/backendUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
 
     const convId = conversa_id ? String(conversa_id) : cleanPhone;
     const resolvedConteudo = parseSpintax(String(conteudo).trim());
-    const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
 
     // 1. Tentar despachar pelo servidor Fastify/Baileys (que faz o disparo real e persiste no banco)
     try {

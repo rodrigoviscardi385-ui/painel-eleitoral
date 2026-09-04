@@ -43,11 +43,20 @@ export function ConfigBot({ apiBaseUrl = '' }: ConfigBotProps) {
 
   const fetchConfig = async () => {
     setLoading(true);
+    setError('');
     try {
-      const res = await fetch(`${apiBaseUrl}/api/bot/config`);
-      if (res.ok) {
+      let res = await fetch('/api/bot/config').catch(() => null);
+      if (!res || !res.ok) {
+        if (apiBaseUrl && apiBaseUrl !== 'http://localhost:3001') {
+          res = await fetch(`${apiBaseUrl}/api/bot/config`).catch(() => null);
+        }
+      }
+
+      if (res && res.ok) {
         const data = await res.json();
-        setConfig({ ...defaultConfig, ...data.config });
+        if (data?.config) {
+          setConfig({ ...defaultConfig, ...data.config });
+        }
       }
     } catch {
       setError('Erro ao carregar configuração');
@@ -63,14 +72,25 @@ export function ConfigBot({ apiBaseUrl = '' }: ConfigBotProps) {
     setError('');
     setSaved(false);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/bot/config`, {
+      let res = await fetch('/api/bot/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao salvar');
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        if (apiBaseUrl && apiBaseUrl !== 'http://localhost:3001') {
+          res = await fetch(`${apiBaseUrl}/api/bot/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+          }).catch(() => null);
+        }
+      }
+
+      if (!res || !res.ok) {
+        const err = res ? await res.json().catch(() => ({})) : {};
+        throw new Error(err.error || 'Erro ao salvar configuração do bot');
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

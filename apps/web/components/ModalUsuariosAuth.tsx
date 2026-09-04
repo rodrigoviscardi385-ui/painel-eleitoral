@@ -50,8 +50,9 @@ const AVAILABLE_PERMISSIONS = [
 export function ModalUsuariosAuth({
   isOpen,
   onClose,
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
 }: ModalUsuariosAuthProps) {
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
   const [usuarios, setUsuarios] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -68,7 +69,7 @@ export function ModalUsuariosAuth({
   const fetchUsuarios = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/auth/usuarios`);
+      const res = await fetch(`${effectiveBaseUrl}/api/auth/usuarios`);
       if (res.ok) {
         const data = await res.json();
         setUsuarios(data.usuarios || []);
@@ -117,7 +118,7 @@ export function ModalUsuariosAuth({
     setSubmitting(true);
     setMessage(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/auth/usuarios`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/auth/usuarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +135,7 @@ export function ModalUsuariosAuth({
       if (res.ok) {
         setMessage({
           type: 'success',
-          text: `Usuário ${nome} cadastrado com sucesso com o cargo ${role}!`,
+          text: `Usuário ${nome} cadastrado com sucesso!`,
         });
         setNome('');
         setEmail('');
@@ -155,7 +156,7 @@ export function ModalUsuariosAuth({
     if (!confirm(`Deseja realmente remover o acesso de ${userName}?`)) return;
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/auth/usuarios/${id}`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/auth/usuarios/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) {

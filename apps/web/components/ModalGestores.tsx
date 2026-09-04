@@ -34,8 +34,9 @@ interface ModalGestoresProps {
 export function ModalGestores({
   isOpen,
   onClose,
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
 }: ModalGestoresProps) {
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
   const [gestores, setGestores] = useState<Gestor[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -51,7 +52,7 @@ export function ModalGestores({
   const fetchGestores = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/gestores`);
+      const res = await fetch(`${effectiveBaseUrl}/api/gestores`);
       if (res.ok) {
         const data = await res.json();
         setGestores(data.gestores || []);
@@ -80,7 +81,7 @@ export function ModalGestores({
     setSubmitting(true);
     setMessage(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/gestores`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/gestores`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export function ModalGestores({
 
     setDeletingId(id);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/gestores/${id}`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/gestores/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) {

@@ -38,15 +38,16 @@ export function ModalCriarGrupo({
   initialLeader = null,
   onGroupCreated,
 }: ModalCriarGrupoProps) {
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
   const [nomeGrupo, setNomeGrupo] = useState('');
   const [descricaoGrupo, setDescricaoGrupo] = useState('');
   const [numeroLider, setNumeroLider] = useState('');
   const [selectedLeaderId, setSelectedLeaderId] = useState('');
   const [leaders, setLeaders] = useState<LeaderOption[]>([]);
   const [campanhaInfo, setCampanhaInfo] = useState<{ nome_urna: string; numero_candidato: string; partido: string; slogan: string }>({
-    nome_urna: 'Rodrigo da Saúde',
-    numero_candidato: '2026',
-    partido: 'AVANTE',
+    nome_urna: 'Gustavo Reis',
+    numero_candidato: '55955',
+    partido: 'PSD',
     slogan: 'Trabalho, honestidade e compromisso com você',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -59,14 +60,14 @@ export function ModalCriarGrupo({
     if (!isOpen) return;
 
     // 1. Carregar Config da Campanha
-    fetch(`${apiBaseUrl}/api/campanha/config`)
+    fetch(`${effectiveBaseUrl}/api/campanha/config`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.config) {
           const cfg = {
-            nome_urna: data.config.nome_urna || 'Rodrigo da Saúde',
-            numero_candidato: data.config.numero_candidato || '2026',
-            partido: data.config.partido || 'AVANTE',
+            nome_urna: data.config.nome_urna || 'Gustavo Reis',
+            numero_candidato: data.config.numero_candidato || '55955',
+            partido: data.config.partido || 'PSD',
             slogan: data.config.slogan || 'Trabalho, honestidade e compromisso com você',
           };
           setCampanhaInfo(cfg);
@@ -81,7 +82,7 @@ export function ModalCriarGrupo({
         const cSlog = cfg?.slogan || campanhaInfo.slogan;
 
         // 2. Carregar Líderes (Apenas perfis LIDER e ADMIN têm direito de criar grupo)
-        fetch(`${apiBaseUrl}/api/liderancas/tree?maskLGPD=false`)
+        fetch(`${effectiveBaseUrl}/api/liderancas/tree?maskLGPD=false`)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
             const rawList = Array.isArray(data?.tree) ? data.tree : Array.isArray(data?.lideres) ? data.lideres : [];
@@ -163,7 +164,7 @@ export function ModalCriarGrupo({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/whatsapp/groups/create`, {
+      const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/groups/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

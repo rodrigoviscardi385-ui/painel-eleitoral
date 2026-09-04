@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, schema } from '../../../../lib/db';
 import { eq } from 'drizzle-orm';
+import { getBackendUrl } from '../../../../lib/backendUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,7 @@ export async function PUT(
 
     // Se promovido a GESTOR, chamar backend Fastify para promover a ADM em todos os grupos
     if (updateData.cargo === 'GESTOR') {
-      const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const backendUrl = getBackendUrl();
       fetch(`${backendUrl}/api/liderancas/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

@@ -16,7 +16,9 @@ import {
   Pencil, 
   Trash2,
   AlertCircle,
-  UserPlus
+  UserPlus,
+  MessageSquare,
+  ExternalLink
 } from 'lucide-react';
 import { ModalEditarLideranca } from './ModalEditarLideranca';
 import { ModalConfirmarExclusao } from './ModalConfirmarExclusao';
@@ -47,6 +49,7 @@ interface ArvoreLiderancaProps {
   apiBaseUrl?: string;
   onOpenCreateGroup?: (leader?: TreeNode) => void;
   onRefresh?: () => void;
+  onOpenChat?: (contact: { id: string; nome: string; whatsapp: string; cargo?: string }) => void;
 }
 
 export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
@@ -56,6 +59,7 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
   apiBaseUrl = '',
   onOpenCreateGroup,
   onRefresh,
+  onOpenChat,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -284,6 +288,38 @@ export const ArvoreLideranca: React.FC<ArvoreLiderancaProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+              {/* Botão de Chamar no Chat Interno */}
+              {onOpenChat && node.whatsapp && (
+                <button
+                  onClick={() => {
+                    onOpenChat({
+                      id: node.id,
+                      nome: node.nome,
+                      whatsapp: node.whatsapp,
+                      cargo: node.cargo,
+                    });
+                  }}
+                  className="px-2 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                  title={`Abrir Chat no Sistema com ${node.nome}`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Conversar</span>
+                </button>
+              )}
+
+              {/* Botão de WhatsApp Direto (wa.me) */}
+              {node.whatsapp && (
+                <a
+                  href={`https://wa.me/${node.whatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-emerald-950/60 text-slate-300 hover:text-emerald-400 border border-slate-700/50 hover:border-emerald-500/30 transition-colors cursor-pointer"
+                  title={`Chamar no WhatsApp Web/App (${node.whatsapp})`}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              )}
+
               {/* Regra de Negócio: Apenas Líder ou Admin têm direito de criar Grupo Oficial de WhatsApp */}
               {(node.cargo === 'LIDER' || node.cargo === 'ADMIN') && (
                 <button

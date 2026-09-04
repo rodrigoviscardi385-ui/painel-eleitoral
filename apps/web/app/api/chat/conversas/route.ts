@@ -72,7 +72,7 @@ export async function GET() {
         existing.bairro = u.bairro;
         existing.zona_eleitoral = u.zona_eleitoral;
         existing.opt_out = u.opt_out;
-      } else if (listaFinal.length < 25) {
+      } else if (listaFinal.length < 200) {
         listaFinal.push({
           id: u.whatsapp,
           nome: u.nome,

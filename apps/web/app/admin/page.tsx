@@ -41,7 +41,7 @@ import { ModalNovoCadastro } from '../../components/ModalNovoCadastro';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { Smartphone, QrCode, UserCheck, Users, BookOpen, Settings, Receipt, UserPlus } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_BASE_URL = !process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL.includes('localhost') ? '' : process.env.NEXT_PUBLIC_API_URL;
 
 export default function AdminPage() {
   const router = useRouter();
@@ -55,17 +55,17 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState<'cockpit' | 'arvore' | 'disparos' | 'chat' | 'materiais' | 'gastos' | 'bot' | 'campanha' | 'lgpd'>('cockpit');
   const [campanha, setCampanha] = useState<CampanhaConfigData>({
-    nome_urna: 'Rodrigo da Saúde',
-    nome_completo: 'Rodrigo Viscardi',
-    numero_candidato: '2026',
+    nome_urna: 'Gustavo Reis',
+    nome_completo: 'Gustavo Reis',
+    numero_candidato: '55955',
     cargo: 'Deputado Federal',
-    partido: 'AVANTE',
+    partido: 'PSD',
     coligacao: 'Coligação Por Dias Melhores',
     slogan: 'Trabalho, honestidade e compromisso com você',
     foto_url: '',
     logo_url: '',
     cor_primaria: '#10b981',
-    cidade: 'São Paulo',
+    cidade: 'Santos',
     estado: 'SP',
     data_eleicao: '2026-10-04',
     cnpj_campanha: '00.000.000/0001-00',
@@ -73,6 +73,12 @@ export default function AdminPage() {
     propostas_ia: '',
     tom_voz_ia: 'POPULAR',
   });
+  const [selectedChatContact, setSelectedChatContact] = useState<{
+    id: string;
+    nome: string;
+    whatsapp: string;
+    cargo?: string;
+  } | null>(null);
   const [isMasked, setIsMasked] = useState(true);
   const [showUnmaskModal, setShowUnmaskModal] = useState(false);
   const [isModalMetaOpen, setIsModalMetaOpen] = useState(false);
@@ -726,6 +732,10 @@ export default function AdminPage() {
                   setSelectedLeaderForGroup(leader || null);
                   setIsModalCriarGrupoOpen(true);
                 }}
+                onOpenChat={(contact) => {
+                  setSelectedChatContact(contact);
+                  setActiveTab('chat');
+                }}
                 onRefresh={refreshData}
               />
             </ErrorBoundary>
@@ -747,6 +757,7 @@ export default function AdminPage() {
               <ChatAoVivo
                 apiBaseUrl={API_BASE_URL}
                 currentUser={currentUser || { nome: 'Operador', role: 'ADMIN' }}
+                initialContact={selectedChatContact}
               />
             </ErrorBoundary>
           </div>

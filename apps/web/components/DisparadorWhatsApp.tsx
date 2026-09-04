@@ -37,9 +37,9 @@ interface DisparadorWhatsAppProps {
 }
 
 export const DisparadorWhatsApp: React.FC<DisparadorWhatsAppProps> = ({
-  apiBaseUrl = 'http://localhost:3001',
+  apiBaseUrl = '',
 }) => {
-  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl === 'http://localhost:3001' ? '' : apiBaseUrl;
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
   const [titulo, setTitulo] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ZONA' | 'BAIRRO' | 'LIDER'>('TODOS');
   const [filtroValor, setFiltroValor] = useState('');

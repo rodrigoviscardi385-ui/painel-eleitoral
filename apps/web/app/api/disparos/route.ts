@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db, schema } from '../../../lib/db';
-import { desc, sql } from 'drizzle-orm';
+import { eq, inArray, desc, sql } from 'drizzle-orm';
+import { getBackendUrl } from '../../../lib/backendUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     }).catch(() => {});
 
     // 5. Acionar worker no Fastify (se disponível)
-    const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
     fetch(`${backendUrl}/api/disparos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -13,7 +13,7 @@ import fs from 'fs';
 import { extractSupportersFromText, transcribeAudioWithWhisper } from './groqExtractor.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql, and } from 'drizzle-orm';
 
 export interface WhatsAppStatus {
   connected: boolean;
@@ -234,9 +234,7 @@ class NativeWhatsAppService {
           if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid === 'status@broadcast') continue;
 
           const senderNumber = remoteJid.split('@')[0].split(':')[0].replace(/\D/g, '');
-          const isSelf = senderNumber === myNumber;
-
-          if (msg.key.fromMe && !isSelf) continue;
+          if (!senderNumber) continue;
 
           let incomingText =
             msg.message.conversation ||
@@ -254,7 +252,7 @@ class NativeWhatsAppService {
 
           if (audioMsg) {
             try {
-              console.log(`🎙️ Áudio recebido de ${senderNumber}. Transcrevendo com Groq Whisper...`);
+              console.log(`🎙️ Áudio detectado de/para ${senderNumber}. Transcrevendo com Groq Whisper...`);
               const buffer = await downloadMediaMessage(
                 msg,
                 'buffer',
@@ -273,7 +271,50 @@ class NativeWhatsAppService {
 
           if (!incomingText) continue;
 
-          console.log(`📩 Mensagem recebida de ${remoteJid} (self: ${isSelf}): "${incomingText}"`);
+          // Se a mensagem foi enviada pelo próprio aparelho celular oficial ou pelo painel (fromMe)
+          if (msg.key.fromMe) {
+            console.log(`📤 Mensagem de saída enviada para ${senderNumber}: "${incomingText}"`);
+            try {
+              // Evita duplicar se a mensagem acabou de ser inserida via rota HTTP do painel
+              const recentOut = await db
+                .select({ id: schema.mensagensChat.id })
+                .from(schema.mensagensChat)
+                .where(
+                  and(
+                    eq(schema.mensagensChat.conversa_id, senderNumber),
+                    eq(schema.mensagensChat.direcao, 'SAIDA'),
+                    eq(schema.mensagensChat.conteudo, incomingText)
+                  )
+                )
+                .limit(1);
+
+              if (recentOut.length === 0) {
+                const { broadcastChatMessage } = await import('../routes/chat.js');
+                const [savedMsg] = await db
+                  .insert(schema.mensagensChat)
+                  .values({
+                    conversa_id: senderNumber,
+                    de_whatsapp: myNumber || 'painel_central',
+                    para_whatsapp: senderNumber,
+                    remetente_nome: 'Candidato / Equipe',
+                    conteudo: incomingText,
+                    tipo: audioMsg ? 'AUDIO' : 'TEXTO',
+                    direcao: 'SAIDA',
+                    status: 'ENVIADO',
+                    setor: 'GERAL',
+                    tags: JSON.stringify([]),
+                  })
+                  .returning();
+
+                broadcastChatMessage(savedMsg);
+              }
+            } catch (outErr) {
+              console.warn('Aviso ao sincronizar mensagem de saída do WhatsApp no banco:', outErr);
+            }
+            continue;
+          }
+
+          console.log(`📩 Mensagem recebida de ${remoteJid}: "${incomingText}"`);
 
           const trimmedIncoming = incomingText.trim();
 

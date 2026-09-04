@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db, schema } from '../../../../lib/db';
 import { eq } from 'drizzle-orm';
+import { getBackendUrl } from '../../../../lib/backendUrl';
 
 export const dynamic = 'force-dynamic';
 
-const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const backendUrl = getBackendUrl();
 
 export async function GET() {
   try {

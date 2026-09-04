@@ -39,7 +39,7 @@ interface WarmingState {
 export const AquecedorChipAntiBan: React.FC<AquecedorChipProps> = ({
   apiBaseUrl = '',
 }) => {
-  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl === 'http://localhost:3001' ? '' : apiBaseUrl;
+  const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
 
   const [data, setData] = useState<WarmingState>({
     status: 'PAUSADO',

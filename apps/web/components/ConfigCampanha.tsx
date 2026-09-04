@@ -130,17 +130,37 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
 
   const fetchConfig = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${apiBaseUrl}/api/campanha/config`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.config) {
-          setConfig({ ...defaultCampanha, ...data.config });
-          if (onConfigUpdated) onConfigUpdated(data.config);
+      // 1. Prioriza rota interna do Next.js (/api/campanha/config)
+      let res = await fetch('/api/campanha/config').catch(() => null);
+
+      // 2. Se falhar ou estiver em porta remota, tenta com apiBaseUrl
+      if (!res || !res.ok) {
+        if (apiBaseUrl && apiBaseUrl !== 'http://localhost:3001') {
+          res = await fetch(`${apiBaseUrl}/api/campanha/config`).catch(() => null);
         }
       }
-    } catch {
-      setError('Não foi possível conectar à API de campanha.');
+
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data?.config) {
+          setConfig((prev) => ({
+            ...prev,
+            ...data.config,
+            // Garante que campos de IA essenciais sejam preservados
+            biografia_ia: data.config.biografia_ia || prev.biografia_ia,
+            propostas_ia: data.config.propostas_ia || prev.propostas_ia,
+            tom_voz_ia: data.config.tom_voz_ia || prev.tom_voz_ia,
+          }));
+          if (onConfigUpdated) onConfigUpdated(data.config);
+        }
+      } else {
+        console.warn('Aviso: Não foi possível obter configuração remota, mantendo estado atual.');
+      }
+    } catch (err: any) {
+      console.error('Erro ao buscar configuração de campanha:', err);
+      setError('Aviso: Conectando à base de dados de campanha...');
     } finally {
       setLoading(false);
     }
@@ -156,20 +176,34 @@ export function ConfigCampanha({ apiBaseUrl = '', onConfigUpdated }: ConfigCampa
     setSavedSuccess(false);
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/campanha/config`, {
+      // 1. Tenta salvar pela rota interna do Next.js
+      let res = await fetch('/api/campanha/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
-      });
+      }).catch(() => null);
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Erro ao salvar alterações da campanha.');
+      // 2. Fallback caso necessário
+      if (!res || !res.ok) {
+        if (apiBaseUrl && apiBaseUrl !== 'http://localhost:3001') {
+          res = await fetch(`${apiBaseUrl}/api/campanha/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+          }).catch(() => null);
+        }
+      }
+
+      if (!res || !res.ok) {
+        const errData = res ? await res.json().catch(() => ({})) : {};
+        throw new Error(errData.error || 'Erro ao salvar alterações da campanha no servidor.');
       }
 
       const data = await res.json();
-      setConfig(data.config);
-      if (onConfigUpdated) onConfigUpdated(data.config);
+      if (data?.config) {
+        setConfig(data.config);
+        if (onConfigUpdated) onConfigUpdated(data.config);
+      }
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
