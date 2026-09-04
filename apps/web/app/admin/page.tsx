@@ -88,8 +88,30 @@ export default function AdminPage() {
   const [isModalCriarGrupoOpen, setIsModalCriarGrupoOpen] = useState(false);
   const [isModalUsuariosAuthOpen, setIsModalUsuariosAuthOpen] = useState(false);
   const [isModalNovoCadastroOpen, setIsModalNovoCadastroOpen] = useState(false);
-  const [whatsappConnected, setWhatsappConnected] = useState(true);
+  const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  // Monitorar status real do WhatsApp para o cabeçalho
+  useEffect(() => {
+    let isMounted = true;
+    const checkWaStatus = async () => {
+      try {
+        const res = await fetch('/api/whatsapp/status');
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setWhatsappConnected(Boolean(data.connected));
+        }
+      } catch {
+        if (isMounted) setWhatsappConnected(false);
+      }
+    };
+    checkWaStatus();
+    const interval = setInterval(checkWaStatus, 20000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isModalWhatsAppOpen]);
 
   useEffect(() => {
     try {
@@ -442,14 +464,19 @@ export default function AdminPage() {
             </button>
           )}
 
-          {/* Botão Conectar WhatsApp */}
+          {/* Botão Conectar WhatsApp com Status Dinâmico */}
           <button
             onClick={() => setIsModalWhatsAppOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
-            title="Conectar WhatsApp do Comitê ou abrir simulador"
+            className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg shadow-lg transition-all cursor-pointer ${
+              whatsappConnected
+                ? 'text-emerald-100 bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                : 'text-amber-300 bg-amber-950/80 border border-amber-500/40 hover:bg-amber-900/80 shadow-amber-900/20'
+            }`}
+            title={whatsappConnected ? 'WhatsApp Conectado e Ativo' : 'WhatsApp Desconectado - Clique para Conectar'}
           >
-            <Smartphone className="w-4 h-4 text-emerald-200" />
-            <span>Conectar WhatsApp</span>
+            <span className={`w-2 h-2 rounded-full ${whatsappConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <Smartphone className="w-4 h-4 text-white" />
+            <span>{whatsappConnected ? 'WhatsApp Ativo' : 'Conectar WhatsApp'}</span>
           </button>
 
           {/* Botão QR Code do Comitê para novos Líderes */}

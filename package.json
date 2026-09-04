@@ -7,13 +7,12 @@
     "apps/api"
   ],
   "scripts": {
-    "dev": "cd apps/web && npm run dev",
-    "build": "cd apps/web && npm run build",
-    "start": "cd apps/web && npm run start",
-    "dev:api": "cd apps/api && npm run dev",
-    "dev:web": "cd apps/web && npm run dev",
-    "build:api": "cd apps/api && npm run build",
-    "build:web": "cd apps/web && npm run build",
+    "dev": "node scripts/dev.mjs",
+    "dev:all": "node scripts/dev.mjs",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/web run build",
     "test:nasa": "npx tsx scripts/nasa_master_test_suite.ts",
     "db:reset:prod": "npx tsx scripts/reset_database_for_production.ts"
   },

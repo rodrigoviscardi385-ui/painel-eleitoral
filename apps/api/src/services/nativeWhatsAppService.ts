@@ -5,7 +5,9 @@ import makeWASocket, {
   proto,
   downloadMediaMessage,
   Browsers,
+  fetchLatestBaileysVersion,
 } from '@whiskeysockets/baileys';
+
 import QRCode from 'qrcode';
 import pino from 'pino';
 import path from 'path';
@@ -118,15 +120,21 @@ class NativeWhatsAppService {
     this.isInitializing = true;
 
     try {
+      const { version, isLatest } = await fetchLatestBaileysVersion().catch(() => ({
+        version: [2, 3000, 1015901307] as [number, number, number],
+        isLatest: false,
+      }));
+      console.log(`🌐 Baileys WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
+
       const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
 
       this.sock = makeWASocket({
+        version,
         auth: state,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
-        // Emulação canônica do WhatsApp Web no Chrome / Ubuntu (elimina flag de cliente não oficial)
-        browser: Browsers.ubuntu('Chrome'),
-        markOnlineOnConnect: false, // Stealth mode: não dispara presença de bot em massa ao logar
+        browser: Browsers.macOS('Desktop'),
+        markOnlineOnConnect: false,
         generateHighQualityLinkPreview: true,
         connectTimeoutMs: 60_000,
         keepAliveIntervalMs: 30_000,
@@ -183,9 +191,11 @@ class NativeWhatsAppService {
         }
 
         if (connection === 'close') {
-          const shouldReconnect =
-            (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
-          console.log('WhatsApp desconectado. Reconectar?', shouldReconnect);
+          const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+          const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+          const shouldReconnect = !isLoggedOut;
+
+          console.log(`📡 WhatsApp conexão encerrada. StatusCode: ${statusCode || 'n/a'}. Reconectar? ${shouldReconnect}`);
           this.isConnected = false;
           this.currentQrCode = null;
 
@@ -201,7 +211,7 @@ class NativeWhatsAppService {
             );
             setTimeout(() => this.initialize(), backoffDelay);
           } else {
-            // Limpa credenciais ao fazer logout
+            console.warn('⚠️ WhatsApp: Logout confirmado pelo usuário ou aparelho desvinculado.');
             if (fs.existsSync(this.authDir)) {
               fs.rmSync(this.authDir, { recursive: true, force: true });
             }
@@ -901,15 +911,15 @@ class NativeWhatsAppService {
 
         // Anti-Ban: Simulação de Presença Humana (composing) antes do envio
         await this.sock.sendPresenceUpdate('composing', targetJid).catch(() => {});
-        const typingDuration = Math.min(Math.max(resolvedMessage.length * 35, 1200), 3800) + Math.floor(Math.random() * 600);
+        const typingDuration = Math.min(Math.max(resolvedMessage.length * 15, 300), 1200) + Math.floor(Math.random() * 300);
         await new Promise((r) => setTimeout(r, typingDuration));
         await this.sock.sendPresenceUpdate('paused', targetJid).catch(() => {});
 
         await this.sock.sendMessage(targetJid, { text: resolvedMessage });
         console.log(`📤 Mensagem enviada com sucesso via Baileys para ${targetJid}`);
         return true;
-      } catch (err) {
-        console.error(`Erro ao enviar mensagem Baileys para ${jid}:`, err);
+      } catch (err: any) {
+        console.error(`Erro ao enviar mensagem Baileys para ${jid}:`, err?.message || err);
       }
     } else {
       console.log(`[WhatsApp Simulado / Offline] Para ${jid}:\n${message}`);

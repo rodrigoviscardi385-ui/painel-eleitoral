@@ -1,11 +1,25 @@
 /**
- * Retorna a URL canônica do backend Fastify / Baileys (Render).
- * Evita referências a localhost em ambiente de produção (Vercel).
+ * Retorna a URL canônica do backend Fastify / Baileys.
+ * Em desenvolvimento local conecta na porta 3001.
+ * Em produção respeita INTERNAL_API_URL ou NEXT_PUBLIC_API_URL.
  */
 export function getBackendUrl(): string {
-  const envUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl && !envUrl.includes('localhost')) {
-    return envUrl.replace(/\/+$/, '');
+  // 1. URL explícita via variável interna (serviço-a-serviço ou docker)
+  if (process.env.INTERNAL_API_URL?.trim()) {
+    return process.env.INTERNAL_API_URL.trim().replace(/\/+$/, '');
   }
+
+  // 2. URL pública configurada
+  if (process.env.NEXT_PUBLIC_API_URL?.trim()) {
+    return process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, '');
+  }
+
+  // 3. Em ambiente local/dev, conecta no Fastify local (porta 3001)
+  if (process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:3001';
+  }
+
+  // 4. Fallback em produção
   return 'https://painel-eleitoral-api.onrender.com';
 }
+

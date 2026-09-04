@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getBackendUrl } from '../../../../lib/backendUrl';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
-  const backendUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://painel-eleitoral-api.onrender.com';
+  const backendUrl = getBackendUrl();
 
   try {
     const res = await fetch(`${backendUrl}/api/whatsapp/logout`, {

@@ -26,7 +26,7 @@ export const ModalConectarWhatsApp: React.FC<ModalConectarWhatsAppProps> = ({
   apiBaseUrl = '',
 }) => {
   const effectiveBaseUrl = !apiBaseUrl || apiBaseUrl.includes('localhost') ? '' : apiBaseUrl;
-  const [status, setStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'QRCODE' | 'CONNECTING'>('CONNECTED');
+  const [status, setStatus] = useState<'CONNECTED' | 'DISCONNECTED' | 'QRCODE' | 'CONNECTING'>('CONNECTING');
   const [qrcodeBase64, setQrcodeBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'qrcode' | 'simulador'>('qrcode');
@@ -44,11 +44,21 @@ export const ModalConectarWhatsApp: React.FC<ModalConectarWhatsAppProps> = ({
       const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/status`);
       if (res.ok) {
         const data = await res.json();
-        setStatus(data.connected ? 'CONNECTED' : (data.status || 'DISCONNECTED'));
-        if (data.qrcode) setQrcodeBase64(data.qrcode);
+        if (data.connected) {
+          setStatus('CONNECTED');
+          setQrcodeBase64(null);
+        } else if (data.qrcode) {
+          setStatus('QRCODE');
+          setQrcodeBase64(data.qrcode);
+        } else {
+          setStatus(data.status || 'DISCONNECTED');
+        }
+      } else {
+        setStatus('DISCONNECTED');
       }
     } catch (err) {
       console.warn('Erro ao consultar status:', err);
+      setStatus('DISCONNECTED');
     } finally {
       setIsLoading(false);
     }
@@ -60,9 +70,14 @@ export const ModalConectarWhatsApp: React.FC<ModalConectarWhatsAppProps> = ({
       const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/connect`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        setStatus(data.status || (data.connected ? 'CONNECTED' : 'QRCODE'));
-        if (data.qrcode) {
+        if (data.connected) {
+          setStatus('CONNECTED');
+          setQrcodeBase64(null);
+        } else if (data.qrcode) {
+          setStatus('QRCODE');
           setQrcodeBase64(data.qrcode);
+        } else {
+          setStatus(data.status || 'QRCODE');
         }
       }
     } catch (err) {
@@ -118,7 +133,7 @@ export const ModalConectarWhatsApp: React.FC<ModalConectarWhatsAppProps> = ({
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${apiBaseUrl}/api/whatsapp/status`);
+        const res = await fetch(`${effectiveBaseUrl}/api/whatsapp/status`);
         if (res.ok) {
           const data = await res.json();
           if (data.connected) {
@@ -127,6 +142,8 @@ export const ModalConectarWhatsApp: React.FC<ModalConectarWhatsAppProps> = ({
           } else if (data.qrcode) {
             setStatus('QRCODE');
             setQrcodeBase64(data.qrcode);
+          } else {
+            setStatus(data.status || 'DISCONNECTED');
           }
         }
       } catch (err) {
@@ -135,7 +152,7 @@ export const ModalConectarWhatsApp: React.FC<ModalConectarWhatsAppProps> = ({
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [isOpen, apiBaseUrl]);
+  }, [isOpen, effectiveBaseUrl]);
 
   if (!isOpen) return null;
 
