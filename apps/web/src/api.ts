@@ -399,5 +399,26 @@ export const api = {
     }),
   verificarIntegridadeGovBr: (id: string) =>
     request<any>(`/api/equipe-rua/${id}/verificar-integridade`),
+
+  // Alertas de Suprimentos (Santinhos de Rua)
+  getAlertasSuprimentos: (params: { status?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    return request<{ success: boolean; alertas: any[]; totalPendentes: number; timestamp: string }>(
+      `/api/equipe-rua/alertas-material?${query.toString()}`
+    );
+  },
+
+  solicitarMaterialRua: (data: { bairro?: string; lat?: number; lng?: number; solicitante?: string; item?: string; telefone?: string }) =>
+    request<any>('/api/equipe-rua/solicitar-material', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  atenderAlertaSuprimento: (id: string, status: 'A_CAMINHO' | 'ENTREGUE' = 'A_CAMINHO') =>
+    request<any>(`/api/equipe-rua/alertas-material/${id}/atender`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
 };
 

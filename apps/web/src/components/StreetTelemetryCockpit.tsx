@@ -22,12 +22,15 @@ import {
   Radio,
   Zap,
   QrCode,
-  Smartphone
+  Smartphone,
+  Package,
+  Truck
 } from 'lucide-react';
 import { ModalQRCodeAppRua } from './ModalQRCodeAppRua.tsx';
+import { SantosTelemetryMap, AlertaSuprimentoItem } from './SantosTelemetryMap.tsx';
 import { api } from '../api.ts';
 
-interface ContratadoTelemetria {
+export interface ContratadoTelemetria {
   id: string;
   nome: string;
   cpf: string;
@@ -58,27 +61,61 @@ export const StreetTelemetryCockpit: React.FC = () => {
 
   // ─── TELEMETRIA REAL DA EQUIPE DE RUA EM SANTOS (ZERO SIMULAÇÃO) ─────────
   const [contratados, setContratados] = useState<ContratadoTelemetria[]>([]);
+  const [alertasSuprimentos, setAlertasSuprimentos] = useState<AlertaSuprimentoItem[]>([]);
 
   // Carregar dados de telemetria reais do backend Fastify
   useEffect(() => {
     loadTelemetry();
-    const interval = setInterval(loadTelemetry, 10000);
+    const interval = setInterval(loadTelemetry, 6000);
     return () => clearInterval(interval);
   }, []);
 
   const loadTelemetry = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/equipe-rua/telemetria/ao-vivo');
-      if (res.ok) {
-        const data = await res.json();
+      const [resTelemetria, resAlertas] = await Promise.allSettled([
+        fetch('/api/equipe-rua/telemetria/ao-vivo'),
+        api.getAlertasSuprimentos(),
+      ]);
+
+      if (resTelemetria.status === 'fulfilled' && resTelemetria.value.ok) {
+        const data = await resTelemetria.value.json();
         if (data && Array.isArray(data.contratados)) {
           setContratados(data.contratados);
         }
       }
+
+      if (resAlertas.status === 'fulfilled' && resAlertas.value?.success) {
+        setAlertasSuprimentos(resAlertas.value.alertas || []);
+      }
     } catch (_) {
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDespacharVan = async (alertaId: string) => {
+    try {
+      await api.atenderAlertaSuprimento(alertaId, 'A_CAMINHO');
+      loadTelemetry();
+    } catch (err: any) {
+      alert(`Erro ao despachar van: ${err.message}`);
+    }
+  };
+
+  const handleSimularPedidoSantinho = async () => {
+    try {
+      await api.solicitarMaterialRua({
+        bairro: 'Gonzaga (Praça Independência)',
+        solicitante: 'Marcos Silveira (Equipe Gonzaga)',
+        lat: -23.9660,
+        lng: -46.3338,
+        item: 'Santinhos 10x15 e Praguinhas',
+        telefone: '(13) 99781-4421',
+      });
+      loadTelemetry();
+    } catch (err: any) {
+      alert(`Erro ao solicitar: ${err.message}`);
     }
   };
 
@@ -276,12 +313,32 @@ export const StreetTelemetryCockpit: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
         {/* COLUNA ESQUERDA: RADAR GRÁFICO TÁTICO DE SANTOS */}
         <div className="glass-panel" style={{ padding: '18px', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Compass size={18} color="var(--primary)" />
               <span style={{ fontSize: '14px', fontWeight: 800 }}>
                 RADAR CINÉTICO DE SANTOS (MAPA DINÂMICO)
               </span>
+              <button
+                onClick={handleSimularPedidoSantinho}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  marginLeft: '6px'
+                }}
+                title="Simular pedido de santinhos via app de rua para testar os alertas"
+              >
+                <Package size={12} /> Testar Alerta Santinho
+              </button>
             </div>
             <div style={{ display: 'flex', gap: '6px', fontSize: '11px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
@@ -296,175 +353,61 @@ export const StreetTelemetryCockpit: React.FC = () => {
             </div>
           </div>
 
-          {/* SIMULADOR GRÁFICO DO MAPA DE SANTOS COM COORDENADAS PROJETADAS */}
-          <div
-            style={{
-              position: 'relative',
-              height: '360px',
-              backgroundColor: '#0a0f1d',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              overflow: 'hidden',
-              backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 0)',
-              backgroundSize: '24px 24px'
-            }}
-          >
-            {/* Contornos Simbólicos das Zonas de Santos */}
-            <div style={{ position: 'absolute', top: '15px', left: '20px', fontSize: '11px', color: '#64748b', fontWeight: 700 }}>
-              ZONA NOROESTE (Rádio Clube / Castelo)
-            </div>
-            <div style={{ position: 'absolute', top: '15px', right: '20px', fontSize: '11px', color: '#64748b', fontWeight: 700 }}>
-              CENTRO HISTÓRICO & PORTO
-            </div>
-            <div style={{ position: 'absolute', bottom: '15px', right: '20px', fontSize: '11px', color: '#64748b', fontWeight: 700 }}>
-              ORLA (Gonzaga, Boqueirão, Ponta da Praia)
-            </div>
-            <div style={{ position: 'absolute', top: '45%', left: '35%', fontSize: '11px', color: '#475569', fontWeight: 700 }}>
-              MONTE SERRAT & MORROS
-            </div>
-
-            {/* MENSAGEM SE NÃO HOUVER NENHUM COLABORADOR COM TURNO ATIVO */}
-            {contratados.length === 0 && (
-              <div
+          {/* BANNER DE ALERTAS DE SUPRIMENTOS (PEDIDOS DE SANTINHO) */}
+          {alertasSuprimentos.filter(a => a.status === 'PENDENTE').length > 0 && (
+            <div
+              style={{
+                marginBottom: '12px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                <Package size={16} color="#ef4444" className="animate-bounce" />
+                <span style={{ fontWeight: 800, color: '#fca5a5' }}>
+                  🚨 {alertasSuprimentos.filter(a => a.status === 'PENDENTE').length} Pedido(s) de Santinhos / Suprimentos em Aberto!
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const p = alertasSuprimentos.find(a => a.status === 'PENDENTE');
+                  if (p) handleDespacharVan(p.id);
+                }}
                 style={{
-                  position: 'absolute',
-                  inset: 0,
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '5px 10px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(10, 15, 29, 0.88)',
-                  backdropFilter: 'blur(4px)',
-                  padding: '24px',
-                  textAlign: 'center',
-                  zIndex: 15
+                  gap: '5px'
                 }}
               >
-                <Smartphone size={42} color="#ffe600" style={{ marginBottom: '12px' }} />
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>
-                  Nenhum Colaborador com Turno Ativo no Momento
-                </div>
-                <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '380px', marginBottom: '16px', lineHeight: '1.5' }}>
-                  Assim que a equipe de rua acessar o App no celular e registrar o <strong>Check-in de Entrada</strong>, a velocidade real, os passos e a localização GPS aparecerão neste radar ao vivo.
-                </div>
-                <button
-                  onClick={() => setIsQrModalOpen(true)}
-                  style={{
-                    backgroundColor: '#ffe600',
-                    color: '#000000',
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <QrCode size={16} /> Abrir QR Code para Equipes de Campo
-                </button>
-              </div>
-            )}
+                <Truck size={13} /> Despachar Van Imediata
+              </button>
+            </div>
+          )}
 
-            {/* PINOS INTERATIVOS DOS CONTRATADOS COM PROJEÇÃO GEOGRÁFICA REAL */}
-            {contratados.map((c) => {
-              // Projeção geográfica real de Santos:
-              // Lat: de -23.9200 (Norte) a -23.9950 (Sul)
-              // Lng: de -46.3900 (Oeste) a -46.2950 (Leste)
-              const minLat = -23.9950;
-              const maxLat = -23.9200;
-              const minLng = -46.3900;
-              const maxLng = -46.2950;
-
-              let top = '50%';
-              let left = '50%';
-              if (c.latitude && c.longitude && c.latitude !== 0 && c.longitude !== 0) {
-                const latPct = ((maxLat - c.latitude) / (maxLat - minLat)) * 100;
-                const lngPct = ((c.longitude - minLng) / (maxLng - minLng)) * 100;
-                top = `${Math.max(12, Math.min(88, latPct))}%`;
-                left = `${Math.max(12, Math.min(88, lngPct))}%`;
-              } else {
-                if (c.regiao === 'CENTRO') { top = '22%'; left = '72%'; }
-                else if (c.regiao === 'ZONA_NOROESTE') { top = '28%'; left = '20%'; }
-                else if (c.regiao === 'MORROS') { top = '48%'; left = '45%'; }
-                else { top = '78%'; left = '52%'; }
-              }
-
-              const isSelected = selectedContratado?.id === c.id;
-              const colorPin =
-                c.statusCinetico === 'EM_MOVIMENTO'
-                  ? '#10b981'
-                  : c.statusCinetico === 'PARADO_BASE'
-                  ? '#3b82f6'
-                  : c.statusCinetico === 'DESLOCAMENTO_VEICULO'
-                  ? '#a855f7'
-                  : '#ef4444';
-
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => setSelectedContratado(c)}
-                  style={{
-                    position: 'absolute',
-                    top,
-                    left,
-                    transform: 'translate(-50%, -50%)',
-                    cursor: 'pointer',
-                    zIndex: isSelected ? 20 : 10,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div
-                    style={{
-                      width: isSelected ? '26px' : '20px',
-                      height: isSelected ? '26px' : '20px',
-                      borderRadius: '50%',
-                      backgroundColor: colorPin,
-                      border: '3px solid #ffffff',
-                      boxShadow: `0 0 ${isSelected ? '16px' : '10px'} ${colorPin}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      animation: c.statusCinetico === 'EM_MOVIMENTO' ? 'pulse 1.4s infinite' : 'none'
-                    }}
-                  >
-                    {c.statusCinetico === 'EM_MOVIMENTO' && (
-                      <Footprints size={11} color="#000" />
-                    )}
-                    {c.statusCinetico === 'PARADO_BASE' && (
-                      <MapPin size={11} color="#fff" />
-                    )}
-                    {c.statusCinetico === 'PARADO_ALERTA' && (
-                      <AlertTriangle size={11} color="#fff" />
-                    )}
-                    {c.statusCinetico === 'DESLOCAMENTO_VEICULO' && (
-                      <Zap size={11} color="#fff" />
-                    )}
-                  </div>
-
-                  <div
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.85)',
-                      color: '#ffffff',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      marginTop: '4px',
-                      whiteSpace: 'nowrap',
-                      border: isSelected ? `1px solid ${colorPin}` : '1px solid #333'
-                    }}
-                  >
-                    {c.nome.split(' ')[0]} ({c.velocidadeKmh} km/h)
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* NOVO MAPA DINÂMICO INTERATIVO DE SANTOS COM LEAFLET */}
+          <SantosTelemetryMap
+            contratados={contratadosFiltrados}
+            alertasSuprimentos={alertasSuprimentos}
+            selectedContratado={selectedContratado}
+            onSelectContratado={setSelectedContratado}
+            onDespacharVan={handleDespacharVan}
+            height="390px"
+          />
 
           {/* DETALHES DO COLABORADOR SELECIONADO NO RADAR */}
           {selectedContratado ? (

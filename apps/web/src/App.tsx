@@ -37,6 +37,7 @@ import { VoterVirtualList, VirtualVoterItem } from './components/VoterVirtualLis
 import { StreetTeamManager } from './components/StreetTeamManager.tsx';
 import { StreetAppPWA } from './components/StreetAppPWA.tsx';
 import { StreetTelemetryCockpit } from './components/StreetTelemetryCockpit.tsx';
+import { SupplyAlertNotification } from './components/SupplyAlertNotification.tsx';
 import { ModalQRCodeAppRua } from './components/ModalQRCodeAppRua.tsx';
 import { OfflineSyncClient } from './services/offlineSyncClient.ts';
 import { api } from './api.ts';
@@ -697,6 +698,11 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Alerta em Tempo Real na Tela do Sistema para Pedidos de Santinhos */}
+      <SupplyAlertNotification
+        onNavigateToTelemetry={() => setActiveTab('telemetria-rua')}
+      />
     </div>
   );
 };

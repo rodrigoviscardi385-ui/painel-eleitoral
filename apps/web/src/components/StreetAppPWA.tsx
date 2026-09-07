@@ -472,6 +472,7 @@ export const StreetAppPWA: React.FC = () => {
           lat: gpsCoords.lat,
           lng: gpsCoords.lng,
           solicitante: colaborador?.nome || 'Equipe de Campo Santos',
+          telefone: colaborador?.telefone || '',
           item: 'Santinhos e Adesivos de Carro'
         })
       });

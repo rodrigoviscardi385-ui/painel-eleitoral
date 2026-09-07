@@ -678,18 +678,80 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
   });
 
   // ─── 14. Alerta Real de Suprimentos para Van de Apoio ──────────────────────
+  interface AlertaSuprimento {
+    id: string;
+    solicitante: string;
+    telefone?: string;
+    bairro: string;
+    lat: number;
+    lng: number;
+    item: string;
+    status: 'PENDENTE' | 'A_CAMINHO' | 'ENTREGUE';
+    tempoEstimadoChegadaMinutos: number;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  const alertasSuprimentos: AlertaSuprimento[] = [];
+
   app.post('/api/equipe-rua/solicitar-material', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { bairro, lat, lng, solicitante, item } = request.body as any;
-    console.log(`[SUPPLY ALERT] Alerta de material: ${item} para ${solicitante} em ${bairro} (${lat}, ${lng})`);
-    await logAuditLGPD('SOLICITACAO_MATERIAL_RUA', `Solicitação de material (${item}) por ${solicitante} em ${bairro}`);
+    const { bairro, lat, lng, solicitante, item, telefone } = request.body as any;
+    const alertId = 'alert_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    const novoAlerta: AlertaSuprimento = {
+      id: alertId,
+      solicitante: (solicitante || 'Equipe de Campo Santos').trim(),
+      telefone: telefone || '',
+      bairro: bairro || 'Santos',
+      lat: Number(lat) || -23.9618,
+      lng: Number(lng) || -46.3322,
+      item: item || 'Santinhos e Adesivos de Carro',
+      status: 'PENDENTE',
+      tempoEstimadoChegadaMinutos: 15,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    alertasSuprimentos.unshift(novoAlerta);
+    if (alertasSuprimentos.length > 50) alertasSuprimentos.pop();
+
+    console.log(`[SUPPLY ALERT] 🚨 Alerta de material registrado: ${novoAlerta.item} para ${novoAlerta.solicitante} em ${novoAlerta.bairro}`);
+    await logAuditLGPD('SOLICITACAO_MATERIAL_RUA', `Solicitação de material (${novoAlerta.item}) por ${novoAlerta.solicitante} em ${novoAlerta.bairro}`);
 
     return reply.status(200).send({
       success: true,
       alertaEmitido: true,
-      solicitante,
-      bairro,
+      alerta: novoAlerta,
+      solicitante: novoAlerta.solicitante,
+      bairro: novoAlerta.bairro,
       tempoEstimadoChegadaMinutos: 15
     });
+  });
+
+  app.get('/api/equipe-rua/alertas-material', async (request: FastifyRequest) => {
+    const { status } = request.query as any;
+    let lista = alertasSuprimentos;
+    if (status) {
+      lista = lista.filter(a => a.status === status);
+    }
+    const pendentes = alertasSuprimentos.filter(a => a.status === 'PENDENTE').length;
+    return {
+      success: true,
+      alertas: lista,
+      totalPendentes: pendentes,
+      timestamp: new Date().toISOString()
+    };
+  });
+
+  app.post('/api/equipe-rua/alertas-material/:id/atender', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as any;
+    const { status = 'A_CAMINHO' } = (request.body as any) || {};
+    const alert = alertasSuprimentos.find(a => a.id === id);
+    if (!alert) {
+      return reply.status(404).send({ error: 'Alerta não encontrado' });
+    }
+    alert.status = status;
+    alert.updatedAt = new Date().toISOString();
+    return reply.status(200).send({ success: true, alerta: alert });
   });
 
   // ─── 15. Ponto Eletrônico: Check-in de Entrada ─────────────────────────────
