@@ -611,26 +611,40 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
 
     try {
       // Gravação direta na tabela oficial de apoiadores da campanha
-      const [usuarioGravado] = await db
-        .insert(schema.usuarios)
-        .values({
-          nome: nomeFormatado,
-          whatsapp: cleanWhatsapp,
-          cargo: 'APOIADOR',
-          bairro: bairro || 'Santos',
-          status_onboarding: 'COMPLETO',
-          notas: nota,
-        })
-        .onConflictDoUpdate({
-          target: schema.usuarios.whatsapp,
-          set: {
+      const existente = await db
+        .select({ id: schema.usuarios.id, notas: schema.usuarios.notas })
+        .from(schema.usuarios)
+        .where(eq(schema.usuarios.whatsapp, cleanWhatsapp))
+        .limit(1)
+        .then((r) => r[0]);
+
+      let usuarioGravado: any;
+      if (existente) {
+        const [updated] = await db
+          .update(schema.usuarios)
+          .set({
             nome: nomeFormatado,
             bairro: bairro || 'Santos',
-            notas: sql`CONCAT(COALESCE(${schema.usuarios.notas}, ''), ' | Atualizado por ', ${cadastradoPor || 'Colaborador'})`,
-            updated_at: new Date(),
-          },
-        })
-        .returning();
+            notas: existente.notas ? `${existente.notas} | Atualizado por ${cadastradoPor || 'Colaborador'}` : nota,
+            updated_at: new Date()
+          })
+          .where(eq(schema.usuarios.id, existente.id))
+          .returning();
+        usuarioGravado = updated;
+      } else {
+        const [created] = await db
+          .insert(schema.usuarios)
+          .values({
+            nome: nomeFormatado,
+            whatsapp: cleanWhatsapp,
+            cargo: 'APOIADOR',
+            bairro: bairro || 'Santos',
+            status_onboarding: 'COMPLETO',
+            notas: nota,
+          })
+          .returning();
+        usuarioGravado = created;
+      }
 
       // Atualiza contador de cadastros em tempo real na telemetria do colaborador
       const idChave = membro_id || (cadastradoPor ? `colab_${cadastradoPor}` : null);
