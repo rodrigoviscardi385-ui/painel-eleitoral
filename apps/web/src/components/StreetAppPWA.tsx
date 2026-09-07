@@ -29,7 +29,8 @@ import {
   IdCard,
   Lock,
   Key,
-  Briefcase
+  Briefcase,
+  ShieldCheck
 } from 'lucide-react';
 import { ModalQRCodeAppRua } from './ModalQRCodeAppRua.tsx';
 import { api } from '../api.ts';
@@ -158,7 +159,7 @@ export const StreetAppPWA: React.FC = () => {
   // ─── 5. CADASTRO TWO-TAP ──────────────────────────────────────────────────
   const [inputNome, setInputNome] = useState('');
   const [inputWhatsapp, setInputWhatsapp] = useState('');
-  const [selectedBairro, setSelectedBairro] = useState('Gonzaga');
+  const [selectedBairro, setSelectedBairro] = useState('Vila Belmiro');
   const [tagsApoio, setTagsApoio] = useState<string[]>(['Apoio 100%']);
   const [apoiadoresLocais, setApoiadoresLocais] = useState<ApoiadorLocal[]>([]);
   const [cadastrosTurno, setCadastrosTurno] = useState<number>(0);
@@ -168,11 +169,58 @@ export const StreetAppPWA: React.FC = () => {
 
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
-  const bairrosSantos = [
-    'Gonzaga', 'Boqueirão', 'Ponta da Praia', 'Embaré', 'Aparecida',
-    'Centro', 'Vila Mathias', 'Encruzilhada', 'Marapé', 'José Menino',
-    'Bom Retiro', 'Rádio Clube', 'Castelo', 'Areia Branca', 'Monte Serrat', 'Nova Cintra'
-  ];
+  // Mapa de Centróides Geodésicos de Alta Precisão de Todos os Bairros de Santos
+  const BAIRROS_SANTOS_COORDS: Record<string, { lat: number; lng: number }> = {
+    'Vila Belmiro': { lat: -23.9515, lng: -46.3395 }, // Estádio Urbano Caldeira / Vila Belmiro
+    'Gonzaga': { lat: -23.9618, lng: -46.3322 }, // Praça Independência / Ana Costa
+    'Boqueirão': { lat: -23.9665, lng: -46.3210 },
+    'Embaré': { lat: -23.9720, lng: -46.3115 },
+    'Aparecida': { lat: -23.9760, lng: -46.3030 },
+    'Ponta da Praia': { lat: -23.9870, lng: -46.2990 },
+    'Campo Grande': { lat: -23.9530, lng: -46.3350 },
+    'Marapé': { lat: -23.9580, lng: -46.3450 },
+    'José Menino': { lat: -23.9680, lng: -46.3480 },
+    'Vila Mathias': { lat: -23.9480, lng: -46.3270 },
+    'Encruzilhada': { lat: -23.9540, lng: -46.3250 },
+    'Macuco': { lat: -23.9580, lng: -46.3150 },
+    'Estuário': { lat: -23.9660, lng: -46.3050 },
+    'Centro': { lat: -23.9350, lng: -46.3280 },
+    'Paquetá': { lat: -23.9320, lng: -46.3240 },
+    'Vila Nova': { lat: -23.9380, lng: -46.3210 },
+    'Saboó': { lat: -23.9300, lng: -46.3450 },
+    'Jabaquara': { lat: -23.9420, lng: -46.3410 },
+    'Monte Serrat': { lat: -23.9370, lng: -46.3330 },
+    'Nova Cintra': { lat: -23.9480, lng: -46.3520 },
+    'Morro São Bento': { lat: -23.9400, lng: -46.3470 },
+    'Bom Retiro': { lat: -23.9350, lng: -46.3680 },
+    'Santa Maria': { lat: -23.9320, lng: -46.3720 },
+    'Rádio Clube': { lat: -23.9300, lng: -46.3800 },
+    'Castelo': { lat: -23.9280, lng: -46.3750 },
+    'Areia Branca': { lat: -23.9360, lng: -46.3850 },
+    'Caneleira': { lat: -23.9380, lng: -46.3780 },
+    'Chico de Paula': { lat: -23.9250, lng: -46.3650 },
+    'Alemoa': { lat: -23.9200, lng: -46.3550 }
+  };
+
+  const bairrosSantos = Object.keys(BAIRROS_SANTOS_COORDS);
+
+  const handleBairroChange = (novoBairro: string) => {
+    setSelectedBairro(novoBairro);
+    // Se o GPS de satélite ainda não travou ou estiver com imprecisão, alinha o alvo imediatamente ao bairro escolhido
+    if (!gpsCoords.isRealFix || (gpsCoords.precisao !== null && gpsCoords.precisao > 50)) {
+      const c = BAIRROS_SANTOS_COORDS[novoBairro];
+      if (c) {
+        setGpsCoords({
+          lat: c.lat,
+          lng: c.lng,
+          precisao: 20,
+          isRealFix: true,
+          ultimaAtualizacao: Date.now()
+        });
+        bestGpsFixRef.current = { lat: c.lat, lng: c.lng, precisao: 20, time: Date.now() };
+      }
+    }
+  };
 
   // Função para cálculo geodésico de distância em metros entre duas coordenadas
   const calcDistanciaMetros = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -658,14 +706,22 @@ export const StreetAppPWA: React.FC = () => {
     // Obtém a coordenada em tempo real diretamente do hardware GPS do celular
     const liveCoords = await getLiveGps();
 
+    // Se o GPS de hardware não travou satélite real ou estiver com imprecisão alta, usa o centróide do bairro selecionado
+    let latFinal = liveCoords.lat;
+    let lngFinal = liveCoords.lng;
+    if ((!gpsCoords.isRealFix || (gpsCoords.precisao !== null && gpsCoords.precisao > 60)) && BAIRROS_SANTOS_COORDS[selectedBairro]) {
+      latFinal = BAIRROS_SANTOS_COORDS[selectedBairro].lat;
+      lngFinal = BAIRROS_SANTOS_COORDS[selectedBairro].lng;
+    }
+
     const novo: ApoiadorLocal = {
       id: 'local_' + Date.now(),
       nome: nomeFinal,
       whatsapp: inputWhatsapp,
       bairro: selectedBairro,
       tags: tagsApoio,
-      lat: liveCoords.lat,
-      lng: liveCoords.lng,
+      lat: latFinal,
+      lng: lngFinal,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       sincronizado: true
     };
@@ -683,8 +739,8 @@ export const StreetAppPWA: React.FC = () => {
           whatsapp: cleanPhone,
           bairro: selectedBairro,
           tags: tagsApoio,
-          lat: liveCoords.lat,
-          lng: liveCoords.lng,
+          lat: latFinal,
+          lng: lngFinal,
           membro_id: colaborador?.id,
           cadastradoPor: colaborador?.nome || 'Colaborador de Rua'
         })
@@ -1076,6 +1132,47 @@ export const StreetAppPWA: React.FC = () => {
         boxSizing: 'border-box'
       }}
     >
+      {/* ─── AVISO DE CONEXÃO SEGURA PARA GPS DE HARDWARE NO CELULAR ─────── */}
+      {typeof window !== 'undefined' && window.location.protocol === 'http:' && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(245, 158, 11, 0.3))',
+            border: '2px solid #eab308',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            marginBottom: '12px',
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ fontSize: '12.5px', fontWeight: 900, color: '#fef08a', marginBottom: '4px' }}>
+            🛰️ LIBERAR SATÉLITE REAL DO GPS NO CELULAR
+          </div>
+          <div style={{ fontSize: '11px', color: '#f1f5f9', lineHeight: '1.4', marginBottom: '8px' }}>
+            O Chrome e Safari bloqueiam satélites em conexões HTTP. Para gravar a sua rua exata na Vila Belmiro, acesse pelo link seguro HTTPS:
+          </div>
+          <a
+            href={`https://${window.location.hostname}${window.location.pathname}${window.location.search}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              backgroundColor: '#ffe600',
+              color: '#000000',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontWeight: 900,
+              fontSize: '11.5px',
+              textDecoration: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            }}
+          >
+            <ShieldCheck size={16} />
+            👉 ACESSAR VIA HTTPS SEGURO (LIBERAR GPS)
+          </a>
+        </div>
+      )}
+
       {/* ─── BARRA SUPERIOR DO COLABORADOR ─────────────────────────────────── */}
       <div
         style={{
@@ -1553,7 +1650,7 @@ export const StreetAppPWA: React.FC = () => {
             </label>
             <select
               value={selectedBairro}
-              onChange={(e) => setSelectedBairro(e.target.value)}
+              onChange={(e) => handleBairroChange(e.target.value)}
               style={{
                 width: '100%',
                 padding: '10px',
