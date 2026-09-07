@@ -134,11 +134,22 @@ export const StreetAppPWA: React.FC = () => {
   const [passosAcumulados, setPassosAcumulados] = useState<number>(0);
   const [tempoParadoMinutos, setTempoParadoMinutos] = useState<number>(0);
   const [statusCinetico, setStatusCinetico] = useState<'EM_MOVIMENTO' | 'PARADO_BASE' | 'PARADO_ALERTA'>('PARADO_BASE');
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; precisao: number }>({
+  const [gpsCoords, setGpsCoords] = useState<{
+    lat: number;
+    lng: number;
+    precisao: number | null;
+    isRealFix: boolean;
+    ultimaAtualizacao: number | null;
+  }>({
     lat: -23.9618,
     lng: -46.3322,
-    precisao: 5.0
+    precisao: null,
+    isRealFix: false,
+    ultimaAtualizacao: null
   });
+  const [gpsPermissao, setGpsPermissao] = useState<'OBTENDO' | 'AUTORIZADO' | 'NEGADO' | 'ERRO'>('OBTENDO');
+  const [calibrandoGps, setCalibrandoGps] = useState(false);
+  const bestGpsFixRef = useRef<{ lat: number; lng: number; precisao: number; time: number } | null>(null);
   const [bateriaPct, setBateriaPct] = useState<number>(100);
 
   const ultimoMovimentoRef = useRef<number>(Date.now());
@@ -175,7 +186,95 @@ export const StreetAppPWA: React.FC = () => {
     return R * c;
   };
 
-  // ─── CICLO DE SENSORES E GPS QUANDO EM TURNO ──────────────────────────────
+  // ─── CICLO PERMANENTE DE GPS REAL DE HARDWARE (CALIBRAÇÃO CONTÍNUA) ───────
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGpsPermissao('NEGADO');
+      return;
+    }
+
+    const onGpsSuccess = (pos: GeolocationPosition) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const precisao = Number(pos.coords.accuracy.toFixed(1));
+      const now = Date.now();
+
+      setGpsPermissao('AUTORIZADO');
+
+      // Atualiza o melhor fix se for mais preciso ou se já se passaram mais de 12 segundos
+      if (!bestGpsFixRef.current || precisao <= bestGpsFixRef.current.precisao || (now - bestGpsFixRef.current.time > 12000)) {
+        bestGpsFixRef.current = { lat, lng, precisao, time: now };
+      }
+
+      setGpsCoords({
+        lat,
+        lng,
+        precisao,
+        isRealFix: true,
+        ultimaAtualizacao: now
+      });
+
+      // Cálculo de velocidade e cinemática
+      let speed = 0;
+      if (pos.coords.speed !== null && pos.coords.speed !== undefined && !isNaN(pos.coords.speed) && pos.coords.speed >= 0) {
+        speed = Number((pos.coords.speed * 3.6).toFixed(1));
+      } else if (ultimaPosicaoRef.current) {
+        const dt = (now - ultimaPosicaoRef.current.time) / 1000;
+        if (dt >= 2) {
+          const dM = calcDistanciaMetros(ultimaPosicaoRef.current.lat, ultimaPosicaoRef.current.lng, lat, lng);
+          speed = Number(((dM / dt) * 3.6).toFixed(1));
+        }
+      }
+      ultimaPosicaoRef.current = { lat, lng, time: now };
+      setVelocidadeKmh(speed);
+
+      if (speed > 1.2) {
+        ultimoMovimentoRef.current = now;
+        setIsMoving(true);
+        setStatusCinetico('EM_MOVIMENTO');
+        setTempoParadoMinutos(0);
+      }
+    };
+
+    const onGpsError = (err: GeolocationPositionError) => {
+      console.warn('GPS hardware alerta:', err.message);
+      if (err.code === err.PERMISSION_DENIED) {
+        setGpsPermissao('NEGADO');
+      } else {
+        setGpsPermissao('ERRO');
+      }
+    };
+
+    // Watch contínuo de alta precisão
+    const watchId = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, {
+      enableHighAccuracy: true,
+      maximumAge: 2000,
+      timeout: 20000
+    });
+
+    // Disparo imediato para aquecer satélites
+    navigator.geolocation.getCurrentPosition(onGpsSuccess, onGpsError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 12000
+    });
+
+    // Leitura real do nível de Bateria
+    if ((navigator as any).getBattery) {
+      (navigator as any).getBattery().then((battery: any) => {
+        setBateriaPct(Math.round(battery.level * 100));
+        battery.addEventListener('levelchange', () => {
+          setBateriaPct(Math.round(battery.level * 100));
+        });
+      });
+    }
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
+
+  // ─── CICLO DE ACELERÔMETRO E MONITORAMENTO DE INATIVIDADE (QUANDO EM TURNO) ─
   useEffect(() => {
     if (!pontoAtual) return;
 
@@ -197,56 +296,6 @@ export const StreetAppPWA: React.FC = () => {
       window.addEventListener('devicemotion', handleMotion);
     }
 
-    // Escuta de GPS Real com alta precisão
-    let watchId: number | null = null;
-    if (navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const now = Date.now();
-
-          let speed = 0;
-          if (pos.coords.speed !== null && pos.coords.speed !== undefined && !isNaN(pos.coords.speed) && pos.coords.speed >= 0) {
-            speed = Number((pos.coords.speed * 3.6).toFixed(1));
-          } else if (ultimaPosicaoRef.current) {
-            const dt = (now - ultimaPosicaoRef.current.time) / 1000;
-            if (dt >= 2) {
-              const dM = calcDistanciaMetros(ultimaPosicaoRef.current.lat, ultimaPosicaoRef.current.lng, lat, lng);
-              speed = Number(((dM / dt) * 3.6).toFixed(1));
-            }
-          }
-          ultimaPosicaoRef.current = { lat, lng, time: now };
-
-          setVelocidadeKmh(speed);
-          setGpsCoords({
-            lat,
-            lng,
-            precisao: Number(pos.coords.accuracy.toFixed(1))
-          });
-
-          if (speed > 1.2) {
-            ultimoMovimentoRef.current = now;
-            setIsMoving(true);
-            setStatusCinetico('EM_MOVIMENTO');
-            setTempoParadoMinutos(0);
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
-      );
-    }
-
-    // Leitura real do nível de Bateria
-    if ((navigator as any).getBattery) {
-      (navigator as any).getBattery().then((battery: any) => {
-        setBateriaPct(Math.round(battery.level * 100));
-        battery.addEventListener('levelchange', () => {
-          setBateriaPct(Math.round(battery.level * 100));
-        });
-      });
-    }
-
     // Monitoramento periódico de inatividade física
     const idleCheckInterval = setInterval(() => {
       const paradoSegundos = Math.floor((Date.now() - ultimoMovimentoRef.current) / 1000);
@@ -265,7 +314,6 @@ export const StreetAppPWA: React.FC = () => {
 
     return () => {
       if (window.DeviceMotionEvent) window.removeEventListener('devicemotion', handleMotion);
-      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       clearInterval(idleCheckInterval);
     };
   }, [pontoAtual]);
@@ -303,26 +351,65 @@ export const StreetAppPWA: React.FC = () => {
     return () => clearInterval(timer);
   }, [pontoAtual, colaborador, gpsCoords, velocidadeKmh, isMoving, statusCinetico, tempoParadoMinutos, passosAcumulados, bateriaPct, selectedBairro, cadastrosTurno]);
 
-  // ─── CAPTURA DE GPS DE HARDWARE EM TEMPO REAL ───────────────────────────
-  const getLiveGps = (): Promise<{ lat: number; lng: number }> => {
+  // ─── CAPTURA DE GPS DE HARDWARE EM TEMPO REAL COM CALIBRAÇÃO ─────────────
+  const getLiveGps = async (): Promise<{ lat: number; lng: number; precisao?: number }> => {
+    const now = Date.now();
+    // 1. Se o fix contínuo já estiver com alta precisão (<= 15 metros) e recente (< 8s), usa imediatamente
+    if (
+      bestGpsFixRef.current &&
+      bestGpsFixRef.current.precisao <= 15 &&
+      now - bestGpsFixRef.current.time < 8000
+    ) {
+      return bestGpsFixRef.current;
+    }
+
+    // 2. Caso contrário, aciona leitura forçada no chip GNSS com alta prioridade
     return new Promise((resolve) => {
       if (typeof window !== 'undefined' && navigator.geolocation) {
+        setCalibrandoGps(true);
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            setGpsCoords({ lat: coords.lat, lng: coords.lng, precisao: Math.round(pos.coords.accuracy || 5) });
+            setCalibrandoGps(false);
+            const coords = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              precisao: Number(pos.coords.accuracy.toFixed(1))
+            };
+            setGpsCoords({
+              lat: coords.lat,
+              lng: coords.lng,
+              precisao: coords.precisao,
+              isRealFix: true,
+              ultimaAtualizacao: Date.now()
+            });
+            bestGpsFixRef.current = { ...coords, time: Date.now() };
             resolve(coords);
           },
           (err) => {
-            console.warn('GPS hardware timeout/erro, usando última coordenada válida:', err);
-            resolve({ lat: gpsCoords.lat, lng: gpsCoords.lng });
+            setCalibrandoGps(false);
+            console.warn('GPS hardware timeout/erro, usando melhor leitura disponível:', err);
+            if (bestGpsFixRef.current) {
+              resolve(bestGpsFixRef.current);
+            } else {
+              resolve({ lat: gpsCoords.lat, lng: gpsCoords.lng, precisao: gpsCoords.precisao || 30 });
+            }
           },
-          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 1500 }
         );
       } else {
-        resolve({ lat: gpsCoords.lat, lng: gpsCoords.lng });
+        resolve({ lat: gpsCoords.lat, lng: gpsCoords.lng, precisao: 50 });
       }
     });
+  };
+
+  const handleRecalibrarGps = async () => {
+    setCalibrandoGps(true);
+    try {
+      await getLiveGps();
+      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+    } finally {
+      setCalibrandoGps(false);
+    }
   };
 
   // ─── ETAPA 1: VALIDAR SE O IDENTIFICADOR (CPF OU WHATSAPP) CONSTA NA EQUIPE DE RUA ────
@@ -1316,6 +1403,83 @@ export const StreetAppPWA: React.FC = () => {
             <span style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
               CADASTRO TWO-TAP (2 TOQUES)
             </span>
+          </div>
+
+          {/* ─── HUD DE PRECISÃO DO GPS EM TEMPO REAL ────────────────────────── */}
+          <div
+            style={{
+              background: 'rgba(0,0,0,0.5)',
+              border: gpsCoords.isRealFix
+                ? (gpsCoords.precisao !== null && gpsCoords.precisao <= 15 ? '1px solid #10b981' : '1px solid #eab308')
+                : '1px solid #ef4444',
+              borderRadius: '10px',
+              padding: '8px 12px',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Compass
+                size={18}
+                className={calibrandoGps ? 'animate-spin' : ''}
+                color={
+                  gpsCoords.isRealFix
+                    ? (gpsCoords.precisao !== null && gpsCoords.precisao <= 15 ? '#10b981' : '#eab308')
+                    : '#ef4444'
+                }
+              />
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{gpsCoords.isRealFix ? 'GPS SATÉLITE ATIVO' : 'CONECTANDO AOS SATÉLITES...'}</span>
+                  {gpsCoords.precisao !== null && (
+                    <span
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        background: gpsCoords.precisao <= 15 ? 'rgba(16,185,129,0.2)' : 'rgba(234,179,8,0.2)',
+                        color: gpsCoords.precisao <= 15 ? '#34d399' : '#facc15'
+                      }}
+                    >
+                      ± {gpsCoords.precisao}m
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                  {gpsCoords.isRealFix
+                    ? `${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lng.toFixed(5)}`
+                    : 'Aguardando sincronização de hardware'}
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRecalibrarGps}
+              disabled={calibrandoGps}
+              title="Calibrar GPS com máxima precisão"
+              style={{
+                background: 'rgba(255, 230, 0, 0.15)',
+                color: '#ffe600',
+                border: '1px solid rgba(255, 230, 0, 0.4)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                fontSize: '11px',
+                fontWeight: 800,
+                cursor: calibrandoGps ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <RefreshCw size={12} className={calibrandoGps ? 'animate-spin' : ''} />
+              <span>{calibrandoGps ? 'Calibrando...' : 'Calibrar'}</span>
+            </button>
           </div>
 
           <div style={{ marginBottom: '10px' }}>
