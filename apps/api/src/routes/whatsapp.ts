@@ -1,46 +1,60 @@
 /**
  * whatsapp.ts (route)
  * ─────────────────────────────────────────────────────────────────────────────
- * Rotas de status e configuração do WhatsApp — exclusivamente Meta Cloud API.
- * Baileys/wppService completamente removido.
+ * Rotas de status e controle do WhatsApp com suporte a Baileys Anti-Ban (QR Code)
+ * e fallback para Meta Cloud API Oficial.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { FastifyInstance } from 'fastify';
-import { getMetaConfig } from '../services/metaCloudService.js';
+import { getWhatsAppStatus, initWhatsApp, disconnectWhatsApp } from '../services/wppService.js';
+import { getMetaConfig, saveMetaConfig, sendMetaTextMessage } from '../services/metaCloudService.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
 export async function whatsappRoutes(app: FastifyInstance) {
 
-  // ─── Status da conexão (Meta Cloud API) ────────────────────────────────────
+  // ─── 1. Status Geral da Conexão (Baileys com Fallback Meta) ─────────────────
   app.get('/api/whatsapp/status', async () => {
-    const meta = await getMetaConfig();
+    return await getWhatsAppStatus();
+  });
 
-    if (meta.phone_number_id && meta.access_token) {
-      return {
-        status: 'CONNECTED',
-        provider: 'META_CLOUD_API',
-        phoneConnected: meta.display_phone_number || meta.phone_number_id,
-        nameConnected: 'WhatsApp Cloud API Oficial Meta',
-        lastConnectedAt: new Date().toISOString(),
-        qrCodeBase64: null,
-      };
-    }
-
+  // ─── 2. Solicitar Nova Conexão / Gerar QR Code Baileys ──────────────────────
+  app.post('/api/whatsapp/connect', async () => {
+    // Inicia processo de pareamento do Baileys
+    initWhatsApp().catch((err) => console.error('[WhatsApp Connect Error]', err));
     return {
-      status: 'WAITING_CREDENTIALS',
-      provider: 'META_CLOUD_API',
-      phoneConnected: null,
-      nameConnected: null,
-      lastConnectedAt: null,
-      qrCodeBase64: null,
-      message: 'Configure as credenciais da Meta Cloud API no painel (botão WhatsApp).',
+      message: 'Inicializando pareamento seguro Baileys. Aguarde a geração do QR Code...',
+      status: 'INITIALIZING',
     };
   });
 
-  // ─── Status e métricas do controle de disparos ─────────────────────────────
+  // ─── 3. Desconectar Sessão Baileys / Trocar Chip ───────────────────────────
+  app.post('/api/whatsapp/disconnect', async () => {
+    await disconnectWhatsApp();
+    return {
+      message: 'Sessão do WhatsApp desconectada com sucesso. Pasta de credenciais limpa.',
+      status: 'DISCONNECTED',
+    };
+  });
+
+  // ─── 4. Link Oficial de Inbound wa.me para Divulgação Segura ────────────────
+  app.get('/api/whatsapp/inbound-link', async () => {
+    const status = await getWhatsAppStatus();
+    const phone = status.phoneConnected || '5513999999999';
+    const text = encodeURIComponent('Olá Gustavo Reis, sou de Santos e quero conhecer suas propostas para a cidade!');
+    const link = `https://wa.me/${phone}?text=${text}`;
+
+    return {
+      phone,
+      link,
+      isWarmedUp: status.isWarmedUp,
+      instructions: 'Divulgue este link no Instagram, santinhos digitais e bio das redes para que o eleitor envie mensagem primeiro (0% risco de ban).',
+    };
+  });
+
+  // ─── 5. Status e Métricas do Controle de Disparos / Aquecimento ────────────
   app.get('/api/whatsapp/chip-warming', async () => {
     const config = await db.select().from(schema.chipWarmingConfig).limit(1).then((r) => r[0]);
     return config || {
@@ -50,7 +64,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     };
   });
 
-  // ─── Atualização dos parâmetros de controle de disparos ────────────────────
+  // ─── 6. Atualização dos Parâmetros de Disparos ─────────────────────────────
   app.post('/api/whatsapp/chip-warming/update', async (request, reply) => {
     const body = request.body as any;
     const existing = await db.select().from(schema.chipWarmingConfig).limit(1).then((r) => r[0]);
@@ -69,5 +83,24 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
     const updated = await db.select().from(schema.chipWarmingConfig).limit(1).then((r) => r[0]);
     return updated;
+  });
+
+  // ─── 7. Rotas da Meta Cloud API (Mantidas para Compatibilidade) ────────────
+  app.get('/api/whatsapp/meta-config', async () => {
+    return await getMetaConfig();
+  });
+
+  app.post('/api/whatsapp/meta-config', async (request) => {
+    const body = request.body as any;
+    return await saveMetaConfig(body);
+  });
+
+  app.post('/api/whatsapp/meta-test', async (request, reply) => {
+    const { to, text } = (request.body as any) || {};
+    if (!to) {
+      return reply.status(400).send({ error: 'Número de telefone destino obrigatório.' });
+    }
+    const result = await sendMetaTextMessage(to, text || 'Teste de conectividade Meta Cloud API.');
+    return result;
   });
 }

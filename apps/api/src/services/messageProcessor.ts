@@ -19,6 +19,7 @@ import {
 import { parseBoletimUrna } from './buDecoderService.js';
 import { ocrImageBuffer } from './ocrService.js';
 import { sendMetaTextMessage, downloadMetaMedia } from './metaCloudService.js';
+import { sendWhatsAppMessage } from './wppService.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -493,11 +494,11 @@ export async function processIncomingMessage(msg: IncomingMessage): Promise<Proc
 }
 
 /**
- * Atalho interno para envio via Meta Cloud API
+ * Atalho interno para envio de resposta com prioridade Baileys e fallback Meta
  */
 async function reply(to: string, text: string): Promise<void> {
-  const result = await sendMetaTextMessage(to, text);
-  if (!result.success) {
-    console.error(`[Processor] Falha ao enviar mensagem para ${to}: ${result.error}`);
+  const sent = await sendWhatsAppMessage(to, text);
+  if (!sent) {
+    console.error(`[Processor] Falha ao enviar mensagem de resposta para ${to}`);
   }
 }

@@ -19,6 +19,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import dotenv from 'dotenv';
 import { initDatabase } from './db/index.js';
 import { startQueueWorker } from './services/queueWorker.js';
+import { initWhatsApp } from './services/wppService.js';
 
 import { authRoutes } from './routes/auth.js';
 import { whatsappRoutes } from './routes/whatsapp.js';
@@ -160,6 +161,7 @@ async function startServer() {
 
     await initDatabase();
     startQueueWorker();
+    initWhatsApp().catch((e) => console.warn('[server] Aviso ao iniciar WhatsApp Baileys:', e?.message));
 
     await app.listen({ port: PORT, host: HOST });
     console.log(`🚀 API rodando em http://${HOST}:${PORT}`);

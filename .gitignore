@@ -4,5 +4,7 @@ dist
 .env
 .env.local
 baileys_auth_info
+.wpp-auth
+.wpp-auth*
 *.log
 *.tar.gz
