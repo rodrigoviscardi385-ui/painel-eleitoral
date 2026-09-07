@@ -8,7 +8,6 @@
 
 import { FastifyInstance } from 'fastify';
 import { getWhatsAppStatus, initWhatsApp, disconnectWhatsApp } from '../services/wppService.js';
-import { getMetaConfig, saveMetaConfig, sendMetaTextMessage } from '../services/metaCloudService.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -83,24 +82,5 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
     const updated = await db.select().from(schema.chipWarmingConfig).limit(1).then((r) => r[0]);
     return updated;
-  });
-
-  // ─── 7. Rotas da Meta Cloud API (Mantidas para Compatibilidade) ────────────
-  app.get('/api/whatsapp/meta-config', async () => {
-    return await getMetaConfig();
-  });
-
-  app.post('/api/whatsapp/meta-config', async (request) => {
-    const body = request.body as any;
-    return await saveMetaConfig(body);
-  });
-
-  app.post('/api/whatsapp/meta-test', async (request, reply) => {
-    const { to, text } = (request.body as any) || {};
-    if (!to) {
-      return reply.status(400).send({ error: 'Número de telefone destino obrigatório.' });
-    }
-    const result = await sendMetaTextMessage(to, text || 'Teste de conectividade Meta Cloud API.');
-    return result;
   });
 }
