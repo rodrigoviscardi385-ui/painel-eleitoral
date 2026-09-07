@@ -197,7 +197,7 @@ export const CockpitSpeedometer: React.FC<CockpitProps> = ({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
           gap: '12px',
         }}
       >
@@ -308,14 +308,7 @@ export const CockpitSpeedometer: React.FC<CockpitProps> = ({
       </div>
 
       {/* ─── 3. GRID HERO: VELOCÍMETRO RADIAL + 4 KPIS ESSENCIAIS ──────────── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(300px, 380px) 1fr',
-          gap: '20px',
-          alignItems: 'stretch',
-        }}
-      >
+      <div className="grid-hero-cockpit">
         {/* Velocímetro / Anel Radial */}
         <div
           className="glass-panel"
@@ -410,7 +403,7 @@ export const CockpitSpeedometer: React.FC<CockpitProps> = ({
         </div>
 
         {/* 4 Cards de Métricas em Tempo Real */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+        <div className="grid-kpi-cockpit">
           {/* Card 1: Eleitores & Apoiadores */}
           <div className="kpi-card">
             <div className="kpi-card-header">
@@ -539,7 +532,7 @@ export const CockpitSpeedometer: React.FC<CockpitProps> = ({
 
         {/* ── ABA 1: RANKING DE LIDERANÇAS & RADAR DE ATENÇÃO ────────────────── */}
         {intelTab === 'ranking' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
             {/* Top Líderes */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>

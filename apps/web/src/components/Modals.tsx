@@ -34,117 +34,159 @@ import {
 } from 'lucide-react';
 import { api } from '../api.ts';
 
+import { buscarLocaisSantos, LOCAIS_SANTOS_BASE } from '../data/locaisVotacaoSantos.ts';
+
 // ─── Componente Seletor de Escolas e Locais de Votação de Santos ─────────────
 export const SeletorLocalVotacaoSantos: React.FC<{
   onSelectLocal: (local: { nome_escola: string; bairro: string; zona_eleitoral: string; secoes: number[]; endereco: string }) => void;
   selectedEscola?: string;
 }> = ({ onSelectLocal, selectedEscola }) => {
-  const [busca, setBusca] = useState('');
-  const [locais, setLocais] = useState<any[]>([]);
+  const [busca, setBusca] = useState(selectedEscola || '');
+  const [locais, setLocais] = useState<any[]>(LOCAIS_SANTOS_BASE);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Fechar ao clicar fora
   useEffect(() => {
-    if (busca.length >= 2) {
-      setIsLoading(true);
-      const timer = setTimeout(async () => {
-        try {
-          const res = await api.getLocaisVotacao(busca);
-          setLocais(res || []);
-          setIsOpen(true);
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setIsLoading(false);
-        }
-      }, 250);
-      return () => clearTimeout(timer);
-    } else {
-      setLocais([]);
-      setIsOpen(false);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Busca instantânea local (com tolerância a acentos) + chamada à API assíncrona
+  useEffect(() => {
+    const termo = busca.trim();
+    if (!termo) {
+      setLocais(LOCAIS_SANTOS_BASE);
+      return;
     }
+
+    // 1. Resolução instantânea local (0ms de latência, sem acentos)
+    const matchesLocais = buscarLocaisSantos(termo);
+    setLocais(matchesLocais);
+
+    // 2. Consulta complementar à API caso conectado
+    setIsLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.getLocaisVotacao({ busca: termo });
+        if (res && res.length > 0) {
+          setLocais(res);
+        }
+      } catch (_) {
+        // Mantém os matches locais instantâneos
+      } finally {
+        setIsLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
   }, [busca]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#10b981', fontWeight: 600, marginBottom: '4px' }}>
-        <School size={14} /> Buscar Escola / Local de Votação (Santos - Zonas 118 e 272)
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', marginBottom: '6px' }}>
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#10b981', fontWeight: 600, marginBottom: '4px' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <School size={14} /> Buscar Colégio / Local de Votação (Santos - Zonas 118ª, 272ª e 273ª)
+        </span>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          {locais.length} disponíveis
+        </span>
       </label>
       <div style={{ position: 'relative' }}>
         <input
           type="text"
           className="input-field"
-          placeholder="Digite o nome da escola, bairro ou seção (ex: Martim Afonso, Barnabé, Marapé...)"
-          value={busca || selectedEscola || ''}
+          placeholder="Digite o nome da escola, colégio ou bairro (ex: Martim Afonso, Barnabé, SESI, Stella Maris...)"
+          value={busca}
           onChange={(e) => {
             setBusca(e.target.value);
             setIsOpen(true);
           }}
-          onFocus={() => {
-            if (busca.length >= 2 && locais.length > 0) setIsOpen(true);
-          }}
-          style={{ paddingRight: '32px', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+          onFocus={() => setIsOpen(true)}
+          style={{ paddingRight: '36px', borderColor: 'rgba(16, 185, 129, 0.4)' }}
         />
         {isLoading ? (
-          <span style={{ position: 'absolute', right: '10px', top: '9px', fontSize: '11px', color: '#10b981' }}>
+          <span style={{ position: 'absolute', right: '12px', top: '10px', fontSize: '11px', color: '#10b981' }}>
             ...
           </span>
         ) : (
-          <Search size={14} style={{ position: 'absolute', right: '10px', top: '10px', color: 'var(--text-secondary)' }} />
+          <Search size={15} style={{ position: 'absolute', right: '12px', top: '11px', color: 'var(--text-secondary)' }} />
         )}
       </div>
 
-      {isOpen && locais.length > 0 && (
+      {isOpen && (
         <div
+          className="chat-scroll-container"
           style={{
             position: 'absolute',
-            top: '100%',
+            top: 'calc(100% + 4px)',
             left: 0,
             right: 0,
-            background: '#161f30',
-            border: '1px solid #334155',
-            borderRadius: '8px',
-            marginTop: '4px',
-            maxHeight: '220px',
+            background: 'var(--bg-surface-elevated)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '10px',
+            maxHeight: '260px',
             overflowY: 'auto',
             zIndex: 9999,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+            boxShadow: 'var(--shadow-dropdown)',
           }}
         >
-          {locais.map((loc) => (
-            <div
-              key={loc.id}
-              onClick={() => {
-                onSelectLocal(loc);
-                setBusca(`${loc.nome_escola} (${loc.bairro})`);
-                setIsOpen(false);
-              }}
-              style={{
-                padding: '8px 12px',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                cursor: 'pointer',
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
-                {loc.nome_escola}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', gap: '8px', marginTop: '2px' }}>
-                <span style={{ color: '#10b981', fontWeight: 600 }}>{loc.bairro}</span>
-                <span>•</span>
-                <span>Zona {loc.zona_eleitoral}</span>
-                <span>•</span>
-                <span>{loc.secoes?.length} seções</span>
-              </div>
-              {loc.endereco && (
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {loc.endereco}
-                </div>
-              )}
+          {locais.length === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+              Nenhum colégio ou local de votação encontrado para "<strong>{busca}</strong>".
+              <br />
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Tente buscar pelo bairro (ex: Gonzaga, Vila Belmiro, Ponta da Praia) ou número da Zona.
+              </span>
             </div>
-          ))}
+          ) : (
+            locais.map((loc) => (
+              <div
+                key={loc.id}
+                onClick={() => {
+                  onSelectLocal(loc);
+                  setBusca(`${loc.nome_escola} (${loc.bairro})`);
+                  setIsOpen(false);
+                }}
+                style={{
+                  padding: '10px 14px',
+                  borderBottom: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(16, 185, 129, 0.12)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {loc.nome_escola}
+                  </span>
+                  <span
+                    className="badge badge-verde"
+                    style={{ fontSize: '10px', padding: '1px 6px' }}
+                  >
+                    {loc.zona_eleitoral}ª ZE
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', gap: '8px', marginTop: '3px' }}>
+                  <span style={{ color: '#10b981', fontWeight: 600 }}>{loc.bairro}</span>
+                  <span>•</span>
+                  <span>{loc.secoes?.length || 0} seções eleitorais</span>
+                </div>
+                {loc.endereco && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {loc.endereco}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

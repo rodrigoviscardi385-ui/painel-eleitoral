@@ -559,7 +559,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Mobile Header Icons */}
-            <div className="mobile-only" style={{ display: 'none', alignItems: 'center', gap: '8px' }}>
+            <div className="mobile-only" style={{ alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={onOpenQrModal}
+                className="btn btn-secondary btn-icon"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderColor: isOnline ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-color)',
+                  color: isOnline ? 'var(--primary)' : 'var(--text-secondary)',
+                }}
+                title={isOnline ? 'WhatsApp Conectado' : 'Conectar WhatsApp'}
+              >
+                <QrCode size={16} />
+              </button>
+
               {onToggleTheme && (
                 <button
                   onClick={onToggleTheme}

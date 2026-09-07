@@ -6,5 +6,3 @@ dist
 baileys_auth_info
 *.log
 *.tar.gz
-deploy/
-scripts/

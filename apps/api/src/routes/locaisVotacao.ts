@@ -1,6 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import { LOCAIS_VOTACAO_SANTOS } from '../data/locaisVotacaoSantos.js';
 
+function normalizeText(text: string): string {
+  if (!text) return '';
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export async function locaisVotacaoRoutes(app: FastifyInstance) {
   // Lista ou busca locais de votação de Santos/SP por nome de escola, bairro ou zona
   app.get('/api/locais-votacao', async (request) => {
@@ -13,17 +22,17 @@ export async function locaisVotacaoRoutes(app: FastifyInstance) {
     }
 
     if (bairro) {
-      const bClean = String(bairro).toLowerCase();
-      resultados = resultados.filter((l) => l.bairro.toLowerCase().includes(bClean));
+      const bClean = normalizeText(String(bairro));
+      resultados = resultados.filter((l) => normalizeText(l.bairro).includes(bClean));
     }
 
     if (busca) {
-      const q = String(busca).toLowerCase().trim();
+      const q = normalizeText(String(busca));
       resultados = resultados.filter(
         (l) =>
-          l.nome.toLowerCase().includes(q) ||
-          l.bairro.toLowerCase().includes(q) ||
-          l.endereco.toLowerCase().includes(q) ||
+          normalizeText(l.nome).includes(q) ||
+          normalizeText(l.bairro).includes(q) ||
+          normalizeText(l.endereco).includes(q) ||
           l.zona.includes(q) ||
           l.secoes.some((s) => String(s) === q)
       );
@@ -52,6 +61,13 @@ export async function locaisVotacaoRoutes(app: FastifyInstance) {
       '272': {
         escolas: LOCAIS_VOTACAO_SANTOS.filter((l) => l.zona === '272').length,
         secoes: LOCAIS_VOTACAO_SANTOS.filter((l) => l.zona === '272').reduce(
+          (acc, curr) => acc + curr.secoes.length,
+          0
+        ),
+      },
+      '273': {
+        escolas: LOCAIS_VOTACAO_SANTOS.filter((l) => l.zona === '273').length,
+        secoes: LOCAIS_VOTACAO_SANTOS.filter((l) => l.zona === '273').reduce(
           (acc, curr) => acc + curr.secoes.length,
           0
         ),

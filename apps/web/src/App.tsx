@@ -389,21 +389,7 @@ export const App: React.FC = () => {
       />
 
       {/* Conteúdo da Aba Ativa */}
-      <main
-        style={{
-          flex: 1,
-          maxWidth: '1440px',
-          width: '100%',
-          margin: '0 auto',
-          padding: activeTab === 'chat' ? '12px 24px' : '24px',
-          height: activeTab === 'chat' ? 'calc(100vh - 72px)' : 'auto',
-          maxHeight: activeTab === 'chat' ? 'calc(100vh - 72px)' : 'none',
-          overflow: activeTab === 'chat' ? 'hidden' : 'visible',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-        }}
-      >
+      <main className={`app-main-content ${activeTab === 'chat' ? 'chat-mode' : ''}`}>
         {activeTab === 'cockpit' && (
           <CockpitSpeedometer
             metas={metas}

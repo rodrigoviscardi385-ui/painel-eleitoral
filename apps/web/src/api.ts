@@ -335,11 +335,15 @@ export const api = {
     }),
 
   // Locais de Votação Santos / SP (Escolas e Zonas)
-  getLocaisVotacao: (params: { busca?: string; zona?: string; bairro?: string } = {}) => {
+  getLocaisVotacao: (params: string | { busca?: string; zona?: string; bairro?: string } = {}) => {
     const query = new URLSearchParams();
-    if (params.busca) query.set('busca', params.busca);
-    if (params.zona) query.set('zona', params.zona);
-    if (params.bairro) query.set('bairro', params.bairro);
+    if (typeof params === 'string') {
+      if (params.trim()) query.set('busca', params.trim());
+    } else {
+      if (params.busca) query.set('busca', params.busca.trim());
+      if (params.zona) query.set('zona', params.zona);
+      if (params.bairro) query.set('bairro', params.bairro);
+    }
     return request<any[]>(`/api/locais-votacao?${query.toString()}`);
   },
   getLocaisVotacaoEstatisticas: () => request<any>('/api/locais-votacao/estatisticas'),
