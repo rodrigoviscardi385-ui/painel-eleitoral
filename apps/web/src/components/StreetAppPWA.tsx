@@ -41,6 +41,8 @@ interface ColaboradorSession {
   cpf: string;
   bairro: string;
   funcao: string;
+  token?: string;
+  authenticated?: boolean;
   createdAt: string;
 }
 
@@ -72,12 +74,22 @@ interface ApoiadorLocal {
 }
 
 export const StreetAppPWA: React.FC = () => {
-  // ─── 1. SESSÃO ISOLADA DO COLABORADOR ──────────────────────────────────────
+  // ─── 1. SESSÃO ISOLADA DO COLABORADOR (EXIGE AUTENTICAÇÃO REAL) ────────────
   const [colaborador, setColaborador] = useState<ColaboradorSession | null>(() => {
     try {
       const saved = localStorage.getItem('santos_colaborador_session');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Se a sessão for legada/mockada (sem token ou sem authenticated: true), limpa imediatamente para exigir login
+        if (!parsed.authenticated || !parsed.token) {
+          localStorage.removeItem('santos_colaborador_session');
+          return null;
+        }
+        return parsed;
+      }
+      return null;
     } catch (_) {
+      localStorage.removeItem('santos_colaborador_session');
       return null;
     }
   });
@@ -377,6 +389,8 @@ export const StreetAppPWA: React.FC = () => {
           cpf: c.cpf || 'Cadastrado',
           bairro: c.bairro || 'Gonzaga',
           funcao: c.funcao || 'Mobilizador de Rua',
+          token: res.token || 'jwt_session_' + Date.now(),
+          authenticated: true,
           createdAt: new Date().toISOString()
         };
 
@@ -414,6 +428,8 @@ export const StreetAppPWA: React.FC = () => {
           cpf: c.cpf || 'Cadastrado',
           bairro: c.bairro || 'Gonzaga',
           funcao: c.funcao || 'Mobilizador de Rua',
+          token: res.token || 'jwt_session_' + Date.now(),
+          authenticated: true,
           createdAt: new Date().toISOString()
         };
 
@@ -1046,21 +1062,23 @@ export const StreetAppPWA: React.FC = () => {
 
           <button
             onClick={handleLogoutColaborador}
-            title="Sair da conta"
+            title="Sair da conta e trocar de colaborador"
             style={{
-              background: 'rgba(239, 68, 68, 0.2)',
-              color: '#ef4444',
-              border: '1px solid #ef4444',
-              padding: '6px 8px',
-              borderRadius: '6px',
-              fontWeight: 700,
+              background: '#ef4444',
+              color: '#ffffff',
+              border: 'none',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              fontWeight: 800,
               fontSize: '11px',
               cursor: 'pointer',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              gap: '4px'
             }}
           >
             <LogOut size={13} />
+            SAIR
           </button>
         </div>
       </div>

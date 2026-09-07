@@ -21,6 +21,7 @@ import {
   ChevronRight,
   ExternalLink,
   Lock,
+  Key,
   QrCode,
   Share2,
 } from 'lucide-react';
@@ -28,7 +29,17 @@ import { api } from '../api.ts';
 import { StreetTeamModal } from './StreetTeamModal.tsx';
 import { StreetContractModal } from './StreetContractModal.tsx';
 
-export const StreetTeamManager: React.FC = () => {
+interface StreetTeamManagerProps {
+  initialSubTab?: 'COLABORADORES' | 'APOIADORES';
+}
+
+export const StreetTeamManager: React.FC<StreetTeamManagerProps> = ({ initialSubTab = 'COLABORADORES' }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'COLABORADORES' | 'APOIADORES'>(initialSubTab);
+  const [apoiadoresRua, setApoiadoresRua] = useState<any[]>([]);
+  const [totalApoiadoresRua, setTotalApoiadoresRua] = useState<number>(0);
+  const [buscaApoiadores, setBuscaApoiadores] = useState('');
+  const [loadingApoiadores, setLoadingApoiadores] = useState(false);
+
   const [membros, setMembros] = useState<any[]>([]);
   const [metricas, setMetricas] = useState({
     total: 0,
@@ -49,6 +60,31 @@ export const StreetTeamManager: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [searchTerm, filtroJornada, filtroStatus]);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
+  useEffect(() => {
+    loadApoiadores();
+  }, [buscaApoiadores]);
+
+  const loadApoiadores = async () => {
+    try {
+      setLoadingApoiadores(true);
+      const res = await api.getApoiadoresColetados({ busca: buscaApoiadores, limite: 100 });
+      if (res && res.success) {
+        setApoiadoresRua(res.apoiadores || []);
+        setTotalApoiadoresRua(res.total || 0);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar apoiadores:', err);
+    } finally {
+      setLoadingApoiadores(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -104,21 +140,21 @@ export const StreetTeamManager: React.FC = () => {
 
           <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Users size={26} color="var(--primary)" />
-            Equipe de Rua & Contratos Gov.br
+            Equipe de Rua & Cadastros de Campo
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '4px 0 0 0', maxWidth: '680px' }}>
-            Cadastro independente de militância de campo com geração dinâmica de contratos (Meio Período vs Período Integral) e assinatura digital biométrica via Gov.br (Lei 14.063/2020).
+            Gestão dos colaboradores de rua autorizados no app mobile e auditoria em tempo real de eleitores/apoiadores cadastrados com GPS.
           </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
-            onClick={loadData}
+            onClick={() => { loadData(); loadApoiadores(); }}
             className="btn btn-secondary btn-sm"
             style={{ borderRadius: 'var(--radius-md)' }}
-            title="Recarregar lista"
+            title="Recarregar dados"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={(loading || loadingApoiadores) ? 'animate-spin' : ''} />
             <span>Atualizar</span>
           </button>
 
@@ -131,13 +167,73 @@ export const StreetTeamManager: React.FC = () => {
             style={{ borderRadius: 'var(--radius-md)', padding: '9px 18px' }}
           >
             <UserPlus size={16} />
-            <span>Novo Cadastro de Rua</span>
+            <span>Novo Colaborador de Rua</span>
           </button>
         </div>
       </div>
 
-      {/* ─── 2. CARDS DE INDICADORES EXECUTIVOS ─────────────────────────────── */}
-      <div className="street-metrics-grid">
+      {/* ─── NAVEGAÇÃO ENTRE SUB-ABAS: COLABORADORES VS APOIADORES CADASTRADOS ──── */}
+      <div style={{ display: 'flex', gap: '12px', margin: '18px 0 10px 0', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveSubTab('COLABORADORES')}
+          style={{
+            padding: '12px 22px',
+            borderRadius: '12px',
+            border: activeSubTab === 'COLABORADORES' ? '2px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+            background: activeSubTab === 'COLABORADORES' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(15, 23, 42, 0.6)',
+            color: activeSubTab === 'COLABORADORES' ? '#10b981' : '#94a3b8',
+            fontSize: '13px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: activeSubTab === 'COLABORADORES' ? '0 4px 15px rgba(16, 185, 129, 0.2)' : 'none'
+          }}
+        >
+          <Users size={18} />
+          Colaboradores de Rua & Acessos ({metricas.total})
+        </button>
+
+        <button
+          onClick={() => { setActiveSubTab('APOIADORES'); loadApoiadores(); }}
+          style={{
+            padding: '12px 22px',
+            borderRadius: '12px',
+            border: activeSubTab === 'APOIADORES' ? '2px solid #ffe600' : '1px solid rgba(255, 255, 255, 0.1)',
+            background: activeSubTab === 'APOIADORES' ? 'rgba(255, 230, 0, 0.18)' : 'rgba(15, 23, 42, 0.6)',
+            color: activeSubTab === 'APOIADORES' ? '#ffe600' : '#94a3b8',
+            fontSize: '13px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: activeSubTab === 'APOIADORES' ? '0 4px 15px rgba(255, 230, 0, 0.2)' : 'none'
+          }}
+        >
+          <MapPin size={18} />
+          Apoiadores Cadastrados na Rua (Auditoria GPS & Quem Registrou)
+          {totalApoiadoresRua > 0 && (
+            <span style={{
+              background: '#ffe600',
+              color: '#000000',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: 900
+            }}>
+              {totalApoiadoresRua}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ─── CONTEÚDO DA SUB-ABA 1: COLABORADORES DE RUA & CONTRATOS ────── */}
+      {activeSubTab === 'COLABORADORES' && (
+        <>
+          {/* ─── 2. CARDS DE INDICADORES EXECUTIVOS ─────────────────────────────── */}
+          <div className="street-metrics-grid">
         <div className="street-metric-card">
           <div className="street-metric-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
             <Users size={22} />
@@ -278,6 +374,7 @@ export const StreetTeamManager: React.FC = () => {
                   <th>Modalidade de Jornada</th>
                   <th>Remuneração TSE</th>
                   <th>Status Assinatura Gov.br</th>
+                  <th>Acesso App de Rua</th>
                   <th>Contato / Local</th>
                   <th style={{ textAlign: 'right' }}>Ações Rápidas</th>
                 </tr>
@@ -379,6 +476,29 @@ export const StreetTeamManager: React.FC = () => {
                         )}
                       </td>
 
+                      {/* Acesso ao App de Rua */}
+                      <td>
+                        {m.primeiro_acesso_realizado ? (
+                          <div>
+                            <span className="badge badge-verde" style={{ fontSize: '11px', gap: '4px', fontWeight: 700 }}>
+                              <Lock size={12} /> Senha Ativa
+                            </span>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              Login: {m.cpf}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="badge badge-amarelo" style={{ fontSize: '11px', gap: '4px', fontWeight: 700 }}>
+                              <Key size={12} /> 1º Acesso Pendente
+                            </span>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              Cria senha no app
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
                       {/* Contato & Local */}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', color: 'var(--text-primary)' }}>
@@ -442,6 +562,160 @@ export const StreetTeamManager: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+        </>
+      )}
+
+      {/* ─── CONTEÚDO DA SUB-ABA 2: APOIADORES CADASTRADOS NA RUA (GPS REAL & AUDITORIA) ─── */}
+      {activeSubTab === 'APOIADORES' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Barra de Filtros e Busca de Apoiadores */}
+          <div className="glass-panel street-filters-bar">
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px', maxWidth: '440px' }}>
+              <Search
+                size={16}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
+              />
+              <input
+                type="text"
+                placeholder="Buscar por apoiador, bairro ou colaborador que cadastrou..."
+                value={buscaApoiadores}
+                onChange={(e) => setBuscaApoiadores(e.target.value)}
+                className="input-field"
+                style={{ paddingLeft: '36px', height: '38px', fontSize: '13px' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="badge badge-verde" style={{ fontSize: '12px', fontWeight: 700, padding: '6px 12px' }}>
+                📍 {totalApoiadoresRua} Apoiadores Rastreados com GPS
+              </span>
+              <button
+                onClick={loadApoiadores}
+                disabled={loadingApoiadores}
+                className="btn btn-secondary btn-sm"
+                style={{ borderRadius: 'var(--radius-md)', padding: '7px 14px' }}
+              >
+                <RefreshCw size={14} className={loadingApoiadores ? 'animate-spin' : ''} />
+                <span>Atualizar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tabela de Apoiadores de Rua */}
+          {loadingApoiadores && apoiadoresRua.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '60px', textAlign: 'center' }}>
+              <RefreshCw size={28} className="animate-spin" style={{ margin: '0 auto 12px auto', color: '#ffe600' }} />
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Carregando apoiadores registrados em campo...</p>
+            </div>
+          ) : apoiadoresRua.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
+              <MapPin size={42} style={{ color: 'var(--text-muted)', margin: '0 auto 12px auto' }} />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Nenhum apoiador de rua encontrado</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '460px', margin: '8px auto 18px auto' }}>
+                Os eleitores e apoiadores cadastrados pela equipe no aplicativo móvel com GPS em tempo real aparecerão aqui automaticamente.
+              </p>
+            </div>
+          ) : (
+            <div className="glass-panel street-table-card">
+              <div style={{ overflowX: 'auto' }}>
+                <table className="street-table">
+                  <thead>
+                    <tr>
+                      <th>Eleitor / Apoiador</th>
+                      <th>WhatsApp / Contato</th>
+                      <th>Bairro de Santos</th>
+                      <th>Colaborador Responsável</th>
+                      <th>Momento do Cadastro</th>
+                      <th>Geolocalização GPS Real</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apoiadoresRua.map((a: any) => (
+                      <tr key={a.id}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '13.5px' }}>
+                            {a.nome}
+                          </div>
+                          {Array.isArray(a.tags) && a.tags.length > 0 && (
+                            <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                              {a.tags.map((t: string) => (
+                                <span key={t} style={{ background: 'rgba(255, 230, 0, 0.15)', color: '#ffe600', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', color: 'var(--text-primary)' }}>
+                            <Phone size={13} color="var(--primary)" />
+                            <a
+                              href={`https://wa.me/55${(a.whatsapp || a.telefone || '').replace(/\D/g, '')}?text=Ol%C3%A1%20${encodeURIComponent(a.nome)},%20obrigado%20pelo%20apoio%20em%20Santos!`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--text-primary)', textDecoration: 'none' }}
+                            >
+                              {a.whatsapp || a.telefone || '—'}
+                            </a>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#93c5fd', borderColor: 'rgba(59, 130, 246, 0.3)', fontWeight: 700 }}>
+                            {a.bairro || 'Santos'}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="badge badge-verde" style={{ fontWeight: 700, fontSize: '11px' }}>
+                              👤 {a.cadastrado_por_nome || a.cadastradoPor || 'Equipe de Rua'}
+                            </span>
+                            {a.cadastrado_por_id && (
+                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                ({String(a.cadastrado_por_id).slice(0, 8)})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {a.created_at ? new Date(a.created_at).toLocaleString('pt-BR') : '—'}
+                        </td>
+                        <td>
+                          {a.latitude && a.longitude ? (
+                            <a
+                              href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-secondary btn-sm"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                background: 'rgba(255, 230, 0, 0.12)',
+                                color: '#ffe600',
+                                borderColor: 'rgba(255, 230, 0, 0.3)',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              <MapPin size={12} />
+                              {Number(a.latitude).toFixed(4)}, {Number(a.longitude).toFixed(4)}
+                              <ExternalLink size={10} style={{ marginLeft: '2px' }} />
+                            </a>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Sem GPS</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

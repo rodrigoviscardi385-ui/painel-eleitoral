@@ -541,7 +541,11 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'equipe-rua' && (
-          <StreetTeamManager />
+          <StreetTeamManager initialSubTab="COLABORADORES" />
+        )}
+
+        {activeTab === 'cadastros-rua' && (
+          <StreetTeamManager initialSubTab="APOIADORES" />
         )}
 
         {activeTab === 'telemetria-rua' && (
