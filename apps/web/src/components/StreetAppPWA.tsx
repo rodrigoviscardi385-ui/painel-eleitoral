@@ -21,8 +21,10 @@ import {
   Flame,
   AlertOctagon,
   Eye,
-  Award
+  Award,
+  QrCode
 } from 'lucide-react';
+import { ModalQRCodeAppRua } from './ModalQRCodeAppRua.tsx';
 import { api } from '../api.ts';
 
 interface ApoiadorLocal {
@@ -43,6 +45,7 @@ export const StreetAppPWA: React.FC = () => {
   const [turnoAtivo, setTurnoAtivo] = useState<boolean>(true);
   const [panicClicks, setPanicClicks] = useState<number>(0);
   const [panicMsg, setPanicMsg] = useState<string | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
 
   // ─── Estados de Telemetria Cinética (Acelerômetro + GPS) ────────────────────
   const [isMoving, setIsMoving] = useState<boolean>(true);
@@ -341,6 +344,28 @@ export const StreetAppPWA: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Botão de QR Code para Instalação */}
+          <button
+            onClick={() => setIsQrModalOpen(true)}
+            title="Abrir QR Code para outro colaborador escanear"
+            style={{
+              background: solarMode ? '#ffe600' : '#10b981',
+              color: '#000000',
+              border: 'none',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <QrCode size={14} />
+            QR CODE
+          </button>
+
           {/* Alternador de Modo Solar */}
           <button
             onClick={() => setSolarMode(!solarMode)}
@@ -898,6 +923,12 @@ export const StreetAppPWA: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de Instalação do App do Colaborador (QR Code) */}
+      <ModalQRCodeAppRua
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+      />
     </div>
   );
 };

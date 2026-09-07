@@ -20,8 +20,11 @@ import {
   Footprints,
   Eye,
   Radio,
-  Zap
+  Zap,
+  QrCode,
+  Smartphone
 } from 'lucide-react';
+import { ModalQRCodeAppRua } from './ModalQRCodeAppRua.tsx';
 import { api } from '../api.ts';
 
 interface ContratadoTelemetria {
@@ -51,6 +54,7 @@ export const StreetTelemetryCockpit: React.FC = () => {
   const [filtroStatus, setFiltroStatus] = useState<string>('TODOS');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedContratado, setSelectedContratado] = useState<ContratadoTelemetria | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
 
   // ─── DADOS INICIAIS REALISTAS DE TELEMETRIA DA EQUIPE DE RUA EM SANTOS ───────
   const [contratados, setContratados] = useState<ContratadoTelemetria[]>([
@@ -263,6 +267,26 @@ export const StreetTelemetryCockpit: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              style={{
+                background: '#ffe600',
+                color: '#000000',
+                border: 'none',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 0 10px rgba(255, 230, 0, 0.2)'
+              }}
+            >
+              <QrCode size={16} /> QR Code para a Tropa
+            </button>
+
             <button
               onClick={() => {
                 alert('Exportando Relatório Circunstanciado de Atividades (PDF assinado ICP-Brasil para o SPCE/TSE)...');
@@ -722,6 +746,12 @@ export const StreetTelemetryCockpit: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Instalação do App de Campo com QR Code */}
+      <ModalQRCodeAppRua
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+      />
     </div>
   );
 };

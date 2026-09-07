@@ -37,11 +37,23 @@ import { VoterVirtualList, VirtualVoterItem } from './components/VoterVirtualLis
 import { StreetTeamManager } from './components/StreetTeamManager.tsx';
 import { StreetAppPWA } from './components/StreetAppPWA.tsx';
 import { StreetTelemetryCockpit } from './components/StreetTelemetryCockpit.tsx';
+import { ModalQRCodeAppRua } from './components/ModalQRCodeAppRua.tsx';
 import { OfflineSyncClient } from './services/offlineSyncClient.ts';
 import { api } from './api.ts';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('cockpit');
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get('tab') || params.get('app');
+      if (urlTab === 'rua' || urlTab === 'app-rua-mobile') return 'app-rua-mobile';
+      if (urlTab === 'telemetria' || urlTab === 'telemetria-rua') return 'telemetria-rua';
+      if (urlTab) return urlTab;
+    }
+    return 'cockpit';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [isAppRuaQrOpen, setIsAppRuaQrOpen] = useState(false);
   const [maskLGPD, setMaskLGPD] = useState(true); // Mascarado por padrão por segurança LGPD
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
@@ -342,6 +354,15 @@ export const App: React.FC = () => {
           <div className="status-pulse online" style={{ width: '16px', height: '16px', margin: '0 auto 12px' }}></div>
           <span style={{ fontSize: '14px', fontWeight: 600 }}>Carregando Painel Eleitoral...</span>
         </div>
+      </div>
+    );
+  }
+
+  // Se for acesso direto ao App de Rua do Colaborador (via QR Code / ?app=rua), exibe a interface móvel direta
+  if (activeTab === 'app-rua-mobile' && !currentUser) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
+        <StreetAppPWA />
       </div>
     );
   }
