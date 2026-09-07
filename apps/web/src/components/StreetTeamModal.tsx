@@ -13,8 +13,9 @@ import {
   MapPin,
   Phone,
   FileCheck,
+  ShieldCheck,
 } from 'lucide-react';
-import { api } from '../api';
+import { api } from '../api.ts';
 
 interface StreetTeamModalProps {
   memberToEdit?: any | null;
@@ -109,64 +110,55 @@ export const StreetTeamModal: React.FC<StreetTeamModalProps> = ({
         dados_bancarios_banco: memberToEdit.dados_bancarios_banco || '',
         dados_bancarios_agencia: memberToEdit.dados_bancarios_agencia || '',
         dados_bancarios_conta: memberToEdit.dados_bancarios_conta || '',
-        chave_pix: memberToEdit.chave_pix || '',
+        chave_pix: memberToEdit.chave_pix || memberToEdit.cpf || '',
         funcao_atividade: memberToEdit.funcao_atividade || 'MOBILIZADOR_RUA',
         tipo_jornada: memberToEdit.tipo_jornada || 'MEIO_PERIODO',
-        carga_horaria_semanal: memberToEdit.carga_horaria_semanal || (memberToEdit.tipo_jornada === 'PERIODO_INTEGRAL' ? 40 : 20),
-        remuneracao_pactuada: memberToEdit.remuneracao_pactuada || (memberToEdit.tipo_jornada === 'PERIODO_INTEGRAL' ? 3000 : 1500),
+        carga_horaria_semanal: memberToEdit.carga_horaria_semanal || 20,
+        remuneracao_pactuada: Number(memberToEdit.remuneracao_pactuada) || 1500,
         forma_pagamento: memberToEdit.forma_pagamento || 'PIX_CONTA_CAMPANHA',
         observacoes: memberToEdit.observacoes || '',
       });
     }
   }, [memberToEdit]);
 
-  // Ajusta automaticamente carga horária e remuneração recomendada ao mudar jornada
-  const handleJornadaChange = (tipo: 'MEIO_PERIODO' | 'PERIODO_INTEGRAL') => {
-    setFormData((prev) => ({
-      ...prev,
-      tipo_jornada: tipo,
-      carga_horaria_semanal: tipo === 'MEIO_PERIODO' ? 20 : 40,
-      remuneracao_pactuada: tipo === 'MEIO_PERIODO' ? 1500 : 3000,
-    }));
-  };
-
   const formatCpf = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 11);
-    if (raw.length <= 3) return raw;
-    if (raw.length <= 6) return `${raw.slice(0, 3)}.${raw.slice(3)}`;
-    if (raw.length <= 9) return `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6)}`;
-    return `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6, 9)}-${raw.slice(9, 11)}`;
+    const digits = val.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+    if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
   };
 
-  const formatPhone = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 11);
-    if (raw.length <= 2) return raw;
-    if (raw.length <= 7) return `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
-    return `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7, 11)}`;
+  const handleJornadaChange = (tipo: 'MEIO_PERIODO' | 'PERIODO_INTEGRAL') => {
+    if (tipo === 'MEIO_PERIODO') {
+      setFormData({
+        ...formData,
+        tipo_jornada: 'MEIO_PERIODO',
+        carga_horaria_semanal: 20,
+        remuneracao_pactuada: 1500,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        tipo_jornada: 'PERIODO_INTEGRAL',
+        carga_horaria_semanal: 40,
+        remuneracao_pactuada: 3000,
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!formData.nome_completo.trim()) {
-      setErrorMsg('Informe o nome completo do contratado.');
+    const cleanCpf = formData.cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      setErrorMsg('CPF inválido. O documento deve conter 11 dígitos numéricos.');
       return;
     }
-    if (!formData.cpf.trim() || formData.cpf.replace(/\D/g, '').length !== 11) {
-      setErrorMsg('CPF obrigatório com 11 dígitos.');
-      return;
-    }
-    if (!formData.rg.trim()) {
-      setErrorMsg('Informe o documento de RG.');
-      return;
-    }
-    if (!formData.telefone_whatsapp.trim()) {
-      setErrorMsg('Informe o telefone ou WhatsApp de contato.');
-      return;
-    }
-    if (!formData.endereco_completo.trim()) {
-      setErrorMsg('Informe o endereço residencial completo.');
+
+    if (!formData.nome_completo.trim() || !formData.rg.trim() || !formData.telefone_whatsapp.trim()) {
+      setErrorMsg('Por favor, preencha todos os campos obrigatórios (*).');
       return;
     }
 
@@ -188,209 +180,304 @@ export const StreetTeamModal: React.FC<StreetTeamModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-        {/* Top Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-b border-emerald-800/40 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
-              <User className="w-5 h-5" />
+    <div className="modal-overlay">
+      <div className="modal-dialog-large">
+        {/* Header com Gradiente Temático */}
+        <div className="modal-header-banner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--primary)',
+              }}
+            >
+              <User size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-wide">
-                {isEditing ? 'Editar Membro da Equipe de Rua' : 'Novo Cadastro • Equipe de Rua (TSE)'}
-              </h2>
-              <p className="text-xs text-slate-400">
-                Cadastro independente do banco eleitoral comum • Blindado pelo Art. 100 da Lei 9.504/97
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+                  {isEditing ? 'Editar Membro da Equipe de Rua' : 'Novo Cadastro • Equipe de Rua'}
+                </h2>
+                <span className="badge badge-verde" style={{ fontSize: '11px' }}>
+                  <ShieldCheck size={12} /> Art. 100 Lei 9.504/97
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', margin: '2px 0 0 0' }}>
+                Cadastro segregado do banco eleitoral comum • Preparado para Assinatura Gov.br
               </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
+            className="btn btn-secondary btn-icon"
+            style={{ width: '32px', height: '32px', color: '#ffffff' }}
           >
-            <X className="w-5 h-5" />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Formulário com Scroll Suave */}
+        <form onSubmit={handleSubmit} className="modal-body-scroll">
           {errorMsg && (
-            <div className="p-3.5 bg-rose-950/60 border border-rose-800 rounded-xl flex items-center gap-3 text-rose-300 text-xs">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+            <div
+              style={{
+                padding: '12px 16px',
+                background: 'rgba(244, 63, 94, 0.15)',
+                border: '1px solid rgba(244, 63, 94, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                color: '#fb7185',
+                fontSize: '12.5px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Modalidade de Jornada Selector Highlight */}
-          <div className="bg-slate-800/60 border border-emerald-700/40 rounded-xl p-4">
-            <label className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Clock className="w-4 h-4" /> Modalidade de Contratação Eleitoral (TSE)
+          {/* ─── SELETOR DE MODALIDADE DE JORNADA ─────────────────────────── */}
+          <div
+            style={{
+              padding: '16px',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+            }}
+          >
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11.5px',
+                fontWeight: 700,
+                color: 'var(--primary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginBottom: '10px',
+              }}
+            >
+              <Clock size={14} /> Modalidade de Contratação Eleitoral (TSE)
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleJornadaChange('MEIO_PERIODO')}
-                className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${
-                  formData.tipo_jornada === 'MEIO_PERIODO'
-                    ? 'bg-emerald-950/60 border-emerald-500 text-white shadow-lg shadow-emerald-950/50 ring-1 ring-emerald-500'
-                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-              >
-                <Clock className={`w-5 h-5 mt-0.5 ${formData.tipo_jornada === 'MEIO_PERIODO' ? 'text-emerald-400' : 'text-slate-500'}`} />
-                <div>
-                  <div className="font-bold text-sm text-white">Meio Período (20h semanais)</div>
-                  <div className="text-xs text-slate-400 mt-0.5">4h diárias de ação de rua • Sem exclusividade</div>
-                  <div className="text-xs font-bold text-emerald-400 mt-1">Sugerido: R$ 1.500,00</div>
-                </div>
-              </button>
 
-              <button
-                type="button"
-                onClick={() => handleJornadaChange('PERIODO_INTEGRAL')}
-                className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${
-                  formData.tipo_jornada === 'PERIODO_INTEGRAL'
-                    ? 'bg-amber-950/60 border-amber-500 text-white shadow-lg shadow-amber-950/50 ring-1 ring-amber-500'
-                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
+            <div className="jornada-selector-grid">
+              <div
+                onClick={() => handleJornadaChange('MEIO_PERIODO')}
+                className={`jornada-card-btn ${formData.tipo_jornada === 'MEIO_PERIODO' ? 'selected-meio' : ''}`}
               >
-                <Briefcase className={`w-5 h-5 mt-0.5 ${formData.tipo_jornada === 'PERIODO_INTEGRAL' ? 'text-amber-400' : 'text-slate-500'}`} />
+                <Clock size={20} color={formData.tipo_jornada === 'MEIO_PERIODO' ? 'var(--primary)' : 'var(--text-muted)'} style={{ marginTop: '2px' }} />
                 <div>
-                  <div className="font-bold text-sm text-white">Período Integral (40h semanais)</div>
-                  <div className="text-xs text-slate-400 mt-0.5">8h diárias com 1h de almoço • Ação contínua</div>
-                  <div className="text-xs font-bold text-amber-400 mt-1">Sugerido: R$ 3.000,00</div>
+                  <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                    Meio Período (20h semanais)
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    4h diárias de ação de rua • Sem exclusividade funcional
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>
+                    Honorários sugeridos: R$ 1.500,00
+                  </div>
                 </div>
-              </button>
+              </div>
+
+              <div
+                onClick={() => handleJornadaChange('PERIODO_INTEGRAL')}
+                className={`jornada-card-btn ${formData.tipo_jornada === 'PERIODO_INTEGRAL' ? 'selected-integral' : ''}`}
+              >
+                <Briefcase size={20} color={formData.tipo_jornada === 'PERIODO_INTEGRAL' ? '#f59e0b' : 'var(--text-muted)'} style={{ marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                    Período Integral (40h semanais)
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    8h diárias de campo com intervalo • Mobilização contínua
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#f59e0b', marginTop: '4px' }}>
+                    Honorários sugeridos: R$ 3.000,00
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Dados Pessoais & Documentação Civil */}
+          {/* ─── 1. QUALIFICAÇÃO CIVIL OBRIGATÓRIA TSE ─────────────────────── */}
           <div>
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <User className="w-3.5 h-3.5 text-emerald-400" /> 1. Qualificação Civil Obrigatória TSE
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Nome Completo *</label>
+            <div
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 700,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderBottom: '1px solid var(--border-color)',
+                paddingBottom: '6px',
+              }}
+            >
+              <User size={14} color="var(--primary)" /> 1. Qualificação Civil & Identificação
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Nome Completo *
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="Nome civil completo do prestador de serviço"
                   value={formData.nome_completo}
                   onChange={(e) => setFormData({ ...formData, nome_completo: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">CPF *</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  CPF * (Chave da Assinatura Gov.br)
+                </label>
                 <input
                   type="text"
                   required
                   disabled={isEditing}
                   placeholder="000.000.000-00"
                   value={formData.cpf}
-                  onChange={(e) => setFormData({ ...formData, cpf: formatCpf(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60"
+                  onChange={(e) => {
+                    const formatted = formatCpf(e.target.value);
+                    setFormData({
+                      ...formData,
+                      cpf: formatted,
+                      chave_pix: formData.chave_pix === '' || formData.chave_pix === formData.cpf ? formatted : formData.chave_pix,
+                    });
+                  }}
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">RG *</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  RG *
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="Número do RG"
                   value={formData.rg}
                   onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Órgão Emissor</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Órgão Emissor
+                </label>
                 <input
                   type="text"
-                  placeholder="Ex: SSP/SP"
+                  placeholder="SSP/SP"
                   value={formData.rg_orgao_emissor}
                   onChange={(e) => setFormData({ ...formData, rg_orgao_emissor: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Telefone / WhatsApp *</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Título de Eleitor
+                </label>
                 <input
                   type="text"
-                  required
-                  placeholder="(13) 99999-9999"
-                  value={formData.telefone_whatsapp}
-                  onChange={(e) => setFormData({ ...formData, telefone_whatsapp: formatPhone(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Título de Eleitor</label>
-                <input
-                  type="text"
-                  placeholder="Número do título (opcional)"
+                  placeholder="12 dígitos numéricos"
                   value={formData.titulo_eleitor}
-                  onChange={(e) => setFormData({ ...formData, titulo_eleitor: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  onChange={(e) => setFormData({ ...formData, titulo_eleitor: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Zona Eleitoral</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Zona Eleitoral Santos
+                </label>
                 <select
                   value={formData.zona_eleitoral}
                   onChange={(e) => setFormData({ ...formData, zona_eleitoral: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 >
-                  <option value="118">118ª Zona (Centro / Morros / ZN)</option>
-                  <option value="272">272ª Zona (Orla / Gonzaga / Boqueirão)</option>
-                  <option value="273">273ª Zona (Porto / Ponta da Praia)</option>
+                  <option value="118">118ª Zona Eleitoral (Santos)</option>
+                  <option value="272">272ª Zona Eleitoral (Santos)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Seção Eleitoral</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Seção Eleitoral
+                </label>
                 <input
                   type="text"
                   placeholder="Ex: 0142"
                   value={formData.secao_eleitoral}
                   onChange={(e) => setFormData({ ...formData, secao_eleitoral: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
               </div>
             </div>
           </div>
 
-          {/* Endereço Residencial em Santos/SP */}
+          {/* ─── 2. CONTATO E TERRITÓRIO EM SANTOS ─────────────────────────── */}
           <div>
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" /> 2. Endereço Residencial
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Logradouro e Número *</label>
+            <div
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 700,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderBottom: '1px solid var(--border-color)',
+                paddingBottom: '6px',
+              }}
+            >
+              <MapPin size={14} color="#3b82f6" /> 2. Contato & Base Territorial de Santos
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  WhatsApp Celular * (Receberá o Link Gov.br)
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Av. Ana Costa, 120, Apto 42"
-                  value={formData.endereco_completo}
-                  onChange={(e) => setFormData({ ...formData, endereco_completo: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  placeholder="(13) 99999-9999"
+                  value={formData.telefone_whatsapp}
+                  onChange={(e) => setFormData({ ...formData, telefone_whatsapp: e.target.value })}
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Bairro em Santos *</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Bairro de Atuação *
+                </label>
                 <select
                   value={formData.bairro}
                   onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 >
                   {BAIRROS_SANTOS.map((b) => (
                     <option key={b} value={b}>
@@ -400,160 +487,146 @@ export const StreetTeamModal: React.FC<StreetTeamModalProps> = ({
                 </select>
               </div>
 
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Endereço Residencial Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Rua, número, complemento"
+                  value={formData.endereco_completo}
+                  onChange={(e) => setFormData({ ...formData, endereco_completo: e.target.value })}
+                  className="input-field"
+                />
+              </div>
+
               <div>
-                <label className="block text-xs text-slate-400 mb-1">CEP</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  CEP
+                </label>
                 <input
                   type="text"
                   placeholder="11000-000"
                   value={formData.cep}
                   onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Município</label>
-                <input
-                  type="text"
-                  readOnly
-                  value="Santos"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">UF</label>
-                <input
-                  type="text"
-                  readOnly
-                  value="SP"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-400"
+                  className="input-field"
                 />
               </div>
             </div>
           </div>
 
-          {/* Dados Bancários & Pagamento Eleitoral TSE */}
+          {/* ─── 3. DADOS BANCÁRIOS & CHAVE PIX (SPCE/TSE) ─────────────────── */}
           <div>
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <CreditCard className="w-3.5 h-3.5 text-emerald-400" /> 3. Dados Bancários & Pagamento Eleitoral (TSE)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Chave PIX (Preferencial CPF)</label>
+            <div
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 700,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderBottom: '1px solid var(--border-color)',
+                paddingBottom: '6px',
+              }}
+            >
+              <CreditCard size={14} color="#f59e0b" /> 3. Dados de Pagamento Eleitoral (Resolução TSE 23.607/2019)
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Chave PIX * (Prioritariamente o CPF)
+                </label>
                 <input
                   type="text"
-                  placeholder="Chave PIX vinculada ao titular"
+                  required
+                  placeholder="Chave PIX do contratado"
                   value={formData.chave_pix}
                   onChange={(e) => setFormData({ ...formData, chave_pix: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
+                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                  TSE: titularidade exclusiva do contratado.
+                </span>
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Remuneração Acordada (R$)</label>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Valor dos Honorários (R$) *
+                </label>
                 <input
                   type="number"
                   step="50"
+                  required
                   value={formData.remuneracao_pactuada}
                   onChange={(e) => setFormData({ ...formData, remuneracao_pactuada: Number(e.target.value) })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-emerald-500"
+                  className="input-field"
+                  style={{ fontWeight: 700, color: 'var(--primary)' }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Banco</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Banco
+                </label>
                 <input
                   type="text"
-                  placeholder="Ex: Nubank / Itaú / CEF"
+                  placeholder="Ex: Nubank, Caixa, BB"
                   value={formData.dados_bancarios_banco}
                   onChange={(e) => setFormData({ ...formData, dados_bancarios_banco: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Agência</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
+                  Agência & Conta
+                </label>
                 <input
                   type="text"
-                  placeholder="0001"
-                  value={formData.dados_bancarios_agencia}
-                  onChange={(e) => setFormData({ ...formData, dados_bancarios_agencia: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-slate-400 mb-1">Conta Corrente / Poupança</label>
-                <input
-                  type="text"
-                  placeholder="123456-7"
+                  placeholder="Ag: 0001 / C: 12345-6"
                   value={formData.dados_bancarios_conta}
                   onChange={(e) => setFormData({ ...formData, dados_bancarios_conta: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="input-field"
                 />
               </div>
             </div>
           </div>
 
-          {/* Atividade & Observações */}
-          <div>
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <Briefcase className="w-3.5 h-3.5 text-emerald-400" /> 4. Atividade de Rua & Observações
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Função na Campanha</label>
-                <select
-                  value={formData.funcao_atividade}
-                  onChange={(e) => setFormData({ ...formData, funcao_atividade: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="MOBILIZADOR_RUA">Mobilizador de Rua / Panfleteiro</option>
-                  <option value="AGITADOR_BANDEIRA">Agitador de Bandeira (Bandeiraço)</option>
-                  <option value="COORDENADOR_EQUIPE_RUA">Líder / Coordenador de Equipe de Rua</option>
-                  <option value="ADESIVADOR_VEICULOS">Adesivador Autorizado</option>
-                  <option value="APOIO_LOGISTICO_CARREATA">Apoio Logístico e Carreatas</option>
-                </select>
-              </div>
+          {/* Botões do Rodapé */}
+          <div
+            style={{
+              paddingTop: '16px',
+              borderTop: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary"
+            >
+              Cancelar
+            </button>
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Observações Operacionais</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Disponibilidade para sábados / Zona Noroeste"
-                  value={formData.observacoes}
-                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn btn-primary"
+              style={{ padding: '9px 22px' }}
+            >
+              <Save size={16} />
+              <span>{saving ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar & Emitir Contrato'}</span>
+            </button>
           </div>
         </form>
-
-        {/* Footer Actions */}
-        <div className="px-6 py-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={saving}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-950 transition-all hover:scale-[1.02]"
-          >
-            {saving ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            {isEditing ? 'Salvar Alterações' : 'Concluir Cadastro de Rua'}
-          </button>
-        </div>
       </div>
     </div>
   );

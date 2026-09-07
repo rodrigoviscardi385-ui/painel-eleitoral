@@ -388,5 +388,16 @@ export const api = {
     if (params?.format) query.set('format', params.format);
     return request<any>(`/api/equipe-rua/${id}/contrato?${query.toString()}`);
   },
+  gerarEEnviarContratoGovBr: (id: string, options?: { tipo_jornada?: string }) =>
+    request<any>(`/api/equipe-rua/${id}/gerar-e-enviar-govbr`, {
+      method: 'POST',
+      body: JSON.stringify(options || {}),
+    }),
+  simularAssinaturaGovBr: (id: string) =>
+    request<any>(`/api/equipe-rua/${id}/simular-assinatura-govbr`, {
+      method: 'POST',
+    }),
+  verificarIntegridadeGovBr: (id: string) =>
+    request<any>(`/api/equipe-rua/${id}/verificar-integridade`),
 };
 

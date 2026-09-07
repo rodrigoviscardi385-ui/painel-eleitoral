@@ -219,10 +219,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               {candidate?.foto_url ? (
                 <img
                   src={candidate.foto_url}
-                  alt={candidate.nome_urna}
+                  alt={candidate.nome_urna || 'Candidato'}
                   style={{
                     width: '38px',
                     height: '38px',
+                    minWidth: '38px',
+                    minHeight: '38px',
                     borderRadius: '10px',
                     objectFit: 'cover',
                     border: '1.5px solid var(--primary)',
@@ -238,6 +240,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   style={{
                     width: '38px',
                     height: '38px',
+                    minWidth: '38px',
+                    minHeight: '38px',
                     borderRadius: '10px',
                     background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
                     display: 'flex',
@@ -250,14 +254,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     flexShrink: 0,
                   }}
                 >
-                  {candidate?.nome_urna?.charAt(0) || <Sparkles size={18} />}
+                  {(candidate?.nome_urna && candidate.nome_urna.trim().length > 1 ? candidate.nome_urna.charAt(0) : null) || <Sparkles size={18} />}
                 </div>
               )}
 
               <div style={{ flexShrink: 0, lineHeight: 1.25 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="header-brand-name">
-                    {candidate?.nome_urna || 'Gustavo Reis'}
+                    {candidate?.nome_urna && candidate.nome_urna.trim().length > 1 ? candidate.nome_urna : 'Gustavo Reis'}
                   </span>
                   <span
                     className="badge badge-verde"

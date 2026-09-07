@@ -428,7 +428,58 @@ export async function initDatabase() {
     );
   `;
 
-  // Criação de índices estratégicos de performance
+  // 25. Tabela equipe_rua (Equipes de Rua, Contratos TSE e Assinatura Digital Gov.br)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS equipe_rua (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      nome_completo TEXT NOT NULL,
+      cpf VARCHAR(14) NOT NULL UNIQUE,
+      rg VARCHAR(30) NOT NULL,
+      rg_orgao_emissor VARCHAR(30) NOT NULL DEFAULT 'SSP/SP',
+      titulo_eleitor VARCHAR(20),
+      zona_eleitoral VARCHAR(10),
+      secao_eleitoral VARCHAR(10),
+      telefone_whatsapp VARCHAR(30) NOT NULL,
+      endereco_completo TEXT NOT NULL,
+      bairro VARCHAR(100) NOT NULL,
+      cidade VARCHAR(100) NOT NULL DEFAULT 'Santos',
+      uf VARCHAR(2) NOT NULL DEFAULT 'SP',
+      cep VARCHAR(10) NOT NULL,
+      dados_bancarios_banco TEXT,
+      dados_bancarios_agencia TEXT,
+      dados_bancarios_conta TEXT,
+      chave_pix TEXT,
+      funcao_atividade TEXT NOT NULL DEFAULT 'MOBILIZADOR_RUA',
+      tipo_jornada TEXT NOT NULL DEFAULT 'MEIO_PERIODO',
+      carga_horaria_semanal INT NOT NULL DEFAULT 20,
+      remuneracao_pactuada NUMERIC(10, 2) NOT NULL DEFAULT 1500.00,
+      forma_pagamento TEXT NOT NULL DEFAULT 'PIX_CONTA_CAMPANHA',
+      data_inicio TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      data_fim TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '45 days'),
+      status_contrato TEXT NOT NULL DEFAULT 'MINUTA_GERADA',
+      link_gov_br TEXT,
+      document_uuid_gov_br TEXT,
+      hash_sha256_original TEXT,
+      hash_sha256_assinado TEXT,
+      carimbo_tempo_assinatura TIMESTAMPTZ,
+      dados_signatario_gov TEXT,
+      observacoes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // Colunas Gov.br caso tabela já existisse
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS link_gov_br TEXT;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS document_uuid_gov_br TEXT;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS hash_sha256_original TEXT;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS hash_sha256_assinado TEXT;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS carimbo_tempo_assinatura TIMESTAMPTZ;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS dados_signatario_gov TEXT;`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_equipe_rua_cpf ON equipe_rua(cpf);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_equipe_rua_status ON equipe_rua(status_contrato);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_equipe_rua_hash_orig ON equipe_rua(hash_sha256_original);`;
+
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_whatsapp ON usuarios(whatsapp);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_lider_acima ON usuarios(lider_acima_id);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_cargo ON usuarios(cargo);`;

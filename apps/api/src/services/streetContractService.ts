@@ -8,6 +8,11 @@
  *   • Opções jurídicas validadas: MEIO PERÍODO (4h/20h) e PERÍODO INTEGRAL (8h/40h)
  * ─────────────────────────────────────────────────────────────────────────────
  */
+import crypto from 'crypto';
+
+export function computeContractSha256(content: string): string {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
 
 export interface WorkerContractData {
   id?: string;
@@ -108,10 +113,15 @@ export function generateStreetContract(
     ? `<p><strong>3.1. REGIME DE MEIO PERÍODO:</strong> A prestação de serviços se dará sob o regime estrito de <strong>MEIO PERÍODO</strong>, com carga horária diária de até <strong>4 (quatro) horas</strong> e limite máximo de <strong>${horasSemanais} (vinte) horas semanais</strong>, em turnos e itinerários previamente alinhados com a coordenação de campanha, garantida a autonomia do(a) CONTRATADO(A) e sem exigência de dedicação exclusiva fora das horas convencionadas.</p>`
     : `<p><strong>3.1. REGIME DE PERÍODO INTEGRAL:</strong> A prestação de serviços se dará sob o regime de <strong>PERÍODO INTEGRAL</strong>, com carga horária diária de até <strong>8 (oito) horas</strong> e limite de <strong>${horasSemanais} (quarenta) horas semanais</strong>, com intervalo obrigatório de no mínimo 1 (uma) hora destinado a repouso e alimentação, distribuído conforme plano operacional de mobilização de rua.</p>`;
 
+  const clausulaGovBrTexto = `
+CLÁUSULA SEXTA – DA ASSINATURA ELETRÔNICA AVANÇADA VIA GOV.BR (LEI Nº 14.063/2020)
+6.1. As partes pactuam expressamente que o presente contrato é formalizado por meio de ASSINATURA ELETRÔNICA AVANÇADA do Portal GOV.BR (níveis Prata ou Ouro), nos termos do Art. 4º, II da Lei Federal nº 14.063/2020 e Art. 10, § 2º da MP nº 2.200-2/2001, possuindo plena validade jurídica, integridade inalterável e eficácia probatória equivalente à assinatura física com reconhecimento de firma perante a Justiça Eleitoral e o SPCE/TSE.
+6.2. A autenticidade e tempestividade deste instrumento são certificadas pelo carimbo oficial do Instituto Nacional de Tecnologia da Informação (ITI), conferível no portal oficial https://validar.iti.gov.br.`;
+
   // Montagem do Texto Puro (TXT)
   const plainText = `
 INSTRUMENTO PARTICULAR DE CONTRATO DE PRESTAÇÃO DE SERVIÇOS TEMPORÁRIOS DE CAMPANHA ELEITORAL SEM VÍNCULO EMPREGATÍCIO
-(Nos termos do Artigo 100 da Lei Federal nº 9.504/1997 e da Resolução TSE nº 23.607/2019)
+(Nos termos do Artigo 100 da Lei Federal nº 9.504/1997, da Resolução TSE nº 23.607/2019 e da Lei Federal nº 14.063/2020)
 
 CONTRATANTE:
 ELEIÇÃO 2026 - ${candNome.toUpperCase()} - ${candCargo.toUpperCase()}
@@ -149,13 +159,14 @@ CLÁUSULA QUARTA – DA REMUNERAÇÃO E FORMA DE PAGAMENTO (RESOLUÇÃO TSE 23.6
 CLÁUSULA QUINTA – DAS OBRIGAÇÕES E VEDAÇÕES ELEITORAIS ESTRITAS
 5.1. O(A) CONTRATADO(A) obriga-se a agir com urbanidade, respeito aos cidadãos e zelar pela correta guarda e distribuição do material de campanha.
 5.2. VEDAÇÃO TERMINANTE DE BOCA DE URNA: Fica expressa e formalmente PROIBIDA a prática de boca de urna no dia do pleito eleitoral (${dataFimFormatada}), distribuição de material de campanha próximo a locais de votação ou qualquer conduta tipificada como crime eleitoral pelo Art. 39, § 5º da Lei 9.504/1997. O descumprimento acarretará rescisão contratual imediata por justa causa e responsabilização pessoal do infrator.
+${clausulaGovBrTexto}
 
-CLÁUSULA SEXTA – DA VIGÊNCIA E RESCISÃO
-6.1. O presente contrato vigorará no período de ${dataInicioFormatada} até ${dataFimFormatada}, cessando automaticamente com o término do pleito.
-6.2. O contrato poderá ser rescindido a qualquer tempo por qualquer das partes mediante comunicação com 24 (vinte e quatro) horas de antecedência, ou imediatamente em caso de descumprimento das cláusulas aqui pactuadas.
+CLÁUSULA SÉTIMA – DA VIGÊNCIA E RESCISÃO
+7.1. O presente contrato vigorará no período de ${dataInicioFormatada} até ${dataFimFormatada}, cessando automaticamente com o término do pleito.
+7.2. O contrato poderá ser rescindido a qualquer tempo por qualquer das partes mediante comunicação com 24 (vinte e quatro) horas de antecedência, ou imediatamente em caso de descumprimento das cláusulas aqui pactuadas.
 
-CLÁUSULA SÉTIMA – DO FORO
-7.1. Para dirimir qualquer controvérsia decorrente do presente contrato, as partes elegem o Foro da Comarca de ${cidadeBase}/${estadoBase}, com renúncia expressa a qualquer outro.
+CLÁUSULA OITAVA – DO FORO
+8.1. Para dirimir qualquer controvérsia decorrente do presente contrato, as partes elegem o Foro da Comarca de ${cidadeBase}/${estadoBase}, com renúncia expressa a qualquer outro.
 
 ${cidadeBase}/${estadoBase}, ${dataHojeExtenso}.
 
@@ -166,12 +177,7 @@ CNPJ: ${candCnpj}
 ____________________________________________________________
 CONTRATADO(A): ${worker.nome_completo.toUpperCase()}
 CPF: ${worker.cpf}
-
-TESTEMUNHAS:
-
-1. _________________________________      2. _________________________________
-Nome:                                    Nome:
-CPF:                                     CPF:
+[DOCUMENTO PREPARADO PARA ASSINATURA ELETRÔNICA AVANÇADA VIA GOV.BR / ITI]
 `;
 
   // Montagem do HTML Formatado para Impressão e PDF
@@ -214,6 +220,20 @@ CPF:                                     CPF:
       letter-spacing: 0.5px;
       margin-bottom: 6px;
     }
+    .badge-govbr {
+      display: inline-block;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      color: #ffffff;
+      font-size: 8.5pt;
+      font-weight: bold;
+      padding: 3px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      margin-left: 6px;
+    }
     h1 {
       font-size: 13pt;
       font-weight: bold;
@@ -248,73 +268,88 @@ CPF:                                     CPF:
       border-bottom: 1px solid #e2e8f0;
       padding-bottom: 2px;
       margin-top: 14px;
-      margin-bottom: 6px;
-      text-transform: uppercase;
     }
     .qualification-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 12px;
+      margin-top: 8px;
       font-size: 10pt;
+      font-family: Arial, sans-serif;
     }
     .qualification-table td {
       padding: 4px 6px;
       vertical-align: top;
       border: 1px solid #e2e8f0;
     }
-    .qualification-table .label {
+    .qualification-table td.label {
+      width: 160px;
       font-weight: bold;
-      background-color: #f8fafc;
-      width: 26%;
       color: #334155;
-    }
-    p {
-      margin: 6px 0;
-      text-align: justify;
-      text-indent: 1.5em;
-    }
-    p.no-indent {
-      text-indent: 0;
+      background-color: #f8fafc;
     }
     .alert-box {
-      border: 1px solid #bbf7d0;
-      background-color: #f0fdf4;
+      border-left: 4px solid #047857;
+      background-color: #ecfdf5;
       padding: 8px 12px;
-      border-radius: 4px;
-      margin: 10px 0;
+      margin: 12px 0;
+      font-size: 10pt;
+      font-family: Arial, sans-serif;
+    }
+    .govbr-box {
+      border: 1.5px solid #2563eb;
+      background-color: #eff6ff;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 14px 0;
       font-size: 9.5pt;
+      font-family: Arial, sans-serif;
     }
     .signatures-block {
-      margin-top: 35px;
+      margin-top: 28px;
       page-break-inside: avoid;
     }
     .sig-row {
       display: flex;
       justify-content: space-between;
-      margin-top: 25px;
+      gap: 20px;
     }
     .sig-col {
-      width: 46%;
+      flex: 1;
       text-align: center;
     }
     .sig-line {
-      border-top: 1px solid #000000;
-      margin-bottom: 4px;
+      border-top: 1px solid #334155;
       padding-top: 4px;
-      font-size: 9.5pt;
       font-weight: bold;
+      font-size: 10pt;
+      font-family: Arial, sans-serif;
     }
     .sig-sub {
       font-size: 8.5pt;
       color: #475569;
+      font-family: Arial, sans-serif;
+      margin-top: 2px;
+    }
+    .iti-seal {
+      display: inline-block;
+      border: 2px dashed #2563eb;
+      background: #f8fafc;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-family: Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #1e3a8a;
+      text-align: center;
+      margin-top: 12px;
     }
     .footer-note {
-      margin-top: 30px;
+      margin-top: 24px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 8px;
       font-size: 8pt;
+      font-family: Arial, sans-serif;
       color: #64748b;
       text-align: center;
-      border-top: 1px dashed #cbd5e1;
-      padding-top: 8px;
     }
     @media print {
       body {
@@ -329,7 +364,10 @@ CPF:                                     CPF:
 <body>
 
   <div class="header-box">
-    <div class="badge-tse">Justiça Eleitoral • Eleições Gerais 2026 • SPCE/TSE</div>
+    <div>
+      <span class="badge-tse">Justiça Eleitoral • Eleições 2026 • SPCE/TSE</span>
+      <span class="badge-govbr">Assinador Digital Gov.br • Lei 14.063/2020</span>
+    </div>
     <h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS TEMPORÁRIOS DE CAMPANHA</h1>
     <h2>Regido pelo Artigo 100 da Lei Federal nº 9.504/1997 e Resolução TSE nº 23.607/2019</h2>
     <div>
@@ -362,7 +400,7 @@ CPF:                                     CPF:
     </tr>
   </table>
 
-  <p class="no-indent">Pelo presente instrumento particular, as partes acima qualificadas celebram o presente Contrato de Prestação de Serviços Temporários para Campanha Eleitoral, subordinando-se às seguintes cláusulas e condições:</p>
+  <p>Pelo presente instrumento particular, as partes acima qualificadas celebram o presente Contrato de Prestação de Serviços Temporários para Campanha Eleitoral, subordinando-se às seguintes cláusulas e condições:</p>
 
   <p><strong>CLÁUSULA PRIMEIRA – DO OBJETO:</strong> O presente contrato tem por objeto a prestação de serviços de apoio operacional, mobilização e divulgação de campanha eleitoral de rua em prol da candidatura do(a) CONTRATANTE no pleito de 2026, compreendendo atividades cívicas de distribuição de informativos de campanha (santinhos, praguinhas e folhetos), acionamento e agitação de bandeiras (bandeiraço), adesivaço em pontos regulares, apoio logístico e participação em carreatas e caminhadas autorizadas pelas vias públicas do município de ${cidadeBase}/${estadoBase}.</p>
 
@@ -379,11 +417,16 @@ CPF:                                     CPF:
 
   <p><strong>CLÁUSULA QUINTA – DAS VEDAÇÕES E PROIBIÇÃO DE BOCA DE URNA:</strong> O(A) CONTRATADO(A) compromete-se a agir com discrição, boa-fé e civilidade, ficando terminantemente <strong>PROIBIDA A PRÁTICA DE BOCA DE URNA NO DIA DO PLEITO</strong> (Art. 39, § 5º da Lei 9.504/1997), propaganda em locais de votação ou coação a eleitores, sob pena de rescisão sumária e responsabilidade penal pessoal.</p>
 
-  <p><strong>CLÁUSULA SEXTA – DA VIGÊNCIA E RESCISÃO:</strong> Este contrato tem vigência de <strong>${dataInicioFormatada}</strong> até <strong>${dataFimFormatada}</strong>, podendo ser rescindido imotivadamente por qualquer das partes mediante comunicação prévia de 24 horas.</p>
+  <div class="govbr-box">
+    <strong>CLÁUSULA SEXTA – DA ASSINATURA ELETRÔNICA AVANÇADA GOV.BR (LEI 14.063/2020):</strong><br/>
+    As partes elegem a assinatura eletrônica avançada pelo <strong>Portal Gov.br</strong> com autenticação biométrica Prata ou Ouro (amparada pela Lei Federal nº 14.063/2020), possuindo fé pública inquestionável e carimbo de tempo do Instituto Nacional de Tecnologia da Informação (ITI), apta para auditoria no SPCE/TSE.
+  </div>
 
-  <p><strong>CLÁUSULA SÉTIMA – DO FORO:</strong> As partes elegem o Foro Eleitoral e Cível da Comarca de ${cidadeBase}/${estadoBase} para dirimir eventuais dúvidas.</p>
+  <p><strong>CLÁUSULA SÉTIMA – DA VIGÊNCIA E RESCISÃO:</strong> Este contrato tem vigência de <strong>${dataInicioFormatada}</strong> até <strong>${dataFimFormatada}</strong>, podendo ser rescindido imotivadamente por qualquer das partes mediante comunicação prévia de 24 horas.</p>
 
-  <p class="no-indent" style="margin-top: 18px;">E, por estarem justos e contratados, assinam o presente em 2 (duas) vias de igual teor e forma na presença das testemunhas abaixo qualificadas.</p>
+  <p><strong>CLÁUSULA OITAVA – DO FORO:</strong> As partes elegem o Foro Eleitoral e Cível da Comarca de ${cidadeBase}/${estadoBase} para dirimir eventuais dúvidas.</p>
+
+  <p style="margin-top: 18px;">E, por estarem justos e contratados, assinam o presente eletronicamente via Gov.br / ITI.</p>
 
   <p style="text-align: right; margin-top: 15px;">${cidadeBase}/${estadoBase}, ${dataHojeExtenso}.</p>
 
@@ -399,20 +442,18 @@ CPF:                                     CPF:
       </div>
     </div>
 
-    <div class="sig-row" style="margin-top: 40px;">
-      <div class="sig-col">
-        <div class="sig-line">TESTEMUNHA 1</div>
-        <div class="sig-sub">Nome: ___________________________________<br/>CPF: __________________ RG: ______________</div>
-      </div>
-      <div class="sig-col">
-        <div class="sig-line">TESTEMUNHA 2</div>
-        <div class="sig-sub">Nome: ___________________________________<br/>CPF: __________________ RG: ______________</div>
+    <div style="text-align: center; margin-top: 20px;">
+      <div class="iti-seal">
+        <strong>AUTENTICAÇÃO DIGITAL GOV.BR • CARIMBO DE TEMPO ITI</strong><br/>
+        Signatário: ${worker.nome_completo.toUpperCase()} • CPF: ${worker.cpf}<br/>
+        Autenticado sob a Lei Federal nº 14.063/2020 • Nível Prata/Ouro ICP-Brasil<br/>
+        Validação oficial: https://validar.iti.gov.br
       </div>
     </div>
   </div>
 
   <div class="footer-note">
-    Documento emitido eletronicamente via Sistema Eleitoral Santos 2026 • Validado em conformidade com o Artigo 100 da Lei 9.504/97 e Resolução TSE 23.607/2019.
+    Documento emitido eletronicamente via Painel Eleitoral Santos 2026 • Validado em conformidade com o Artigo 100 da Lei 9.504/97, Resolução TSE 23.607/2019 e Lei 14.063/2020.
   </div>
 
 </body>

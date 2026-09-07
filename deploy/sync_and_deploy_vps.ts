@@ -192,7 +192,7 @@ EOF
     execSync('git add .', { cwd: ROOT_DIR, stdio: 'inherit' });
     const status = execSync('git status --porcelain', { cwd: ROOT_DIR, encoding: 'utf-8' });
     if (status.trim().length > 0) {
-      const commitMsg = `feat: sync territorial Santos, busca de colegios e scroll responsivo [${new Date().toISOString()}]`;
+      const commitMsg = `feat: assinatura digital Gov.br Lei 14.063/2020, selo ITI, gestao de contratos TSE e arquitetura de agentes [${new Date().toISOString()}]`;
       execSync(`git commit -m "${commitMsg}"`, { cwd: ROOT_DIR, stdio: 'inherit' });
       console.log('✅ Commit realizado com sucesso.');
     } else {

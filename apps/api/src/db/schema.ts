@@ -617,10 +617,16 @@ export const equipeRua = pgTable(
     data_inicio: timestamp('data_inicio', { withTimezone: true }).defaultNow().notNull(),
     data_fim: timestamp('data_fim', { withTimezone: true }).notNull(),
 
-    // Status do Contrato
+    // Status do Contrato e Assinatura Digital Gov.br
     status_contrato: text('status_contrato', {
-      enum: ['MINUTA_GERADA', 'ASSINADO', 'PAGO', 'CANCELADO'],
+      enum: ['MINUTA_GERADA', 'AGUARDANDO_ASSINATURA', 'ASSINADO', 'PAGO', 'CANCELADO', 'REJEITADO'],
     }).default('MINUTA_GERADA').notNull(),
+    link_gov_br: text('link_gov_br'),
+    document_uuid_gov_br: text('document_uuid_gov_br'),
+    hash_sha256_original: text('hash_sha256_original'),
+    hash_sha256_assinado: text('hash_sha256_assinado'),
+    carimbo_tempo_assinatura: timestamp('carimbo_tempo_assinatura', { withTimezone: true }),
+    dados_signatario_gov: text('dados_signatario_gov'), // Metadados Gov.br (nível Prata/Ouro, IP, protocolo ITI)
     observacoes: text('observacoes'),
 
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -632,5 +638,6 @@ export const equipeRua = pgTable(
     index('idx_equipe_rua_tipo_jornada').on(table.tipo_jornada),
     index('idx_equipe_rua_funcao').on(table.funcao_atividade),
     index('idx_equipe_rua_status').on(table.status_contrato),
+    index('idx_equipe_rua_hash_orig').on(table.hash_sha256_original),
   ]
 );

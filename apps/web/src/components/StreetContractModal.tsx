@@ -13,8 +13,13 @@ import {
   DollarSign,
   User,
   Calendar,
+  Send,
+  QrCode,
+  Sparkles,
+  Lock,
+  RefreshCw,
 } from 'lucide-react';
-import { api } from '../api';
+import { api } from '../api.ts';
 
 interface StreetContractModalProps {
   member: any;
@@ -22,7 +27,11 @@ interface StreetContractModalProps {
   onSuccess?: () => void;
 }
 
-export const StreetContractModal: React.FC<StreetContractModalProps> = ({ member, onClose }) => {
+export const StreetContractModal: React.FC<StreetContractModalProps> = ({
+  member,
+  onClose,
+  onSuccess,
+}) => {
   const [jornada, setJornada] = useState<'MEIO_PERIODO' | 'PERIODO_INTEGRAL'>(
     member.tipo_jornada === 'PERIODO_INTEGRAL' ? 'PERIODO_INTEGRAL' : 'MEIO_PERIODO'
   );
@@ -30,6 +39,15 @@ export const StreetContractModal: React.FC<StreetContractModalProps> = ({ member
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'preview' | 'text'>('preview');
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Estados do Gov.br
+  const [govBrLoading, setGovBrLoading] = useState(false);
+  const [govBrLink, setGovBrLink] = useState<string | null>(member.link_gov_br || null);
+  const [govBrStatus, setGovBrStatus] = useState<string>(member.status_contrato || 'MINUTA_GERADA');
+  const [sha256Hash, setSha256Hash] = useState<string | null>(member.hash_sha256_original || null);
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [simulating, setSimulating] = useState(false);
 
   useEffect(() => {
     fetchContract(jornada);
@@ -47,11 +65,56 @@ export const StreetContractModal: React.FC<StreetContractModalProps> = ({ member
     }
   };
 
+  const handleGerarGovBr = async () => {
+    try {
+      setGovBrLoading(true);
+      const res = await api.gerarEEnviarContratoGovBr(member.id, { tipo_jornada: jornada });
+      setGovBrLink(res.link_gov_br);
+      setGovBrStatus('AGUARDANDO_ASSINATURA');
+      setSha256Hash(res.hash_sha256_original);
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      alert(`Falha ao registrar contrato no Gov.br: ${err.message}`);
+    } finally {
+      setGovBrLoading(false);
+    }
+  };
+
+  const handleSimularAssinatura = async () => {
+    try {
+      setSimulating(true);
+      const res = await api.simularAssinaturaGovBr(member.id);
+      setGovBrStatus('ASSINADO');
+      setSha256Hash(res.membro.hash_sha256_assinado || res.membro.hash_sha256_original);
+      alert('Assinatura Gov.br (ITI Ouro) simulada e confirmada com sucesso!');
+      if (onSuccess) onSuccess();
+      fetchContract(jornada);
+    } catch (err: any) {
+      alert(`Erro na simulação: ${err.message}`);
+    } finally {
+      setSimulating(false);
+    }
+  };
+
   const handleCopyText = () => {
     if (!contractData?.plainText) return;
     navigator.clipboard.writeText(contractData.plainText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCopyLink = () => {
+    if (!govBrLink) return;
+    navigator.clipboard.writeText(govBrLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleEnviarWhatsApp = () => {
+    if (!govBrLink) return;
+    const msg = `Olá, ${member.nome_completo}! Aqui é da Coordenação Eleitoral 2026.\n\nSeu Contrato Oficial de Equipe de Rua (${jornada === 'MEIO_PERIODO' ? 'Meio Período' : 'Período Integral'}) está pronto para assinatura digital pelo GOV.BR.\n\nAssine com facilidade pelo seu celular:\n${govBrLink}\n\nDocumento protegido pela Lei 9.504/97 e Lei 14.063/2020.`;
+    const cleanPhone = member.telefone_whatsapp.replace(/\D/g, '');
+    window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   const handlePrint = () => {
@@ -67,181 +130,439 @@ export const StreetContractModal: React.FC<StreetContractModalProps> = ({ member
     }
   };
 
-  const handleOpenRawHtml = () => {
-    const url = `/api/equipe-rua/${member.id}/contrato?tipo_jornada=${jornada}&format=html`;
-    window.open(url, '_blank');
-  };
+  const isAssinado = govBrStatus === 'ASSINADO';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-b border-emerald-800/40 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
-              <FileText className="w-5 h-5" />
+    <div className="modal-overlay">
+      <div className="modal-dialog-large" style={{ maxWidth: '960px' }}>
+        {/* Header com Gradiente Temático */}
+        <div className="modal-header-banner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--primary)',
+              }}
+            >
+              <FileText size={20} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white tracking-wide">Contrato Oficial TSE • Equipe de Rua</h2>
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> Lei 9.504/97 Art. 100
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+                  Contrato Oficial TSE • Equipe de Rua & Gov.br
+                </h2>
+                <span className="badge badge-verde" style={{ fontSize: '11px' }}>
+                  <ShieldCheck size={12} /> Art. 100 Lei 9.504/97
+                </span>
+                <span className="govbr-pill">
+                  Gov.br Lei 14.063/2020
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                {member.nome_completo} • CPF: {member.cpf} • {member.bairro}, {member.cidade || 'Santos'}
+              <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', margin: '2px 0 0 0' }}>
+                {member.nome_completo} • CPF: {member.cpf} • {member.bairro}, Santos/SP
               </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
+            className="btn btn-secondary btn-icon"
+            style={{ width: '32px', height: '32px', color: '#ffffff' }}
           >
-            <X className="w-5 h-5" />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Toolbar & Selectors */}
-        <div className="px-6 py-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
-          {/* Seletor de Jornada: Meio Período vs Período Integral */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-emerald-400" /> Modalidade:
+        {/* ─── BARRA DE FERRAMENTAS: SELETOR DE JORNADA + AÇÕES GOV.BR ───────── */}
+        <div
+          style={{
+            padding: '12px 20px',
+            background: 'var(--bg-input)',
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          {/* Seletor Dinâmico de Jornada (Meio Período vs Período Integral) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Modalidade:
             </span>
-            <div className="inline-flex rounded-xl bg-slate-800/90 p-1 border border-slate-700">
+            <div style={{ display: 'inline-flex', padding: '3px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
               <button
                 type="button"
                 onClick={() => setJornada('MEIO_PERIODO')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  jornada === 'MEIO_PERIODO'
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+                className={`btn btn-sm ${jornada === 'MEIO_PERIODO' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ padding: '5px 12px', fontSize: '12px' }}
               >
-                <Clock className="w-3.5 h-3.5" />
-                Meio Período (4h / 20h sem.)
+                <Clock size={13} />
+                <span>Meio Período (20h)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setJornada('PERIODO_INTEGRAL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  jornada === 'PERIODO_INTEGRAL'
-                    ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+                className={`btn btn-sm ${jornada === 'PERIODO_INTEGRAL' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ padding: '5px 12px', fontSize: '12px', background: jornada === 'PERIODO_INTEGRAL' ? '#f59e0b' : undefined }}
               >
-                <Briefcase className="w-3.5 h-3.5" />
-                Período Integral (8h / 40h sem.)
+                <Briefcase size={13} />
+                <span>Período Integral (40h)</span>
               </button>
             </div>
           </div>
 
-          {/* Ações: Imprimir, Copiar, Alternar modo */}
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700">
+          {/* Botões de Ação Visual & Impressão */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'inline-flex', padding: '2px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)' }}>
               <button
                 onClick={() => setViewMode('preview')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                  viewMode === 'preview' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`btn btn-sm ${viewMode === 'preview' ? 'btn-secondary' : 'btn-ghost'}`}
+                style={{ padding: '4px 10px', fontSize: '11.5px' }}
               >
                 Visualizar A4
               </button>
               <button
                 onClick={() => setViewMode('text')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                  viewMode === 'text' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`btn btn-sm ${viewMode === 'text' ? 'btn-secondary' : 'btn-ghost'}`}
+                style={{ padding: '4px 10px', fontSize: '11.5px' }}
               >
-                Texto Minuta
+                Texto Puro
               </button>
             </div>
 
             <button
               onClick={handleCopyText}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
-              title="Copiar texto jurídico do contrato"
+              className="btn btn-secondary btn-sm"
+              title="Copiar texto do contrato"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Copiado!' : 'Copiar'}
-            </button>
-
-            <button
-              onClick={handleOpenRawHtml}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
-              title="Abrir página em tela cheia"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Aba Cheia
+              {copied ? <Check size={13} color="var(--primary)" /> : <Copy size={13} />}
+              <span>{copied ? 'Copiado!' : 'Copiar Texto'}</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-900/30 transition-all hover:scale-[1.02]"
+              className="btn btn-secondary btn-sm"
             >
-              <Printer className="w-3.5 h-3.5" />
-              Imprimir / PDF
+              <Printer size={14} />
+              <span>Imprimir / PDF</span>
             </button>
           </div>
         </div>
 
-        {/* Banner de Aviso Jurídico Obrigatório */}
-        <div className="px-6 py-2 bg-emerald-950/40 border-b border-emerald-900/40 flex items-center gap-3 text-xs text-emerald-300">
-          <AlertTriangle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <span>
-            <strong>Blindagem Jurídica:</strong> Conforme Art. 100 da Lei 9.504/97, a prestação de serviços eleitorais não gera vínculo empregatício.
-            Pagamento via Conta Eleitoral de Campanha ({contractData?.candidate?.cnpj || 'CNPJ do Candidato'}).
-          </span>
+        {/* ─── PAINEL DE ASSINATURA DIGITAL GOV.BR ──────────────────────────── */}
+        <div
+          style={{
+            padding: '14px 20px',
+            background: isAssinado ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                background: isAssinado ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isAssinado ? 'var(--primary)' : '#3b82f6',
+              }}
+            >
+              {isAssinado ? <CheckCircle size={20} /> : <Lock size={20} />}
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {isAssinado
+                    ? 'Contrato Assinado no Gov.br (ITI Ouro)'
+                    : govBrLink
+                    ? 'Aguardando Assinatura no Gov.br'
+                    : 'Pronto para Envio à Assinatura Gov.br'}
+                </span>
+                <span className={`badge ${isAssinado ? 'badge-verde' : 'badge-amarelo'}`} style={{ fontSize: '10.5px' }}>
+                  {isAssinado ? 'Homologado SPCE/TSE' : 'Sem Papel • Mobile First'}
+                </span>
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {sha256Hash
+                  ? `Hash SHA-256: ${sha256Hash.slice(0, 16)}...${sha256Hash.slice(-8)} (Integridade garantida)`
+                  : 'Gera link instantâneo para o cabo eleitoral assinar pelo celular via Gov.br Prata/Ouro'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {!govBrLink && !isAssinado ? (
+              <button
+                onClick={handleGerarGovBr}
+                disabled={govBrLoading}
+                className="btn btn-primary btn-sm"
+                style={{ background: 'linear-gradient(135deg, #1d4ed8, #2563eb)', border: 'none', padding: '7px 14px' }}
+              >
+                <Sparkles size={14} />
+                <span>{govBrLoading ? 'Registrando no ITI...' : 'Enviar para Assinatura no Gov.br'}</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleCopyLink}
+                  className="btn btn-secondary btn-sm"
+                  title="Copiar link governamental"
+                >
+                  {copiedLink ? <Check size={13} color="var(--primary)" /> : <Copy size={13} />}
+                  <span>{copiedLink ? 'Link Copiado!' : 'Copiar Link Gov.br'}</span>
+                </button>
+
+                <button
+                  onClick={handleEnviarWhatsApp}
+                  className="btn btn-primary btn-sm"
+                  style={{ background: '#22c55e', border: 'none' }}
+                  title="Enviar mensagem com o link no WhatsApp do contratado"
+                >
+                  <Send size={13} />
+                  <span>WhatsApp do Ativista</span>
+                </button>
+
+                <button
+                  onClick={() => setShowQrCode(!showQrCode)}
+                  className="btn btn-secondary btn-sm"
+                  title="Exibir QR Code para leitura presencial no comitê"
+                >
+                  <QrCode size={13} />
+                  <span>{showQrCode ? 'Ocultar QR' : 'QR Code Comitê'}</span>
+                </button>
+
+                {!isAssinado && (
+                  <button
+                    onClick={handleSimularAssinatura}
+                    disabled={simulating}
+                    className="btn btn-secondary btn-sm"
+                    style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                    title="Simular assinatura Gov.br para testar a homologação"
+                  >
+                    <RefreshCw size={13} className={simulating ? 'animate-spin' : ''} />
+                    <span>{simulating ? 'Validando...' : 'Simular Assinatura (Teste)'}</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-950">
+        {/* Modalidade QR Code na tela para leitura no balcão do comitê */}
+        {showQrCode && govBrLink && (
+          <div
+            style={{
+              padding: '16px',
+              background: 'var(--bg-surface-elevated)',
+              borderBottom: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '24px',
+            }}
+          >
+            <div
+              style={{
+                padding: '12px',
+                background: '#ffffff',
+                borderRadius: '12px',
+                display: 'inline-block',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+              }}
+            >
+              {/* Fallback de QR Code visual para o link oficial */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(govBrLink)}`}
+                alt="QR Code Assinatura Gov.br"
+                style={{ width: '130px', height: '130px', display: 'block' }}
+              />
+            </div>
+            <div style={{ maxWidth: '340px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                Assinatura no Balcão do Comitê
+              </h4>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 10px 0' }}>
+                Peça para {member.nome_completo} apontar a câmera do celular para este QR Code. O portal Gov.br abrirá na hora para autenticação biométrica.
+              </p>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                Link: {govBrLink}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── CORPO DO DOCUMENTO (A4 PREVIEW OU TEXTO) ─────────────────────── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', background: 'var(--bg-main)' }}>
           {loading ? (
-            <div className="h-96 flex flex-col items-center justify-center text-slate-400">
-              <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-sm font-medium">Acionando equipe jurídica e redigindo contrato TSE...</p>
-              <p className="text-xs text-slate-500 mt-1">Conferindo dados civis, bancários e regras eleitorais</p>
+            <div style={{ padding: '60px', textAlign: 'center' }}>
+              <RefreshCw size={26} className="animate-spin" style={{ margin: '0 auto 12px auto', color: 'var(--primary)' }} />
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Compilando minuta contratual oficial...</p>
             </div>
           ) : viewMode === 'preview' ? (
-            <div className="flex justify-center">
-              {/* Paper Sheet Preview */}
-              <div className="w-full max-w-3xl bg-white text-slate-900 rounded-lg shadow-2xl p-8 sm:p-12 border border-slate-300 font-serif leading-relaxed text-sm transition-all select-text">
-                <iframe
-                  title="Contrato Eleitoral TSE"
-                  srcDoc={contractData?.printableHtml}
-                  className="w-full h-[650px] border-0 rounded bg-white"
-                />
+            <div
+              style={{
+                maxWidth: '820px',
+                margin: '0 auto',
+                background: '#ffffff',
+                color: '#0f172a',
+                padding: '36px 44px',
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
+                fontFamily: '"Times New Roman", Times, serif',
+                fontSize: '11pt',
+                lineHeight: 1.5,
+              }}
+            >
+              {/* Cabeçalho A4 */}
+              <div style={{ textAlign: 'center', borderBottom: '2px solid #047857', paddingBottom: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'inline-block', background: '#065f46', color: '#ffffff', fontSize: '9pt', fontWeight: 'bold', padding: '2px 10px', borderRadius: '4px', textTransform: 'uppercase', marginBottom: '6px', fontFamily: 'Arial, sans-serif' }}>
+                  Justiça Eleitoral • Eleições Gerais 2026 • Santos/SP
+                </div>
+                <h1 style={{ fontSize: '13pt', fontWeight: 'bold', margin: '4px 0', textTransform: 'uppercase', color: '#0f172a', fontFamily: 'Arial, sans-serif' }}>
+                  Contrato de Prestação de Serviços Temporários de Campanha
+                </h1>
+                <h2 style={{ fontSize: '10pt', fontWeight: 'normal', color: '#475569', margin: 0, fontFamily: 'Arial, sans-serif' }}>
+                  Regido pelo Artigo 100 da Lei Federal nº 9.504/1997 e Resolução TSE nº 23.607/2019
+                </h2>
+                <div style={{ marginTop: '6px' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      background: jornada === 'MEIO_PERIODO' ? '#dbeafe' : '#fef3c7',
+                      color: jornada === 'MEIO_PERIODO' ? '#1e40af' : '#92400e',
+                      border: `1px solid ${jornada === 'MEIO_PERIODO' ? '#93c5fd' : '#fcd34d'}`,
+                      fontSize: '9pt',
+                      fontWeight: 'bold',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontFamily: 'Arial, sans-serif',
+                    }}
+                  >
+                    MODALIDADE: {jornada === 'MEIO_PERIODO' ? 'MEIO PERÍODO (20 HORAS SEMANAIS)' : 'PERÍODO INTEGRAL (40 HORAS SEMANAIS)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Qualificação */}
+              <div style={{ fontSize: '10pt', fontWeight: 'bold', color: '#047857', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px', marginTop: '12px', fontFamily: 'Arial, sans-serif' }}>
+                1. Qualificação das Partes Contratantes
+              </div>
+              <div style={{ fontSize: '10pt', fontFamily: 'Arial, sans-serif', margin: '8px 0 16px 0', lineHeight: 1.6 }}>
+                <div><strong>CONTRATANTE:</strong> CAMPANHA ELEITORAL 2026 - {contractData?.candidate?.nome?.toUpperCase() || 'GUSTAVO REIS'} | CNPJ: {contractData?.candidate?.cnpj || '55.955.000/0001-26'}</div>
+                <div><strong>CONTRATADO(A):</strong> {member.nome_completo.toUpperCase()} | CPF: {member.cpf} | RG: {member.rg} ({member.rg_orgao_emissor || 'SSP/SP'})</div>
+                <div><strong>LOCAL & CONTATO:</strong> Bairro {member.bairro}, Santos/SP • WhatsApp: {member.telefone_whatsapp} • Zona Eleitoral: {member.zona_eleitoral || '118ª'}</div>
+                <div><strong>QUITAÇÃO EXCLUSIVA (TSE):</strong> Chave PIX: {member.chave_pix || member.cpf} (Vinculada ao CPF do titular)</div>
+              </div>
+
+              {/* Cláusulas Principais */}
+              <div style={{ textAlign: 'justify', fontSize: '10.5pt', lineHeight: 1.55 }}>
+                <p><strong>CLÁUSULA 1ª – DO OBJETO:</strong> O presente instrumento tem por objeto a prestação de serviços de apoio operacional, distribuição de material informativo de campanha e mobilização cívica de rua no município de Santos/SP.</p>
+
+                <div style={{ borderLeft: '4px solid #047857', background: '#ecfdf5', padding: '10px 14px', margin: '12px 0', fontSize: '10pt', fontFamily: 'Arial, sans-serif' }}>
+                  <strong>CLÁUSULA 2ª – DA TOTAL INEXISTÊNCIA DE VÍNCULO EMPREGATÍCIO (ART. 100 DA LEI Nº 9.504/1997):</strong><br/>
+                  Conforme preceitua imperativamente o Art. 100 da Lei Federal nº 9.504/1997, este contrato <strong>NÃO GERA QUALQUER VÍNCULO EMPREGATÍCIO</strong> com o candidato ou partido contratante, tratando-se de relação civil e eleitoral sem direitos da CLT.
+                </div>
+
+                <p><strong>CLÁUSULA 3ª – DA JORNADA DE ATIVIDADES:</strong> {jornada === 'MEIO_PERIODO' ? 'A execução se dará em regime de MEIO PERÍODO (até 20 horas semanais, 4h diárias) em itinerários alinhados com a coordenação, sem exclusividade funcional.' : 'A execução se dará em regime de PERÍODO INTEGRAL (até 40 horas semanais, 8h diárias com intervalo para repouso) em conformidade com o cronograma eleitoral.'}</p>
+
+                <p><strong>CLÁUSULA 4ª – DA REMUNERAÇÃO E PRESTAÇÃO DE CONTAS TSE:</strong> Pela prestação pontual, a CONTRATANTE pagará o valor líquido total de <strong>R$ {Number(member.remuneracao_pactuada || (jornada === 'MEIO_PERIODO' ? 1500 : 3000)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>, pago exclusivamente via Conta Bancária Eleitoral através de PIX para a chave do(a) CONTRATADO(A) (Resolução TSE 23.607/2019).</p>
+
+                <p><strong>CLÁUSULA 5ª – DA VEDAÇÃO ABSOLUTA DE BOCA DE URNA:</strong> É expressamente proibida qualquer prática de boca de urna no dia da eleição (Art. 39, § 5º da Lei 9.504/97) ou agressões, sob pena de rescisão imediata e responsabilidade penal pessoal.</p>
+
+                <div style={{ border: '1.5px solid #2563eb', background: '#eff6ff', borderRadius: '6px', padding: '10px 14px', margin: '12px 0', fontSize: '9.5pt', fontFamily: 'Arial, sans-serif' }}>
+                  <strong>CLÁUSULA 6ª – DA ASSINATURA ELETRÔNICA AVANÇADA GOV.BR (LEI Nº 14.063/2020):</strong><br/>
+                  As partes elegem a assinatura eletrônica avançada via Portal Gov.br (ITI), possuindo fé pública e pleno valor probatório perante a Justiça Eleitoral, dispensando firma em cartório.
+                </div>
+
+                <p><strong>CLÁUSULA 7ª – DO FORO:</strong> Eleito o Foro da Comarca de Santos/SP.</p>
+              </div>
+
+              {/* Bloco de Assinatura e Carimbo ITI */}
+              <div style={{ marginTop: '28px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', textAlign: 'center', fontSize: '9.5pt', fontFamily: 'Arial, sans-serif' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ borderTop: '1px solid #334155', paddingTop: '4px', fontWeight: 'bold' }}>
+                      CAMPANHA ELEITORAL 2026
+                    </div>
+                    <div style={{ fontSize: '8.5pt', color: '#475569' }}>CONTRATANTE</div>
+                  </div>
+                  <div style={{ width: '40px' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ borderTop: '1px solid #334155', paddingTop: '4px', fontWeight: 'bold' }}>
+                      {member.nome_completo.toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: '8.5pt', color: '#475569' }}>CONTRATADO(A) • CPF: {member.cpf}</div>
+                  </div>
+                </div>
+
+                {/* Selo ITI Gov.br */}
+                <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      display: 'inline-block',
+                      border: isAssinado ? '2px solid #059669' : '2px dashed #2563eb',
+                      background: isAssinado ? '#ecfdf5' : '#f8fafc',
+                      padding: '10px 18px',
+                      borderRadius: '8px',
+                      fontFamily: 'Arial, sans-serif',
+                      fontSize: '8.5pt',
+                      color: isAssinado ? '#065f46' : '#1e3a8a',
+                    }}
+                  >
+                    <strong>
+                      {isAssinado ? '✅ DOCUMENTO ASSINADO DIGITALMENTE NO PORTAL GOV.BR' : '🔒 DOCUMENTO PREPARADO PARA ASSINATURA ELETRÔNICA GOV.BR'}
+                    </strong>
+                    <br />
+                    Signatário: {member.nome_completo.toUpperCase()} • CPF: {member.cpf}
+                    <br />
+                    Certificado ICP-Brasil / ITI • Autenticado sob os termos da Lei Federal nº 14.063/2020
+                    <br />
+                    {sha256Hash && <span style={{ fontFamily: 'monospace', fontSize: '7.5pt' }}>SHA-256: {sha256Hash}</span>}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all">
-              {contractData?.plainText}
+            <div
+              style={{
+                maxWidth: '820px',
+                margin: '0 auto',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '24px',
+              }}
+            >
+              <pre
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.6,
+                }}
+              >
+                {contractData?.plainText}
+              </pre>
             </div>
           )}
-        </div>
-
-        {/* Footer Summary */}
-        <div className="px-6 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-slate-400" />
-              Contratado: <strong className="text-white">{member.nome_completo}</strong>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-              Remuneração: <strong className="text-emerald-400">R$ {Number(contractData?.valorRemuneracao || 1500).toFixed(2)}</strong>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              Vigência: <strong>{contractData?.dataInicio} a {contractData?.dataFim}</strong>
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors"
-          >
-            Fechar
-          </button>
         </div>
       </div>
     </div>

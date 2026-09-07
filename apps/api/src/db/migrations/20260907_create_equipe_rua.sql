@@ -36,16 +36,32 @@ CREATE TABLE IF NOT EXISTS equipe_rua (
     data_inicio TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     data_fim TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '45 days'),
 
-    -- Status e Auditoria
-    status_contrato TEXT NOT NULL DEFAULT 'MINUTA_GERADA', -- 'MINUTA_GERADA', 'ASSINADO', 'PAGO', 'CANCELADO'
+    -- Status e Auditoria e Assinatura Digital Gov.br (Lei 14.063/2020)
+    status_contrato TEXT NOT NULL DEFAULT 'MINUTA_GERADA', -- 'MINUTA_GERADA', 'AGUARDANDO_ASSINATURA', 'ASSINADO', 'PAGO', 'CANCELADO', 'REJEITADO'
+    link_gov_br TEXT,
+    document_uuid_gov_br TEXT,
+    hash_sha256_original TEXT,
+    hash_sha256_assinado TEXT,
+    carimbo_tempo_assinatura TIMESTAMPTZ,
+    dados_signatario_gov TEXT,
     observacoes TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Garantir colunas Gov.br caso a tabela já tenha sido criada anteriormente
+ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS link_gov_br TEXT;
+ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS document_uuid_gov_br TEXT;
+ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS hash_sha256_original TEXT;
+ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS hash_sha256_assinado TEXT;
+ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS carimbo_tempo_assinatura TIMESTAMPTZ;
+ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS dados_signatario_gov TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_equipe_rua_cpf ON equipe_rua(cpf);
 CREATE INDEX IF NOT EXISTS idx_equipe_rua_whatsapp ON equipe_rua(telefone_whatsapp);
 CREATE INDEX IF NOT EXISTS idx_equipe_rua_tipo_jornada ON equipe_rua(tipo_jornada);
 CREATE INDEX IF NOT EXISTS idx_equipe_rua_funcao ON equipe_rua(funcao_atividade);
 CREATE INDEX IF NOT EXISTS idx_equipe_rua_status ON equipe_rua(status_contrato);
+CREATE INDEX IF NOT EXISTS idx_equipe_rua_hash_orig ON equipe_rua(hash_sha256_original);
+
