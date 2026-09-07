@@ -61,6 +61,7 @@ interface NavbarProps {
 interface HubItem {
   id: string;
   label: string;
+  shortLabel: string;
   icon: React.ElementType;
   defaultTab: string;
   subTabs: { id: string; label: string; icon: React.ElementType }[];
@@ -117,6 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     {
       id: 'cockpit',
       label: 'Visão Geral',
+      shortLabel: 'Geral',
       icon: LayoutDashboard,
       defaultTab: 'cockpit',
       subTabs: [],
@@ -124,6 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     {
       id: 'rede',
       label: 'Mobilização & Rede',
+      shortLabel: 'Mobilização',
       icon: Users,
       defaultTab: 'liderancas',
       subTabs: [
@@ -134,6 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     {
       id: 'comunicacao',
       label: 'Comunicação',
+      shortLabel: 'Comunicação',
       icon: MessageSquare,
       defaultTab: 'chat',
       subTabs: [
@@ -145,6 +149,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     {
       id: 'eleicao',
       label: 'Dia D & Apuração',
+      shortLabel: 'Dia D',
       icon: Vote,
       defaultTab: 'warroom',
       subTabs: [
@@ -156,6 +161,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     {
       id: 'governanca',
       label: 'Governança & TSE',
+      shortLabel: 'Governança',
       icon: ShieldCheck,
       defaultTab: 'gastos',
       subTabs: [
@@ -201,11 +207,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           }}
         >
           {/* Linha Principal: Identidade + Hubs Principais + Ações Utilitárias */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', minWidth: 0, width: '100%' }}>
             
-            {/* Identidade do Candidato / Logotipo */}
+            {/* Identidade do Candidato / Logotipo (Protegido contra compressão) */}
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, cursor: 'pointer' }}
+              className="header-brand-box"
               onClick={() => setActiveTab('cockpit')}
               title="Ir para o Cockpit Geral"
             >
@@ -247,19 +253,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              <div style={{ minWidth: 0, lineHeight: 1.2 }}>
+              <div style={{ flexShrink: 0, lineHeight: 1.25 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-heading)',
-                      fontSize: '15px',
-                      fontWeight: 800,
-                      letterSpacing: '-0.02em',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
+                  <span className="header-brand-name">
                     {candidate?.nome_urna || 'Gustavo Reis'}
                   </span>
                   <span
@@ -269,25 +265,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {candidate?.numero_candidato || '55955'}
                   </span>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                  {candidate?.partido || 'PSD'} • {candidate?.cargo || 'Deputado Federal'}
+                <div className="header-brand-sub">
+                  {candidate?.partido || 'PSD'} • {candidate?.cargo || 'Deputado Estadual'}
                 </div>
               </div>
             </div>
 
             {/* 5 HUBS PRINCIPAIS (DESKTOP) */}
-            <nav
-              className="desktop-only"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '3px',
-                background: 'var(--bg-input)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-lg)',
-              }}
-            >
+            <nav className="desktop-only nav-hubs-bar">
               {hubs.map((hub) => {
                 const Icon = hub.icon;
                 const isHubActive = activeHub.id === hub.id;
@@ -298,15 +283,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className={`nav-hub-btn ${isHubActive ? 'active' : ''}`}
                     title={hub.label}
                   >
-                    <Icon size={16} />
-                    <span>{hub.label}</span>
+                    <Icon size={15} style={{ flexShrink: 0 }} />
+                    <span className="nav-label-full">{hub.label}</span>
+                    <span className="nav-label-short">{hub.shortLabel}</span>
                   </button>
                 );
               })}
             </nav>
 
             {/* AÇÕES UTILITÁRIAS & PERFIL (DIREITA) */}
-            <div className="desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="desktop-only nav-actions-bar">
               
               {/* WhatsApp Status Pill */}
               <button
@@ -318,13 +304,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                   borderColor: isOnline ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)',
                   background: isOnline ? 'var(--primary-light)' : undefined,
                   color: isOnline ? 'var(--primary)' : 'var(--text-secondary)',
+                  padding: '5px 11px',
+                  flexShrink: 0,
                 }}
                 title="Status da Conexão com WhatsApp"
               >
                 <span className={`status-pulse ${isOnline ? 'online' : isQrReady ? 'warning' : 'offline'}`} />
-                <QrCode size={13} />
+                <QrCode size={13} style={{ flexShrink: 0 }} />
                 <span style={{ fontSize: '12px', fontWeight: 600 }}>
-                  {isOnline ? 'WhatsApp Conectado' : isQrReady ? 'Escanear QR' : 'WhatsApp'}
+                  {isOnline ? (
+                    <>
+                      <span className="action-label-full">WhatsApp Conectado</span>
+                      <span className="action-label-short">WhatsApp</span>
+                    </>
+                  ) : isQrReady ? (
+                    'Escanear QR'
+                  ) : (
+                    'WhatsApp'
+                  )}
                 </span>
               </button>
 
@@ -337,23 +334,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                   borderRadius: 'var(--radius-full)',
                   borderColor: maskLGPD ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)',
                   color: maskLGPD ? 'var(--primary)' : 'var(--text-secondary)',
+                  padding: '5px 11px',
+                  flexShrink: 0,
                 }}
                 title={maskLGPD ? 'Dados anonimizados por padrão LGPD' : 'Dados abertos (Auditado)'}
               >
-                <ShieldCheck size={14} />
-                <span style={{ fontSize: '12px' }}>LGPD: {maskLGPD ? 'Ativo' : 'Off'}</span>
+                <ShieldCheck size={14} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '12px' }}>
+                  <span className="action-label-full">LGPD: {maskLGPD ? 'Ativo' : 'Off'}</span>
+                  <span className="action-label-short">{maskLGPD ? 'LGPD' : 'LGPD Off'}</span>
+                </span>
               </button>
 
               {/* Botão + Nova Ação (Dropdown Minimalista) */}
-              <div ref={actionsRef} style={{ position: 'relative' }}>
+              <div ref={actionsRef} style={{ position: 'relative', flexShrink: 0 }}>
                 <button
                   onClick={() => setIsActionsOpen(!isActionsOpen)}
                   className="btn btn-primary btn-sm"
-                  style={{ borderRadius: 'var(--radius-full)', gap: '5px', padding: '6px 14px' }}
+                  style={{ borderRadius: 'var(--radius-full)', gap: '5px', padding: '5px 12px' }}
                   title="Criar nova ação ou registrar dado"
                 >
-                  <Plus size={15} />
-                  <span>Nova Ação</span>
+                  <Plus size={15} style={{ flexShrink: 0 }} />
+                  <span className="action-label-full">Nova Ação</span>
+                  <span className="action-label-short">+ Ação</span>
                   <ChevronDown size={13} style={{ opacity: 0.8 }} />
                 </button>
 
