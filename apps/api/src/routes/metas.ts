@@ -1,175 +1,109 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { eq, desc, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
-const metaSchema = z.object({
-  titulo: z.string().min(2),
-  tipo: z.enum(['GLOBAL', 'ZONA', 'BAIRRO', 'LIDER']).default('GLOBAL'),
-  alvo_referencia: z.string().optional().nullable(),
-  quantidade_meta: z.number().int().positive(),
-  data_fim: z.string(), // ISO date
-  meta_diaria_cadencia: z.number().int().positive().default(10),
-}).strip();
+export async function metasRoutes(app: FastifyInstance) {
+  // Lista metas com cálculo de cadência e semáforo em tempo real
+  app.get('/api/metas', async () => {
+    const metas = await db.select().from(schema.metas).orderBy(desc(schema.metas.created_at));
 
-export async function metasRoutes(fastify: FastifyInstance) {
-  /**
-   * KPIs Consolidados para o Cockpit de Metas
-   */
-  fastify.get('/api/metas/kpis', async (_request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      // 1. Totais Gerais
-      const [counts] = (await db.execute(
-        sql`SELECT 
-              COUNT(*) FILTER (WHERE cargo IN ('ADMIN', 'GESTOR', 'LIDER')) AS total_lideres,
-              COUNT(*) FILTER (WHERE cargo = 'APOIADOR') AS total_apoiadores,
-              COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) AS cadastros_hoje
-            FROM ${schema.usuarios}`
-      )) as any;
+    // Conta eleitores atuais no banco para atualizar o progresso da meta global
+    const [totalGeral] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.usuarios);
 
-      const totalLideres = parseInt(counts?.total_lideres || '0', 10);
-      const totalApoiadores = parseInt(counts?.total_apoiadores || '0', 10);
-      const cadastrosHoje = parseInt(counts?.cadastros_hoje || '0', 10);
+    const now = new Date();
 
-      // 2. Metas Cadastradas
-      const listaMetas = await db
-        .select()
-        .from(schema.metas)
-        .orderBy(desc(schema.metas.created_at));
-
-      let metaGlobal = listaMetas.find((m) => m.tipo === 'GLOBAL');
-      if (!metaGlobal) {
-        // Criar meta padrão caso não exista
-        const [createdMeta] = await db
-          .insert(schema.metas)
-          .values({
-            titulo: 'Meta Geral da Campanha 2026',
-            tipo: 'GLOBAL',
-            quantidade_meta: 5000,
-            quantidade_atual: totalApoiadores,
-            data_fim: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-            meta_diaria_cadencia: 25,
-            status_semaforo: totalApoiadores >= 2500 ? 'VERDE' : totalApoiadores >= 1000 ? 'AMARELO' : 'VERMELHO',
-          })
-          .returning();
-        metaGlobal = createdMeta;
-      } else {
-        // Atualizar quantidade atual
-        metaGlobal.quantidade_atual = totalApoiadores;
+    const enrichedMetas = metas.map((m) => {
+      let current = m.quantidade_atual;
+      if (m.tipo === 'GLOBAL') {
+        current = Number(totalGeral?.count || 0);
       }
 
-      // 3. Cálculo de Cadência e Dias Restantes
-      const agora = new Date();
-      const dataFim = new Date(metaGlobal.data_fim);
-      const diffMs = dataFim.getTime() - agora.getTime();
-      const diasRestantes = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-      const faltamVotos = Math.max(0, metaGlobal.quantidade_meta - totalApoiadores);
-      const cadenciaNecessariaDia = Math.ceil(faltamVotos / diasRestantes);
+      const diasRestantes = Math.max(
+        Math.ceil((new Date(m.data_fim).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+        1
+      );
 
-      // Status do Semáforo
-      let semaforoGlobal: 'VERDE' | 'AMARELO' | 'VERMELHO' = 'VERMELHO';
-      if (cadastrosHoje >= metaGlobal.meta_diaria_cadencia) {
-        semaforoGlobal = 'VERDE';
-      } else if (cadastrosHoje >= Math.floor(metaGlobal.meta_diaria_cadencia * 0.5)) {
-        semaforoGlobal = 'AMARELO';
+      const faltam = Math.max(m.quantidade_meta - current, 0);
+      const ritmoNecessarioPorDia = Math.ceil(faltam / diasRestantes);
+
+      // Semáforo dinâmico
+      let semaforo: 'VERDE' | 'AMARELO' | 'VERMELHO' = 'VERDE';
+      if (faltam === 0) {
+        semaforo = 'VERDE';
+      } else if (ritmoNecessarioPorDia > m.meta_diaria_cadencia * 1.5) {
+        semaforo = 'VERMELHO'; // Ritmo muito atrasado
+      } else if (ritmoNecessarioPorDia > m.meta_diaria_cadencia) {
+        semaforo = 'AMARELO'; // Exige atenção
       }
 
-      return reply.send({
-        kpis: {
-          total_lideres: totalLideres,
-          total_apoiadores: totalApoiadores,
-          cadastros_hoje: cadastrosHoje,
-          meta_global: metaGlobal.quantidade_meta,
-          progresso_percentual: Math.min(100, (totalApoiadores / metaGlobal.quantidade_meta) * 100),
-          dias_restantes: diasRestantes,
-          cadencia_diaria_atual: cadastrosHoje,
-          cadencia_diaria_meta: metaGlobal.meta_diaria_cadencia,
-          cadencia_diaria_necessaria: cadenciaNecessariaDia,
-          status_semaforo: semaforoGlobal,
-        },
-        metas: listaMetas,
-      });
-    } catch (error) {
-      console.warn('Aviso: Banco não conectado ou vazio em /api/metas/kpis (usando fallback)');
-      return reply.send({
-        kpis: {
-          total_lideres: 4,
-          total_apoiadores: 6,
-          cadastros_hoje: 2,
-          meta_global: 3500,
-          progresso_percentual: 0.17,
-          dias_restantes: 45,
-          cadencia_diaria_atual: 2,
-          cadencia_diaria_meta: 30,
-          cadencia_diaria_necessaria: 78,
-          status_semaforo: 'AMARELO',
-        },
-        metas: [
-          {
-            id: '1',
-            titulo: 'Meta Geral Campanha 2026',
-            tipo: 'GLOBAL',
-            alvo_referencia: 'Toda a Cidade',
-            quantidade_meta: 3500,
-            quantidade_atual: 6,
-            data_fim: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-            meta_diaria_cadencia: 30,
-            status_semaforo: 'AMARELO',
-          },
-          {
-            id: '2',
-            titulo: 'Mobilização Zona Norte (Zona 120)',
-            tipo: 'ZONA',
-            alvo_referencia: 'Zona 120',
-            quantidade_meta: 1200,
-            quantidade_atual: 3,
-            data_fim: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString(),
-            meta_diaria_cadencia: 15,
-            status_semaforo: 'VERDE',
-          },
-          {
-            id: '3',
-            titulo: 'Mobilização Zona Sul (Zona 150)',
-            tipo: 'ZONA',
-            alvo_referencia: 'Zona 150',
-            quantidade_meta: 1500,
-            quantidade_atual: 3,
-            data_fim: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString(),
-            meta_diaria_cadencia: 15,
-            status_semaforo: 'VERMELHO',
-          },
-        ],
-      });
-    }
+      const percentual = Math.min(Math.round((current / (m.quantidade_meta || 1)) * 100), 100);
+
+      return {
+        ...m,
+        quantidade_atual: current,
+        dias_restantes: diasRestantes,
+        faltam,
+        ritmo_necessario_dia: ritmoNecessarioPorDia,
+        status_semaforo: semaforo,
+        percentual,
+      };
+    });
+
+    return enrichedMetas;
   });
 
-  /**
-   * Criação de nova meta
-   */
-  fastify.post('/api/metas', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const data = metaSchema.parse(request.body);
+  // Criação de meta
+  app.post('/api/metas', async (request, reply) => {
+    const body = request.body as any;
 
-      const [novaMeta] = await db
-        .insert(schema.metas)
-        .values({
-          titulo: data.titulo,
-          tipo: data.tipo,
-          alvo_referencia: data.alvo_referencia,
-          quantidade_meta: data.quantidade_meta,
-          data_fim: new Date(data.data_fim),
-          meta_diaria_cadencia: data.meta_diaria_cadencia,
-          status_semaforo: 'VERDE',
-        })
-        .returning();
-
-      return reply.status(201).send(novaMeta);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return reply.status(400).send({ error: 'Dados inválidos', details: error.errors });
-      }
-      return reply.status(500).send({ error: 'Falha ao criar meta' });
+    if (!body.titulo || !body.quantidade_meta || !body.data_fim) {
+      return reply.status(400).send({ error: 'Título, quantidade da meta e data final são obrigatórios.' });
     }
+
+    const [nova] = await db
+      .insert(schema.metas)
+      .values({
+        titulo: body.titulo,
+        tipo: body.tipo || 'GLOBAL',
+        alvo_referencia: body.alvo_referencia || null,
+        quantidade_meta: Number(body.quantidade_meta),
+        quantidade_atual: 0,
+        data_fim: new Date(body.data_fim),
+        meta_diaria_cadencia: Number(body.meta_diaria_cadencia || 10),
+      })
+      .returning();
+
+    return nova;
+  });
+
+  // Atualização de meta
+  app.put('/api/metas/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    const body = request.body as any;
+
+    const existing = await db.select().from(schema.metas).where(eq(schema.metas.id, id)).limit(1).then((r) => r[0]);
+    if (!existing) {
+      return reply.status(404).send({ error: 'Meta não encontrada.' });
+    }
+
+    const updates: any = { ...body, updated_at: new Date() };
+    if (updates.data_fim) {
+      updates.data_fim = new Date(updates.data_fim);
+    }
+
+    await db.update(schema.metas).set(updates).where(eq(schema.metas.id, id));
+    const updated = await db.select().from(schema.metas).where(eq(schema.metas.id, id)).limit(1).then((r) => r[0]);
+
+    return updated;
+  });
+
+  // Exclusão de meta
+  app.delete('/api/metas/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    await db.delete(schema.metas).where(eq(schema.metas.id, id));
+    return { success: true };
   });
 }

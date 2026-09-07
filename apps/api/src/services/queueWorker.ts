@@ -1,242 +1,251 @@
+/**
+ * queueWorker.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Worker de disparos em massa via Meta Cloud API (única integração oficial).
+ * Correções aplicadas:
+ *   • Mutex isProcessing — sem sobreposição de execuções
+ *   • Reset automático de msgs_enviadas_hoje à meia-noite
+ *   • Usa exclusivamente sendMetaTextMessage (sem Baileys)
+ *   • filtro_tipo e filtro_valor implementados (TODOS | BAIRRO | ZONA | CARGO)
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
-import { evolutionService } from './evolutionService.js';
-import { nativeWhatsAppService } from './nativeWhatsAppService.js';
-import dotenv from 'dotenv';
+import { eq, and, sql } from 'drizzle-orm';
+import { sendMetaTextMessage } from './metaCloudService.js';
 
-dotenv.config();
-
-function capitalizeFirstLetter(string: string): string {
-  if (!string) return '';
-  return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
-}
+let isWorkerRunning = false;
+let isProcessing = false; // Mutex para evitar sobreposição
 
 /**
- * Parser de Spintax recursivo: transforma {Olá|Oi|Tudo bem} em uma variação aleatória única
+ * Resolve variações de Spintax no formato {Oi|Olá|Tudo bem}
  */
 export function parseSpintax(text: string): string {
-  if (!text) return '';
-  const spintaxRegex = /\{([^{}]+)\}/;
-  let match = spintaxRegex.exec(text);
-  while (match) {
-    const options = match[1].split('|');
-    const chosen = options[Math.floor(Math.random() * options.length)];
-    text = text.replace(match[0], chosen);
-    match = spintaxRegex.exec(text);
+  const spintaxRegex = /\{([^{}]+)\}/g;
+  let result = text;
+  let safety = 0;
+  while (spintaxRegex.test(result) && safety < 10) {
+    result = result.replace(/\{([^{}]+)\}/g, (_, match) => {
+      const choices = match.split('|');
+      return choices[Math.floor(Math.random() * choices.length)];
+    });
+    safety++;
   }
-  return text;
+  return result;
 }
 
 /**
- * Gera delay com distribuição Gaussiana (Box-Muller) e jitter orgânico.
- * A distribuição normal imita com fidelidade o ritmo e pausas humanas,
- * neutralizando a heurística de detecção por séries temporais da Meta.
+ * Gera delay gaussiano humanizado (ms) — respeita rate limits da Meta
  */
-function getRandomDelay(min = 3500, max = 8500): number {
-  let u = 0, v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
-  const num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  const mean = (min + max) / 2;
-  const stdDev = (max - min) / 6;
-  const delay = Math.round(mean + num * stdDev);
-  return Math.min(Math.max(delay, min), max);
+function getGaussianDelay(minSec = 2, maxSec = 6): number {
+  const u1 = Math.random();
+  const u2 = Math.random();
+  const z0 = Math.sqrt(-2.0 * Math.log(u1 || 0.0001)) * Math.cos(2.0 * Math.PI * u2);
+  const mean = (minSec + maxSec) / 2;
+  const stdDev = (maxSec - minSec) / 4;
+  const clamped = Math.min(Math.max(mean + z0 * stdDev, minSec), maxSec);
+  return Math.round(clamped * 1000);
 }
 
-export class DisparoQueueWorker {
-  private isProcessing = false;
-  private activeCampaignId: string | null = null;
-  private readonly BATCH_COOLDOWN_COUNT = 50; // Cooldown a cada 50 envios
-  private readonly COOLDOWN_DURATION_MS = 60000; // 60 segundos de resfriamento
+/**
+ * Agenda o reset diário do contador de mensagens à meia-noite
+ */
+function scheduleMidnightReset() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0); // próxima meia-noite
+  const msUntilMidnight = midnight.getTime() - now.getTime();
 
-  /**
-   * Processa a fila de uma campanha específica
-   */
-  async processCampaign(campaignId: string): Promise<void> {
-    if (this.isProcessing && this.activeCampaignId === campaignId) {
-      console.log(`Campanha ${campaignId} já está em processamento.`);
+  setTimeout(async () => {
+    try {
+      // Reset de todas as configurações de chip warming
+      await db.update(schema.chipWarmingConfig).set({
+        msgs_enviadas_hoje: 0,
+        ultimo_ciclo_em: new Date(),
+      });
+      console.log('[QUEUE] ✅ Contador diário de mensagens resetado à meia-noite.');
+    } catch (err) {
+      console.error('[QUEUE] Erro ao resetar contador diário:', err);
+    }
+    // Agenda o próximo reset (24h)
+    setInterval(async () => {
+      try {
+        await db.update(schema.chipWarmingConfig).set({
+          msgs_enviadas_hoje: 0,
+          ultimo_ciclo_em: new Date(),
+        });
+        console.log('[QUEUE] ✅ Contador diário resetado (ciclo de 24h).');
+      } catch (err) {
+        console.error('[QUEUE] Erro no reset periódico:', err);
+      }
+    }, 24 * 60 * 60 * 1000);
+  }, msUntilMidnight);
+
+  console.log(`[QUEUE] Reset diário agendado para ${midnight.toLocaleTimeString('pt-BR')} (${Math.round(msUntilMidnight / 60000)} min).`);
+}
+
+/**
+ * Inicia o worker de envio em background
+ */
+export function startQueueWorker() {
+  if (isWorkerRunning) return;
+  isWorkerRunning = true;
+  console.log('[QUEUE] Worker de disparos via Meta Cloud API iniciado.');
+
+  // Processa a cada 5 segundos com mutex
+  setInterval(async () => {
+    if (isProcessing) return; // Evita sobreposição
+    isProcessing = true;
+    try {
+      await processNextPendingBatch();
+    } catch (err) {
+      console.error('[QUEUE Worker Error]', err);
+    } finally {
+      isProcessing = false;
+    }
+  }, 5000);
+
+  // Agenda reset automático à meia-noite
+  scheduleMidnightReset();
+}
+
+/**
+ * Processa o próximo item pendente da fila
+ */
+async function processNextPendingBatch() {
+  // 1. Verifica limite de rate do chip warming
+  const chipConfig = await db.select().from(schema.chipWarmingConfig).limit(1).then((r) => r[0]);
+  if (chipConfig && chipConfig.msgs_enviadas_hoje >= chipConfig.limite_diario_atual) {
+    return; // Limite diário atingido
+  }
+
+  // 2. Busca campanha ativa
+  const activeCampaign = await db
+    .select()
+    .from(schema.disparosCampanha)
+    .where(eq(schema.disparosCampanha.status, 'EM_ANDAMENTO'))
+    .limit(1)
+    .then((r) => r[0]);
+
+  if (!activeCampaign) return;
+
+  // 3. Próximo item pendente
+  const pendingItem = await db
+    .select()
+    .from(schema.disparosItens)
+    .where(
+      and(
+        eq(schema.disparosItens.disparo_id, activeCampaign.id),
+        eq(schema.disparosItens.status, 'PENDENTE')
+      )
+    )
+    .limit(1)
+    .then((r) => r[0]);
+
+  if (!pendingItem) {
+    // Campanha finalizada
+    await db
+      .update(schema.disparosCampanha)
+      .set({ status: 'CONCLUIDO', updated_at: new Date() })
+      .where(eq(schema.disparosCampanha.id, activeCampaign.id));
+    console.log(`[QUEUE] 🎉 Campanha "${activeCampaign.titulo}" concluída!`);
+    return;
+  }
+
+  // 4. Dados do destinatário
+  const user = await db
+    .select()
+    .from(schema.usuarios)
+    .where(eq(schema.usuarios.id, pendingItem.usuario_id))
+    .limit(1)
+    .then((r) => r[0]);
+
+  if (!user || user.opt_out) {
+    await db.update(schema.disparosItens)
+      .set({
+        status: 'ERRO',
+        erro_detalhe: user?.opt_out ? 'Opt-out LGPD ativo' : 'Usuário não encontrado',
+      })
+      .where(eq(schema.disparosItens.id, pendingItem.id));
+
+    await db.update(schema.disparosCampanha)
+      .set({ total_erros: sql`${schema.disparosCampanha.total_erros} + 1`, updated_at: new Date() })
+      .where(eq(schema.disparosCampanha.id, activeCampaign.id));
+    return;
+  }
+
+  // 5. Filtros de destinatários implementados
+  if (activeCampaign.filtro_tipo && activeCampaign.filtro_tipo !== 'TODOS' && activeCampaign.filtro_valor) {
+    let qualifica = false;
+    switch (activeCampaign.filtro_tipo) {
+      case 'BAIRRO':
+        qualifica = user.bairro?.toLowerCase() === activeCampaign.filtro_valor?.toLowerCase();
+        break;
+      case 'ZONA':
+        qualifica = user.zona_eleitoral === activeCampaign.filtro_valor;
+        break;
+      case 'LIDER':
+        // filtro_valor contém o cargo ou o id do líder acima
+        qualifica = user.lider_acima_id === activeCampaign.filtro_valor || (user.cargo as string) === activeCampaign.filtro_valor;
+        break;
+      default:
+        qualifica = true;
+    }
+
+    if (!qualifica) {
+      await db.update(schema.disparosItens)
+        .set({ status: 'ERRO', erro_detalhe: 'Fora do filtro de destinatários' })
+        .where(eq(schema.disparosItens.id, pendingItem.id));
       return;
     }
+  }
 
-    this.isProcessing = true;
-    this.activeCampaignId = campaignId;
+  // 6. Montagem da mensagem com Spintax e variáveis
+  const config = await db.select().from(schema.campanhaConfig).limit(1).then((r) => r[0]);
+  let finalMessage = parseSpintax(activeCampaign.mensagem_template);
+  finalMessage = finalMessage
+    .replace(/\{nome\}/gi, user.nome)
+    .replace(/\{bairro\}/gi, user.bairro || 'sua região')
+    .replace(/\{candidato\}/gi, config?.nome_urna || 'nosso candidato')
+    .replace(/\{numero\}/gi, config?.numero_candidato || '55955')
+    .replace(/\{cargo\}/gi, config?.cargo || 'Deputado Federal');
 
-    try {
-      // 1. Atualizar status da campanha para EM_ANDAMENTO
-      await db
-        .update(schema.disparosCampanha)
-        .set({ status: 'EM_ANDAMENTO', updated_at: new Date() })
-        .where(eq(schema.disparosCampanha.id, campaignId))
-        .catch(() => {});
+  // Rodapé legal LGPD
+  finalMessage += '\n\n_Para não receber mais mensagens, responda "PARAR"._';
 
-      // 2. Buscar dados da campanha
-      const [campaign] = await db
-        .select()
-        .from(schema.disparosCampanha)
-        .where(eq(schema.disparosCampanha.id, campaignId))
-        .catch(() => []);
+  // 7. Delay humanizado (2–6s) para respeitar rate limits da Meta API
+  const delayMs = getGaussianDelay(2, 6);
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 
-      if (!campaign) {
-        console.error(`Campanha ${campaignId} não encontrada.`);
-        return;
-      }
+  // 8. Disparo via Meta Cloud API (oficial, sem risco de ban)
+  const result = await sendMetaTextMessage(pendingItem.whatsapp_destino, finalMessage);
 
-      // 3. Buscar itens pendentes
-      const pendingItems = await db
-        .select({
-          item: schema.disparosItens,
-          usuario: schema.usuarios,
-        })
-        .from(schema.disparosItens)
-        .innerJoin(schema.usuarios, eq(schema.disparosItens.usuario_id, schema.usuarios.id))
-        .where(
-          and(
-            eq(schema.disparosItens.disparo_id, campaignId),
-            eq(schema.disparosItens.status, 'PENDENTE')
-          )
-        )
-        .catch(() => []);
+  if (result.success) {
+    await db.update(schema.disparosItens)
+      .set({ status: 'ENVIADO', mensagem_final: finalMessage, enviado_em: new Date() })
+      .where(eq(schema.disparosItens.id, pendingItem.id));
 
-      console.log(`[QueueWorker] Iniciando disparo de ${pendingItems.length} mensagens para campanha: ${campaign.titulo}`);
+    await db.update(schema.disparosCampanha)
+      .set({ total_enviados: sql`${schema.disparosCampanha.total_enviados} + 1`, updated_at: new Date() })
+      .where(eq(schema.disparosCampanha.id, activeCampaign.id));
 
-      let sentCount = campaign.total_enviados || 0;
-      let errorCount = campaign.total_erros || 0;
-      let batchCounter = 0;
-
-      for (const { item, usuario } of pendingItems) {
-        // 0. Bloqueio Estrito de Opt-Out (Compliance TSE / LGPD)
-        if (usuario.opt_out) {
-          console.log(`🛑 Disparo ignorado para ${usuario.whatsapp} (${usuario.nome}) devido a Opt-Out ativo.`);
-          await db
-            .update(schema.disparosItens)
-            .set({
-              status: 'ERRO',
-              erro_detalhe: 'Cancelado: Eleitor solicitou descadastro (Opt-Out TSE/LGPD)',
-            })
-            .where(eq(schema.disparosItens.id, item.id));
-          errorCount++;
-          continue;
-        }
-
-        // Formatar primeiro nome capitalizado
-        const primeiroNome = capitalizeFirstLetter(usuario.nome ? usuario.nome.split(' ')[0] : 'Amigo(a)');
-
-        // Substituição atômica de variáveis dinâmicas + Motor Spintax Anti-Bloqueio
-        const rawTemplate = campaign.mensagem_template
-          .replace(/{nome}/gi, primeiroNome)
-          .replace(/{bairro}/gi, usuario.bairro || 'sua região')
-          .replace(/{zona}/gi, usuario.zona_eleitoral || '')
-          .replace(/{secao}/gi, usuario.secao_eleitoral || '');
-
-        const personalizedMessage = parseSpintax(rawTemplate);
-
-        let sendSuccess = false;
-        let errorMessage = '';
-
-        // Se houver PDF anexado (URL pública Supabase CDN)
-        if (campaign.url_midia_pdf) {
-          const mediaRes = await evolutionService.sendMediaMessage(
-            item.whatsapp_destino,
-            campaign.url_midia_pdf,
-            personalizedMessage,
-            'Proposta_Oficial.pdf',
-            'document'
-          );
-          sendSuccess = mediaRes.success;
-          if (!sendSuccess) errorMessage = JSON.stringify(mediaRes.data);
-        } else {
-          // Apenas mensagem de texto: tenta Baileys nativo primeiro
-          sendSuccess = await nativeWhatsAppService.sendMessage(
-            item.whatsapp_destino,
-            personalizedMessage
-          );
-
-          if (!sendSuccess) {
-            const textRes = await evolutionService.sendTextMessage(
-              item.whatsapp_destino,
-              personalizedMessage
-            );
-            sendSuccess = textRes.success;
-            if (!sendSuccess) errorMessage = JSON.stringify(textRes.data);
-          }
-        }
-
-        if (sendSuccess) {
-          sentCount++;
-          batchCounter++;
-          await db
-            .update(schema.disparosItens)
-            .set({
-              status: 'ENVIADO',
-              mensagem_final: personalizedMessage,
-              enviado_em: new Date(),
-            })
-            .where(eq(schema.disparosItens.id, item.id))
-            .catch(() => {});
-        } else {
-          errorCount++;
-          await db
-            .update(schema.disparosItens)
-            .set({
-              status: 'ERRO',
-              mensagem_final: personalizedMessage,
-              erro_detalhe: errorMessage,
-            })
-            .where(eq(schema.disparosItens.id, item.id))
-            .catch(() => {});
-        }
-
-        // Atualizar contadores parciais
-        await db
-          .update(schema.disparosCampanha)
-          .set({
-            total_enviados: sentCount,
-            total_erros: errorCount,
-            updated_at: new Date(),
-          })
-          .where(eq(schema.disparosCampanha.id, campaignId))
-          .catch(() => {});
-
-        // Resfriamento anti-ban a cada 50 mensagens
-        if (batchCounter >= this.BATCH_COOLDOWN_COUNT) {
-          console.log(`[QueueWorker] Cooldown de segurança atingido (${this.BATCH_COOLDOWN_COUNT} envios). Aguardando ${this.COOLDOWN_DURATION_MS / 1000}s de resfriamento...`);
-          batchCounter = 0;
-          await new Promise((resolve) => setTimeout(resolve, this.COOLDOWN_DURATION_MS));
-        } else {
-          // Atraso dinâmico por envio: Delta t = random(3000ms, 7500ms)
-          const delay = getRandomDelay(3000, 7500);
-          console.log(`[QueueWorker] Mensagem enviada para ${item.whatsapp_destino}. Aguardando ${delay}ms (Anti-Ban)...`);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-      }
-
-      // Finalizar status da campanha
-      const finalStatus = errorCount > 0 && sentCount === 0 ? 'FALHA' : 'CONCLUIDO';
-      await db
-        .update(schema.disparosCampanha)
+    if (chipConfig) {
+      await db.update(schema.chipWarmingConfig)
         .set({
-          status: finalStatus,
-          total_enviados: sentCount,
-          total_erros: errorCount,
-          updated_at: new Date(),
+          msgs_enviadas_hoje: sql`${schema.chipWarmingConfig.msgs_enviadas_hoje} + 1`,
+          ultimo_ciclo_em: new Date(),
         })
-        .where(eq(schema.disparosCampanha.id, campaignId))
-        .catch(() => {});
-
-      console.log(`[QueueWorker] Campanha ${campaignId} finalizada. Enviados: ${sentCount}, Erros: ${errorCount}`);
-    } catch (error) {
-      console.error(`[QueueWorker] Erro no processamento da campanha ${campaignId}:`, error);
-      await db
-        .update(schema.disparosCampanha)
-        .set({ status: 'FALHA', updated_at: new Date() })
-        .where(eq(schema.disparosCampanha.id, campaignId))
-        .catch(() => {});
-    } finally {
-      this.isProcessing = false;
-      this.activeCampaignId = null;
+        .where(eq(schema.chipWarmingConfig.id, chipConfig.id));
     }
+  } else {
+    console.error(`[QUEUE] Erro ao enviar para ${pendingItem.whatsapp_destino}: ${result.error}`);
+    await db.update(schema.disparosItens)
+      .set({ status: 'ERRO', erro_detalhe: result.error || 'Falha na Meta Cloud API' })
+      .where(eq(schema.disparosItens.id, pendingItem.id));
+
+    await db.update(schema.disparosCampanha)
+      .set({ total_erros: sql`${schema.disparosCampanha.total_erros} + 1`, updated_at: new Date() })
+      .where(eq(schema.disparosCampanha.id, activeCampaign.id));
   }
 }
-
-export const queueWorker = new DisparoQueueWorker();

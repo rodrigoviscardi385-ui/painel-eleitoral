@@ -1,273 +1,163 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
-import { eq, desc, or, sql } from 'drizzle-orm';
-import { nativeWhatsAppService } from '../services/nativeWhatsAppService.js';
-import Groq from 'groq-sdk';
+import { eq, desc, sql } from 'drizzle-orm';
+import { sendWhatsAppMessage } from '../services/wppService.js';
 
-// Gerenciador de clientes SSE (Server-Sent Events) conectados
-const sseClients = new Set<FastifyReply>();
+export async function chatRoutes(app: FastifyInstance) {
+  // Lista todas as conversas ativas agrupadas por contato
+  app.get('/api/chat/conversas', async () => {
+    const conversas = await db
+      .select({
+        conversa_id: schema.mensagensChat.conversa_id,
+        remetente_nome: schema.mensagensChat.remetente_nome,
+        ultima_mensagem: sql<string>`(
+          SELECT conteudo FROM mensagens_chat m2
+          WHERE m2.conversa_id = mensagens_chat.conversa_id
+          ORDER BY m2.created_at DESC LIMIT 1
+        )`,
+        ultimo_tipo: sql<string>`(
+          SELECT tipo FROM mensagens_chat m2
+          WHERE m2.conversa_id = mensagens_chat.conversa_id
+          ORDER BY m2.created_at DESC LIMIT 1
+        )`,
+        ultima_data: sql<string>`(
+          SELECT created_at FROM mensagens_chat m2
+          WHERE m2.conversa_id = mensagens_chat.conversa_id
+          ORDER BY m2.created_at DESC LIMIT 1
+        )`,
+        total_mensagens: sql<number>`count(*)`,
+        modo: sql<string>`COALESCE((
+          SELECT modo FROM conversa_status cs
+          WHERE cs.conversa_id = mensagens_chat.conversa_id
+        ), 'BOT')`,
+      })
+      .from(schema.mensagensChat)
+      .groupBy(schema.mensagensChat.conversa_id, schema.mensagensChat.remetente_nome)
+      .orderBy(desc(sql`MAX(mensagens_chat.created_at)`));
 
-export function broadcastChatMessage(msg: any) {
-  const data = `data: ${JSON.stringify(msg)}\n\n`;
-  for (const client of sseClients) {
-    try {
-      client.raw.write(data);
-    } catch {
-      sseClients.delete(client);
-    }
-  }
-}
+    // Busca detalhes dos usuários correspondentes
+    const phoneList = conversas.map((c) => c.conversa_id);
+    const users =
+      phoneList.length > 0
+        ? await db
+            .select()
+            .from(schema.usuarios)
+            .where(sql`${schema.usuarios.whatsapp} IN ${phoneList}`)
+        : [];
 
-export async function chatRoutes(fastify: FastifyInstance) {
-  const groqApiKey = process.env.GROQ_API_KEY || '';
-  const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
+    const userMap = new Map(users.map((u) => [u.whatsapp, u]));
 
-  /**
-   * SSE Stream em tempo real
-   * Conecta o frontend ao fluxo de novas mensagens instantâneas
-   */
-  fastify.get('/api/chat/stream', (request: FastifyRequest, reply: FastifyReply) => {
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
+    const result = conversas.map((c) => {
+      const user = userMap.get(c.conversa_id);
+      return {
+        ...c,
+        nome: user?.nome || c.remetente_nome || c.conversa_id,
+        whatsapp: c.conversa_id,
+        cargo: user?.cargo || 'APOIADOR',
+        bairro: user?.bairro || 'Não informado',
+        zona: user?.zona_eleitoral || '',
+        opt_out: user?.opt_out || false,
+      };
     });
 
-    reply.raw.write('event: connected\ndata: {"status":"connected"}\n\n');
-    sseClients.add(reply);
-
-    request.raw.on('close', () => {
-      sseClients.delete(reply);
-    });
+    return result;
   });
 
-  /**
-   * GET /api/chat/conversas
-   * Retorna lista de conversas ativas agrupadas por contato
-   */
-  fastify.get('/api/chat/conversas', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      // Buscar as últimas mensagens de cada conversa
-      const rawConversas = await db
-        .select({
-          conversa_id: schema.mensagensChat.conversa_id,
-          remetente_nome: schema.mensagensChat.remetente_nome,
-          ultima_mensagem: schema.mensagensChat.conteudo,
-          tipo: schema.mensagensChat.tipo,
-          status: schema.mensagensChat.status,
-          setor: schema.mensagensChat.setor,
-          tags: schema.mensagensChat.tags,
-          created_at: schema.mensagensChat.created_at,
-        })
-        .from(schema.mensagensChat)
-        .orderBy(desc(schema.mensagensChat.created_at));
+  // Retorna histórico completo de uma conversa específica
+  app.get('/api/chat/conversas/:phone', async (request) => {
+    const { phone } = request.params as any;
+    const cleanPhone = phone.replace(/\D/g, '');
 
-      // Agrupar por conversa_id
-      const conversasMap = new Map<string, any>();
-      for (const msg of rawConversas) {
-        if (!conversasMap.has(msg.conversa_id)) {
-          let tagsList: string[] = [];
-          try {
-            tagsList = JSON.parse(msg.tags);
-          } catch {
-            tagsList = [];
-          }
+    const messages = await db
+      .select()
+      .from(schema.mensagensChat)
+      .where(eq(schema.mensagensChat.conversa_id, cleanPhone))
+      .orderBy(schema.mensagensChat.created_at);
 
-          conversasMap.set(msg.conversa_id, {
-            id: msg.conversa_id,
-            nome: msg.remetente_nome || msg.conversa_id,
-            whatsapp: msg.conversa_id,
-            ultima_mensagem: msg.ultima_mensagem,
-            tipo: msg.tipo,
-            status: msg.status,
-            setor: msg.setor || 'GERAL',
-            tags: tagsList,
-            updated_at: msg.created_at,
-            nao_lidas: msg.status === 'PENDENTE' || msg.status === 'ENTREGUE' ? 1 : 0,
-            opt_out: false,
-          });
-        }
-      }
+    const user = await db
+      .select()
+      .from(schema.usuarios)
+      .where(eq(schema.usuarios.whatsapp, cleanPhone))
+      .limit(1)
+      .then((r) => r[0]);
 
-      // Buscar também apoiadores e líderes cadastrados no banco para enriquecer a lista
-      const usuariosDb = await db
-        .select({
-          id: schema.usuarios.id,
-          nome: schema.usuarios.nome,
-          whatsapp: schema.usuarios.whatsapp,
-          cargo: schema.usuarios.cargo,
-          bairro: schema.usuarios.bairro,
-          zona_eleitoral: schema.usuarios.zona_eleitoral,
-          opt_out: schema.usuarios.opt_out,
-        })
-        .from(schema.usuarios);
+    const status = await db
+      .select()
+      .from(schema.conversaStatus)
+      .where(eq(schema.conversaStatus.conversa_id, cleanPhone))
+      .limit(1)
+      .then((r) => r[0]);
 
-      const listaFinal = Array.from(conversasMap.values());
+    return {
+      usuario: user || { nome: cleanPhone, whatsapp: cleanPhone, cargo: 'APOIADOR' },
+      modo: status?.modo || 'BOT',
+      atendente_nome: status?.atendente_nome || null,
+      mensagens: messages,
+    };
+  });
 
-      // Adicionar líderes/apoiadores que ainda não têm conversa ativa se a lista for pequena
-      for (const u of usuariosDb) {
-        const cleanPhone = u.whatsapp.replace(/\D/g, '');
-        const existing = listaFinal.find((c) => c.whatsapp.includes(cleanPhone) || cleanPhone.includes(c.whatsapp));
-        if (existing) {
-          existing.nome = u.nome;
-          existing.cargo = u.cargo;
-          existing.bairro = u.bairro;
-          existing.zona_eleitoral = u.zona_eleitoral;
-          existing.opt_out = u.opt_out;
-        } else if (listaFinal.length < 20) {
-          listaFinal.push({
-            id: u.whatsapp,
-            nome: u.nome,
-            whatsapp: u.whatsapp,
-            cargo: u.cargo,
-            bairro: u.bairro,
-            zona_eleitoral: u.zona_eleitoral,
-            ultima_mensagem: 'Toque para iniciar conversa',
-            tipo: 'TEXTO',
-            status: 'LIDO',
-            setor: 'GERAL',
-            opt_out: u.opt_out,
-            tags: [u.cargo],
-            updated_at: new Date().toISOString(),
-            nao_lidas: 0,
-          });
-        }
-      }
+  // Envio de mensagem pelo atendente humano
+  app.post('/api/chat/enviar', async (request, reply) => {
+    const { phone, conteudo, atendente_nome } = request.body as any;
 
-      return reply.send({ conversas: listaFinal });
-    } catch (error) {
-      console.error('Erro ao listar conversas:', error);
-      return reply.status(500).send({ error: 'Falha ao buscar conversas do chat' });
+    if (!phone || !conteudo) {
+      return reply.status(400).send({ error: 'Telefone e conteúdo são obrigatórios.' });
     }
-  });
 
-  /**
-   * GET /api/chat/conversas/:phone
-   * Histórico de mensagens de uma conversa específica
-   */
-  fastify.get('/api/chat/conversas/:phone', async (request: FastifyRequest<{ Params: { phone: string } }>, reply: FastifyReply) => {
-    try {
-      const { phone } = request.params;
-      const cleanPhone = phone.replace(/\D/g, '');
+    const cleanPhone = phone.replace(/\D/g, '');
+    const sent = await sendWhatsAppMessage(phone, conteudo);
 
-      const msgs = await db
-        .select()
-        .from(schema.mensagensChat)
-        .where(
-          or(
-            eq(schema.mensagensChat.conversa_id, phone),
-            eq(schema.mensagensChat.conversa_id, cleanPhone),
-            eq(schema.mensagensChat.de_whatsapp, cleanPhone),
-            eq(schema.mensagensChat.para_whatsapp, cleanPhone)
-          )
-        )
-        .orderBy(schema.mensagensChat.created_at);
-
-      // Marcar mensagens recebidas como LIDAS
-      await db
-        .update(schema.mensagensChat)
-        .set({ status: 'LIDO' })
-        .where(eq(schema.mensagensChat.conversa_id, phone))
-        .catch(() => {});
-
-      return reply.send({ mensagens: msgs });
-    } catch (error) {
-      console.error('Erro ao buscar histórico de mensagens:', error);
-      return reply.status(500).send({ error: 'Falha ao buscar mensagens' });
+    if (!sent) {
+      return reply.status(500).send({ error: 'Falha ao enviar mensagem pelo WhatsApp.' });
     }
-  });
 
-  /**
-   * POST /api/chat/enviar
-   * Envia uma mensagem via Baileys WhatsApp e grava no histórico
-   */
-  fastify.post('/api/chat/enviar', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const body: any = request.body || {};
-      const { para_whatsapp, conversa_id, conteudo, tipo = 'TEXTO', atendente_nome = 'Operador' } = body;
-
-      if (!para_whatsapp || !conteudo) {
-        return reply.status(400).send({ error: 'Destinatário e conteúdo são obrigatórios' });
-      }
-
-      let cleanPhone = String(para_whatsapp).replace(/\D/g, '');
-      if (cleanPhone.length === 10 || cleanPhone.length === 11) {
-        cleanPhone = `55${cleanPhone}`;
-      }
-
-      const convId = conversa_id ? String(conversa_id) : cleanPhone;
-
-      // Enviar via Baileys WhatsApp com resolução de JID canônico
-      const sendSuccess = await nativeWhatsAppService.sendMessage(cleanPhone, String(conteudo).trim());
-
-      // Gravar no histórico do chat
-      const [novaMensagem] = await db
-        .insert(schema.mensagensChat)
-        .values({
-          conversa_id: convId,
-          de_whatsapp: 'painel_central',
-          para_whatsapp: cleanPhone,
-          remetente_nome: atendente_nome,
-          conteudo: String(conteudo).trim(),
-          tipo: tipo as any,
-          direcao: 'SAIDA',
-          status: sendSuccess ? 'ENVIADO' : 'ERRO',
-          atendente_nome,
-        })
-        .returning();
-
-      // Transmitir para o frontend via SSE
-      broadcastChatMessage(novaMensagem);
-
-      return reply.send({
-        success: sendSuccess,
-        mensagem: novaMensagem,
-      });
-    } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      return reply.status(500).send({ error: 'Falha ao enviar mensagem de chat' });
-    }
-  });
-
-  /**
-   * POST /api/chat/copilot
-   * Groq AI Copilot: Sugere a melhor resposta para a dúvida do eleitor
-   */
-  fastify.post('/api/chat/copilot', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const body: any = request.body || {};
-      const { mensagem_eleitor, nome_eleitor, contexto_bairro } = body;
-
-      if (!groq) {
-        return reply.send({
-          sugestao: `Olá ${nome_eleitor || ''}! Muito obrigado pela sua mensagem e apoio à nossa caminhada. Conte comigo!`,
-        });
-      }
-
-      const prompt = `Você é o assistente oficial de comunicação da campanha eleitoral de 2026.
-O eleitor se chama "${nome_eleitor || 'Apoiador'}" e reside no bairro "${contexto_bairro || 'Santos/SP'}".
-Ele enviou a seguinte mensagem no WhatsApp:
-"${mensagem_eleitor}"
-
-Gere uma resposta amigável, acolhedora, propositiva e clara em português do Brasil (máximo 2 a 3 parágrafos curtos) para ser enviada pela equipe de campanha. Inclua emojis de forma natural e profissional.`;
-
-      const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 300,
+    // Marca conversa como atendimento HUMANO quando atendente responde
+    await db
+      .insert(schema.conversaStatus)
+      .values({
+        conversa_id: cleanPhone,
+        modo: 'HUMANO',
+        atendente_nome: atendente_nome || 'Operador',
+      })
+      .onConflictDoUpdate({
+        target: schema.conversaStatus.conversa_id,
+        set: {
+          modo: 'HUMANO',
+          atendente_nome: atendente_nome || 'Operador',
+          updated_at: new Date(),
+        },
       });
 
-      const sugestao = response.choices[0]?.message?.content?.trim() || 'Olá! Agradecemos sua mensagem e apoio à nossa campanha.';
+    return { success: true };
+  });
 
-      return reply.send({ sugestao });
-    } catch (error) {
-      console.warn('Aviso no copilot de chat:', error);
-      return reply.send({
-        sugestao: 'Olá! Muito obrigado pela mensagem e por caminhar junto com a gente nessa jornada por nossa cidade! 🚀🏛️',
-      });
+  // Alterna modo de atendimento entre BOT e HUMANO
+  app.post('/api/chat/alternar-modo', async (request, reply) => {
+    const { phone, modo, atendente_nome } = request.body as any;
+
+    if (!phone || !modo) {
+      return reply.status(400).send({ error: 'Telefone e modo são obrigatórios.' });
     }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+
+    await db
+      .insert(schema.conversaStatus)
+      .values({
+        conversa_id: cleanPhone,
+        modo: modo === 'HUMANO' ? 'HUMANO' : 'BOT',
+        atendente_nome: atendente_nome || null,
+      })
+      .onConflictDoUpdate({
+        target: schema.conversaStatus.conversa_id,
+        set: {
+          modo: modo === 'HUMANO' ? 'HUMANO' : 'BOT',
+          atendente_nome: atendente_nome || null,
+          updated_at: new Date(),
+        },
+      });
+
+    return { success: true, modo };
   });
 }

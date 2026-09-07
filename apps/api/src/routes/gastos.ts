@@ -1,130 +1,161 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { db } from '../db/index.js';
+import { FastifyInstance } from 'fastify';
+import { db, logAuditLGPD } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { eq, desc, sql, and } from 'drizzle-orm';
-import { z } from 'zod';
+import { ocrImageBuffer } from '../services/ocrService.js';
+import { extractExpenseFromText } from '../services/groqService.js';
 
-const gastoInputSchema = z.object({
-  descricao: z.string().min(2),
-  categoria: z.enum([
-    'COMBUSTIVEL',
-    'ALIMENTACAO',
-    'MATERIAL_GRAFICO',
-    'EVENTOS',
-    'IMPULSIONAMENTO',
-    'PESSOAL',
-    'JURIDICO_CONTABIL',
-    'TRANSPORTE',
-    'OUTROS',
-  ]).default('OUTROS'),
-  valor: z.union([z.number(), z.string()]),
-  data_gasto: z.string().optional(),
-  forma_pagamento: z.enum(['PIX', 'CARTAO', 'TRANSFERENCIA', 'DINHEIRO', 'BOLETO']).default('PIX'),
-  fornecedor_nome: z.string().optional().nullable(),
-  fornecedor_documento: z.string().optional().nullable(),
-  numero_documento: z.string().optional().nullable(),
-  comprovante_url: z.string().optional().nullable(),
-  responsavel_nome: z.string().optional().nullable(),
-  status_auditoria: z.enum(['APROVADO', 'PENDENTE', 'REJEITADO']).default('PENDENTE'),
-  observacoes: z.string().optional().nullable(),
-}).strip();
+export async function gastosRoutes(app: FastifyInstance) {
+  // Lista gastos com filtros por categoria e status de auditoria
+  app.get('/api/gastos', async (request) => {
+    const { categoria, status } = request.query as any;
 
-export async function gastosRoutes(fastify: FastifyInstance) {
-  /** GET /api/gastos — Listar todos os gastos com KPIs consolidados */
-  fastify.get('/api/gastos', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const query = (request.query || {}) as Record<string, string>;
-      const { categoria, status, search } = query;
+    const conditions: any[] = [];
+    if (categoria) conditions.push(eq(schema.gastosCampanha.categoria, categoria));
+    if (status) conditions.push(eq(schema.gastosCampanha.status_auditoria, status));
 
-      const conditions = [];
-      if (categoria && categoria !== 'TODAS') {
-        conditions.push(eq(schema.gastosCampanha.categoria, categoria as any));
+    let query = db
+      .select()
+      .from(schema.gastosCampanha)
+      .orderBy(desc(schema.gastosCampanha.data_gasto));
+
+    const data = await (conditions.length > 0
+      ? (query as any).where(sql.join(conditions, sql` AND `))
+      : query);
+
+    // Totais acumulados
+    const [totalSum] = await db
+      .select({
+        total: sql<string>`COALESCE(sum(valor), 0)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(schema.gastosCampanha);
+
+    // Totais por categoria
+    const porCategoria = await db
+      .select({
+        categoria: schema.gastosCampanha.categoria,
+        total: sql<string>`COALESCE(sum(valor), 0)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(schema.gastosCampanha)
+      .groupBy(schema.gastosCampanha.categoria);
+
+    return {
+      gastos: data,
+      totalGeral: Number(totalSum?.total || 0),
+      quantidadeTotal: Number(totalSum?.count || 0),
+      porCategoria,
+    };
+  });
+
+  // Cadastro de despesa
+  app.post('/api/gastos', async (request, reply) => {
+    const body = request.body as any;
+
+    if (!body.descricao || !body.valor) {
+      return reply.status(400).send({ error: 'Descrição e valor são obrigatórios.' });
+    }
+
+    const [novo] = await db
+      .insert(schema.gastosCampanha)
+      .values({
+        descricao: body.descricao,
+        categoria: body.categoria || 'OUTROS',
+        valor: String(body.valor),
+        data_gasto: body.data_gasto ? new Date(body.data_gasto) : new Date(),
+        forma_pagamento: body.forma_pagamento || 'PIX',
+        fornecedor_nome: body.fornecedor_nome || null,
+        fornecedor_documento: body.fornecedor_documento || null,
+        numero_documento: body.numero_documento || null,
+        comprovante_url: body.comprovante_url || null,
+        responsavel_nome: body.responsavel_nome || null,
+        status_auditoria: body.status_auditoria || 'PENDENTE',
+        observacoes: body.observacoes || null,
+      })
+      .returning();
+
+    await logAuditLGPD('SISTEMA', 'NOVO_GASTO_CADASTRADO', (request as any).ip, { id: novo.id, valor: novo.valor });
+
+    return novo;
+  });
+
+  // Atualização (ex: aprovar/rejeitar auditoria contábil)
+  app.put('/api/gastos/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    const body = request.body as any;
+
+    const existing = await db
+      .select()
+      .from(schema.gastosCampanha)
+      .where(eq(schema.gastosCampanha.id, id))
+      .limit(1)
+      .then((r) => r[0]);
+
+    if (!existing) {
+      return reply.status(404).send({ error: 'Despesa não encontrada.' });
+    }
+
+    const updates: any = { ...body, updated_at: new Date() };
+    if (updates.valor) updates.valor = String(updates.valor);
+    if (updates.data_gasto) updates.data_gasto = new Date(updates.data_gasto);
+
+    await db.update(schema.gastosCampanha).set(updates).where(eq(schema.gastosCampanha.id, id));
+
+    const updated = await db
+      .select()
+      .from(schema.gastosCampanha)
+      .where(eq(schema.gastosCampanha.id, id))
+      .limit(1)
+      .then((r) => r[0]);
+
+    return updated;
+  });
+
+  // Exclusão
+  app.delete('/api/gastos/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    await db.delete(schema.gastosCampanha).where(eq(schema.gastosCampanha.id, id));
+    return { success: true };
+  });
+
+  // OCR e reconhecimento automático de comprovante / cupom fiscal
+  app.post('/api/gastos/ocr', async (request, reply) => {
+    const body = request.body as any;
+    const { imagemBase64, texto } = body || {};
+
+    let recognizedText = texto || '';
+
+    if (imagemBase64) {
+      try {
+        const base64Data = imagemBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        recognizedText = await ocrImageBuffer(buffer);
+      } catch (err: any) {
+        console.error('[OCR Cupom Error]', err?.message || err);
       }
-      if (status && status !== 'TODOS') {
-        conditions.push(eq(schema.gastosCampanha.status_auditoria, status as any));
-      }
-      if (search) {
-        conditions.push(
-          sql`(${schema.gastosCampanha.descricao} ILIKE ${`%${search}%`} OR ${schema.gastosCampanha.fornecedor_nome} ILIKE ${`%${search}%`})`
-        );
-      }
+    }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-      const items = await db
-        .select()
-        .from(schema.gastosCampanha)
-        .where(whereClause)
-        .orderBy(desc(schema.gastosCampanha.data_gasto));
-
-      const [statsResult] = (await db.execute(sql`
-        SELECT 
-          COALESCE(SUM(valor), 0) AS total_gasto,
-          COALESCE(SUM(CASE WHEN status_auditoria = 'APROVADO' THEN valor ELSE 0 END), 0) AS total_aprovado,
-          COALESCE(SUM(CASE WHEN status_auditoria = 'PENDENTE' THEN valor ELSE 0 END), 0) AS total_pendente,
-          COUNT(*) AS total_registros
-        FROM gastos_campanha;
-      `)) as any[];
-
-      return reply.send({
-        success: true,
-        data: items,
-        kpis: {
-          totalGasto: Number(statsResult?.total_gasto || 0),
-          totalAprovado: Number(statsResult?.total_aprovado || 0),
-          totalPendente: Number(statsResult?.total_pendente || 0),
-          totalRegistros: Number(statsResult?.total_registros || 0),
-          tetoLegalTSE: 350000.0,
-        },
+    if (!recognizedText || recognizedText.trim().length === 0) {
+      return reply.status(400).send({
+        error: 'Não foi possível ler o texto da imagem do cupom/comprovante. Tente uma foto com iluminação melhor ou digite os dados manualmente.',
       });
-    } catch (err: any) {
-      console.error('[Gastos] Erro ao buscar despesas:', err);
-      return reply.status(500).send({ error: 'Erro ao listar despesas', detalhe: err?.message });
     }
-  });
 
-  /** POST /api/gastos — Inserir gasto manual */
-  fastify.post('/api/gastos', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const body = gastoInputSchema.parse(request.body);
-      const cleanValor = typeof body.valor === 'number' ? body.valor : parseFloat(String(body.valor).replace(',', '.')) || 0;
+    const parsed = await extractExpenseFromText(recognizedText);
 
-      const [novo] = await db
-        .insert(schema.gastosCampanha)
-        .values({
-          ...body,
-          valor: cleanValor.toFixed(2),
-          data_gasto: body.data_gasto ? new Date(body.data_gasto) : new Date(),
-        })
-        .returning();
-
-      return reply.status(201).send({ success: true, data: novo });
-    } catch (err: any) {
-      if (err?.name === 'ZodError') {
-        return reply.status(400).send({ error: 'Dados inválidos', detalhes: err.errors });
-      }
-      console.error('[Gastos] Erro ao cadastrar despesa:', err);
-      return reply.status(500).send({ error: 'Erro ao registrar despesa' });
-    }
-  });
-
-  /** DELETE /api/gastos/:id — Remover despesa */
-  fastify.delete('/api/gastos/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    try {
-      const { id } = request.params;
-      const [deleted] = await db
-        .delete(schema.gastosCampanha)
-        .where(eq(schema.gastosCampanha.id, id))
-        .returning();
-
-      if (!deleted) {
-        return reply.status(404).send({ error: 'Gasto não encontrado' });
-      }
-
-      return reply.send({ success: true, data: deleted });
-    } catch (err: any) {
-      console.error('[Gastos] Erro ao deletar:', err);
-      return reply.status(500).send({ error: 'Erro ao excluir despesa' });
-    }
+    return {
+      success: true,
+      textoLido: recognizedText,
+      dados: {
+        descricao: parsed.descricao || '',
+        valor: parsed.valor || 0,
+        categoria: parsed.categoria || 'OUTROS',
+        forma_pagamento: parsed.forma_pagamento || 'PIX',
+        fornecedor_nome: parsed.fornecedor_nome || '',
+        fornecedor_documento: parsed.fornecedor_documento || '',
+        numero_documento: parsed.numero_documento || '',
+      },
+    };
   });
 }
