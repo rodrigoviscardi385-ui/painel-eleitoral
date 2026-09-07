@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Vote,
   QrCode,
@@ -11,6 +11,9 @@ import {
   AlertCircle,
   RefreshCw,
   Search,
+  ImagePlus,
+  X,
+  Camera,
 } from 'lucide-react';
 import { api } from '../api.ts';
 
@@ -26,6 +29,12 @@ export const ApuracaoBU: React.FC = () => {
   const [msgSucesso, setMsgSucesso] = useState('');
   const [msgErro, setMsgErro] = useState('');
   const [filtroBairro, setFiltroBairro] = useState('');
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [isUploadingFoto, setIsUploadingFoto] = useState(false);
+  const [fotoUploadedUrl, setFotoUploadedUrl] = useState<string | null>(null);
+  const [fotoExpanded, setFotoExpanded] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     carregarDados();
@@ -48,6 +57,39 @@ export const ApuracaoBU: React.FC = () => {
     }
   };
 
+  const handleFotoChange = async (file: File) => {
+    setFotoFile(file);
+    setFotoUploadedUrl(null);
+
+    // Gera preview local
+    const reader = new FileReader();
+    reader.onload = (e) => setFotoPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    // Faz upload imediatamente após seleção
+    try {
+      setIsUploadingFoto(true);
+      const base64Reader = new FileReader();
+      base64Reader.onload = async (ev) => {
+        const base64 = (ev.target?.result as string).split(',')[1];
+        const res = await api.uploadFile(base64, file.name, 'bu_foto');
+        if (res?.url) setFotoUploadedUrl(res.url);
+      };
+      base64Reader.readAsDataURL(file);
+    } catch {
+      // upload falhou, continua sem URL mas preview funciona
+    } finally {
+      setIsUploadingFoto(false);
+    }
+  };
+
+  const handleRemoverFoto = () => {
+    setFotoFile(null);
+    setFotoPreview(null);
+    setFotoUploadedUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleProcessarBU = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!textoBU.trim()) return;
@@ -59,12 +101,14 @@ export const ApuracaoBU: React.FC = () => {
 
       const res = await api.processarBU({
         rawText: textoBU,
+        fotoUrl: fotoUploadedUrl || undefined,
         remetenteNome: remetenteNome || 'Coordenação Geral',
         remetenteWhatsapp: remetenteWhats || 'CENTRAL',
       });
 
       setMsgSucesso(res.message || 'Boletim de Urna validado com sucesso!');
       setTextoBU('');
+      handleRemoverFoto();
       await carregarDados();
       setTimeout(() => {
         setShowModalEnvio(false);
@@ -314,13 +358,14 @@ export const ApuracaoBU: React.FC = () => {
                 <th style={{ padding: '10px', textAlign: 'right' }}>Votos Candidato</th>
                 <th style={{ padding: '10px', textAlign: 'right' }}>Comparecimento</th>
                 <th style={{ padding: '10px' }}>Fiscal / Remetente</th>
+                <th style={{ padding: '10px', textAlign: 'center' }}>Foto</th>
                 <th style={{ padding: '10px' }}>Horário</th>
               </tr>
             </thead>
             <tbody>
               {busFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
                     Nenhum Boletim de Urna encontrado. Envie o QR-Code do BU pelo WhatsApp da campanha ou clique em "Validar Novo BU".
                   </td>
                 </tr>
@@ -341,6 +386,23 @@ export const ApuracaoBU: React.FC = () => {
                     <td style={{ padding: '12px 10px', color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>
                       {b.remetente_nome || 'Central'}
                     </td>
+                    <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                      {b.foto_comprovante_url ? (
+                        <button
+                          onClick={() => setFotoExpanded(b.foto_comprovante_url)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                          title="Ver foto comprovante"
+                        >
+                          <img
+                            src={b.foto_comprovante_url}
+                            alt="Comprovante BU"
+                            style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                          />
+                        </button>
+                      ) : (
+                        <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>—</span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px 10px', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
                       {new Date(b.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </td>
@@ -352,10 +414,38 @@ export const ApuracaoBU: React.FC = () => {
         </div>
       </div>
 
+      {/* Lightbox de foto expandida */}
+      {fotoExpanded && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setFotoExpanded(null)}
+          style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <button
+              onClick={() => setFotoExpanded(null)}
+              style={{
+                position: 'absolute', top: '-14px', right: '-14px',
+                background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-color)',
+                borderRadius: '50%', color: '#fff', cursor: 'pointer',
+                width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <X size={16} />
+            </button>
+            <img
+              src={fotoExpanded}
+              alt="Foto comprovante BU"
+              style={{ maxWidth: '80vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Modal para Validação Manual de BU */}
       {showModalEnvio && (
         <div className="modal-backdrop" onClick={() => setShowModalEnvio(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '24px' }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', padding: '24px' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <QrCode size={20} color="var(--primary)" />
               <span>Validar Boletim de Urna (QR-BU)</span>
@@ -391,6 +481,107 @@ export const ApuracaoBU: React.FC = () => {
                 />
               </div>
 
+              {/* Upload de Foto Comprovante */}
+              <div>
+                <label style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Camera size={14} />
+                  Foto Comprovante do BU (opcional):
+                </label>
+
+                {fotoPreview ? (
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img
+                      src={fotoPreview}
+                      alt="Preview"
+                      style={{
+                        width: '100%', maxHeight: '180px', objectFit: 'contain',
+                        borderRadius: '8px', border: '1px solid var(--border-color)',
+                        background: 'rgba(0,0,0,0.3)',
+                      }}
+                    />
+                    {isUploadingFoto && (
+                      <div style={{
+                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                        borderRadius: '8px', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', color: '#fff', fontSize: '0.8125rem', gap: '8px',
+                      }}>
+                        <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                        Enviando foto...
+                      </div>
+                    )}
+                    {fotoUploadedUrl && !isUploadingFoto && (
+                      <div style={{
+                        position: 'absolute', top: '8px', left: '8px',
+                        background: 'rgba(16,185,129,0.9)', borderRadius: '6px',
+                        padding: '3px 8px', fontSize: '0.75rem', color: '#fff',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                      }}>
+                        <CheckCircle2 size={12} /> Foto enviada
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleRemoverFoto}
+                      style={{
+                        position: 'absolute', top: '8px', right: '8px',
+                        background: 'rgba(0,0,0,0.7)', border: 'none', color: '#fff',
+                        borderRadius: '50%', width: '26px', height: '26px',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const file = e.dataTransfer.files[0];
+                      if (file && file.type.startsWith('image/')) handleFotoChange(file);
+                    }}
+                    style={{
+                      border: '2px dashed var(--border-color)',
+                      borderRadius: '10px',
+                      padding: '24px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: 'rgba(255,255,255,0.02)',
+                      transition: 'border-color 0.2s, background 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--primary)';
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(16,185,129,0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)';
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)';
+                    }}
+                  >
+                    <ImagePlus size={28} color="var(--text-secondary)" style={{ marginBottom: '8px' }} />
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                      Clique ou arraste uma foto do BU aqui
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>
+                      JPG, PNG, WEBP • Máx. 10 MB
+                    </div>
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFotoChange(file);
+                  }}
+                />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
@@ -422,7 +613,7 @@ export const ApuracaoBU: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowModalEnvio(false)}
+                  onClick={() => { setShowModalEnvio(false); handleRemoverFoto(); }}
                   className="btn-secondary"
                   disabled={isProcessing}
                 >
@@ -432,10 +623,10 @@ export const ApuracaoBU: React.FC = () => {
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={isProcessing}
+                  disabled={isProcessing || isUploadingFoto}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  {isProcessing ? 'Validando...' : 'Validar e Contabilizar'}
+                  {isUploadingFoto ? 'Enviando foto...' : isProcessing ? 'Validando...' : 'Validar e Contabilizar'}
                 </button>
               </div>
             </form>
