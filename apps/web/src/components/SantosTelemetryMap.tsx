@@ -58,13 +58,13 @@ interface SantosTelemetryMapProps {
   height?: string;
 }
 
-// Bases Táticas Oficiais da Campanha em Santos
+// Pontos de Referência da Mobilização em Santos (100% Rua e Panfletagem)
 const BASES_CAMPANHA_SANTOS = [
-  { id: 'base_gonzaga', nome: 'Tenda Central - Gonzaga', lat: -23.9660, lng: -46.3338, desc: 'Praça das Bandeiras / Av. Ana Costa' },
-  { id: 'base_zn', nome: 'Base Zona Noroeste', lat: -23.9315, lng: -46.3680, desc: 'Jardim Castelo / Sambódromo' },
+  { id: 'base_gonzaga', nome: 'Ponto de Referência - Gonzaga', lat: -23.9660, lng: -46.3338, desc: 'Praça das Bandeiras / Av. Ana Costa' },
+  { id: 'base_zn', nome: 'Ponto Zona Noroeste', lat: -23.9315, lng: -46.3680, desc: 'Jardim Castelo / Sambódromo' },
   { id: 'base_ponta_praia', nome: 'Ponto Orla Ponta da Praia', lat: -23.9855, lng: -46.3075, desc: 'Travessia de Balsas / Canal 6' },
   { id: 'base_centro', nome: 'Comitê Central - Vila Mathias', lat: -23.9510, lng: -46.3290, desc: 'Rua Carvalho de Mendonça' },
-  { id: 'base_morros', nome: 'Base Tática Nova Cintra', lat: -23.9470, lng: -46.3450, desc: 'Morro Nova Cintra / Lagoa da Saudade' },
+  { id: 'base_morros', nome: 'Ponto Tático Nova Cintra', lat: -23.9470, lng: -46.3450, desc: 'Morro Nova Cintra / Lagoa da Saudade' },
 ];
 
 export const SantosTelemetryMap: React.FC<SantosTelemetryMapProps> = ({
@@ -593,13 +593,13 @@ export const SantosTelemetryMap: React.FC<SantosTelemetryMapProps> = ({
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></span> Em Movimento
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></span> Tenda Base
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></span> Em Pausa
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></span> Alerta/Parado
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          ⛺ Bases Oficiais
+          📍 Pontos de Referência
         </span>
       </div>
     </div>

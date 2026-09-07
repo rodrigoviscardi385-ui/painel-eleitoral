@@ -420,5 +420,54 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ status }),
     }),
+
+  // Autenticação Restrita de Colaborador de Rua (Whitelist & Primeiro Acesso)
+  validarColaboradorRua: (identificador: string) =>
+    request<{
+      autorizado: boolean;
+      primeiroAcesso: boolean;
+      id: string;
+      nome: string;
+      cpf: string;
+      telefone: string;
+      bairro: string;
+      funcao: string;
+      mensagem: string;
+    }>('/api/equipe-rua/auth/validar-colaborador', {
+      method: 'POST',
+      body: JSON.stringify({ identificador }),
+    }),
+
+  primeiroAcessoColaboradorRua: (identificador: string, novaSenha: string) =>
+    request<{
+      success: boolean;
+      token: string;
+      colaborador: any;
+    }>('/api/equipe-rua/auth/primeiro-acesso', {
+      method: 'POST',
+      body: JSON.stringify({ identificador, novaSenha }),
+    }),
+
+  loginColaboradorRua: (identificador: string, senha: string) =>
+    request<{
+      success?: boolean;
+      precisaCriarSenha?: boolean;
+      mensagem?: string;
+      token?: string;
+      colaborador: any;
+    }>('/api/equipe-rua/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identificador, senha }),
+    }),
+
+  // Auditoria de Apoiadores Coletados em Campo (com GPS e Colaborador)
+  getApoiadoresColetados: (params: { busca?: string; limite?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.busca) query.set('busca', params.busca);
+    if (params.limite) query.set('limite', String(params.limite));
+    return request<{ success: boolean; total: number; apoiadores: any[] }>(
+      `/api/equipe-rua/apoiadores-coletados?${query.toString()}`
+    );
+  },
 };
 

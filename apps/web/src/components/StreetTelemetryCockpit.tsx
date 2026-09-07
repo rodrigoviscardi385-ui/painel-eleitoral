@@ -63,10 +63,20 @@ export const StreetTelemetryCockpit: React.FC = () => {
   const [contratados, setContratados] = useState<ContratadoTelemetria[]>([]);
   const [alertasSuprimentos, setAlertasSuprimentos] = useState<AlertaSuprimentoItem[]>([]);
 
+  // ─── AUDITORIA DE APOIADORES CADASTRADOS NA RUA (GPS & COLABORADOR) ──────
+  const [apoiadoresColetados, setApoiadoresColetados] = useState<any[]>([]);
+  const [totalApoiadoresColetados, setTotalApoiadoresColetados] = useState<number>(0);
+  const [buscaApoiador, setBuscaApoiador] = useState('');
+  const [loadingApoiadores, setLoadingApoiadores] = useState(false);
+
   // Carregar dados de telemetria reais do backend Fastify
   useEffect(() => {
     loadTelemetry();
-    const interval = setInterval(loadTelemetry, 6000);
+    loadApoiadores();
+    const interval = setInterval(() => {
+      loadTelemetry();
+      loadApoiadores();
+    }, 6000);
     return () => clearInterval(interval);
   }, []);
 
@@ -91,6 +101,20 @@ export const StreetTelemetryCockpit: React.FC = () => {
     } catch (_) {
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadApoiadores = async () => {
+    setLoadingApoiadores(true);
+    try {
+      const res = await api.getApoiadoresColetados({ busca: buscaApoiador, limite: 50 });
+      if (res && res.success) {
+        setApoiadoresColetados(res.apoiadores || []);
+        setTotalApoiadoresColetados(res.total || 0);
+      }
+    } catch (_) {
+    } finally {
+      setLoadingApoiadores(false);
     }
   };
 
@@ -122,7 +146,7 @@ export const StreetTelemetryCockpit: React.FC = () => {
   // ─── CÁLCULO DE MÉTRICAS AO VIVO ───────────────────────────────────────────
   const totalEmCampo = contratados.length;
   const emMovimento = contratados.filter((c) => c.statusCinetico === 'EM_MOVIMENTO').length;
-  const emTendaBase = contratados.filter((c) => c.statusCinetico === 'PARADO_BASE').length;
+  const emPausa = contratados.filter((c) => c.statusCinetico === 'PARADO_BASE').length;
   const paradosAlerta = contratados.filter((c) => c.statusCinetico === 'PARADO_ALERTA').length;
   const kmTotais = contratados.reduce((acc, c) => acc + c.kmRodados, 0).toFixed(1);
   const cadastrosTotais = contratados.reduce((acc, c) => acc + c.cadastrosHoje, 0);
@@ -268,16 +292,16 @@ export const StreetTelemetryCockpit: React.FC = () => {
             </div>
           </div>
 
-          {/* Card 3: Em Tenda Base */}
+          {/* Card 3: Em Pausa / Ponto de Apoio */}
           <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '12px 14px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
             <div style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <MapPin size={14} /> Em Base / Tenda Oficial
+              <MapPin size={14} /> Em Pausa / Ponto de Apoio
             </div>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#60a5fa', marginTop: '4px' }}>
-              {emTendaBase} <span style={{ fontSize: '12px', color: '#93c5fd', fontWeight: 600 }}>fixos</span>
+              {emPausa} <span style={{ fontSize: '12px', color: '#93c5fd', fontWeight: 600 }}>pausados</span>
             </div>
             <div style={{ fontSize: '11px', color: '#93c5fd', marginTop: '2px' }}>
-              Praça Mauá e Gonzaga
+              Descanso ou Alinhamento
             </div>
           </div>
 
@@ -345,7 +369,7 @@ export const StreetTelemetryCockpit: React.FC = () => {
                 ● Em Movimento
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#60a5fa' }}>
-                ● Tenda Oficial
+                ● Em Pausa
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444' }}>
                 ● Parado Alerta
@@ -546,7 +570,7 @@ export const StreetTelemetryCockpit: React.FC = () => {
             >
               <option value="TODOS">Todos os Status</option>
               <option value="EM_MOVIMENTO">🟢 Em Movimento</option>
-              <option value="PARADO_BASE">🔵 Em Tenda Base</option>
+              <option value="PARADO_BASE">🔵 Em Pausa / Ponto de Apoio</option>
               <option value="PARADO_ALERTA">🔴 Parado Alerta (&gt;20m)</option>
             </select>
           </div>
@@ -594,7 +618,7 @@ export const StreetTelemetryCockpit: React.FC = () => {
                         )}
                         {c.statusCinetico === 'PARADO_BASE' && (
                           <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
-                            🔵 NA TENDA
+                            🔵 EM PAUSA
                           </span>
                         )}
                         {c.statusCinetico === 'PARADO_ALERTA' && (
@@ -625,6 +649,186 @@ export const StreetTelemetryCockpit: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ─── AUDITORIA DE APOIADORES CADASTRADOS NA RUA (GPS EM TEMPO REAL & COLABORADOR) ─── */}
+      <div className="glass-panel" style={{ padding: '20px 24px', borderRadius: '16px', marginTop: '4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={20} color="#ffe600" />
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#f8fafc', letterSpacing: '0.3px' }}>
+                AUDITORIA DE APOIADORES CADASTRADOS NA RUA
+              </h3>
+              <span style={{
+                background: 'rgba(255, 230, 0, 0.15)',
+                color: '#ffe600',
+                border: '1px solid rgba(255, 230, 0, 0.3)',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '11px',
+                fontWeight: 800
+              }}>
+                {totalApoiadoresColetados} Apoiadores Rastreados
+              </span>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              Cruzamento de dados: cada apoiador registrado tem geolocalização por hardware e auditoria de quem o cadastrou.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Buscar apoiador, bairro ou colaborador..."
+                value={buscaApoiador}
+                onChange={(e) => setBuscaApoiador(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') loadApoiadores(); }}
+                style={{
+                  padding: '8px 12px 8px 32px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#ffffff',
+                  outline: 'none',
+                  width: '260px'
+                }}
+              />
+              <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '11px' }} />
+            </div>
+
+            <button
+              onClick={loadApoiadores}
+              disabled={loadingApoiadores}
+              style={{
+                background: 'rgba(255, 230, 0, 0.12)',
+                color: '#ffe600',
+                border: '1px solid rgba(255, 230, 0, 0.3)',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: loadingApoiadores ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <RefreshCw size={14} className={loadingApoiadores ? 'animate-spin' : ''} />
+              Atualizar
+            </button>
+          </div>
+        </div>
+
+        {/* Tabela de Apoiadores Coletados */}
+        {loadingApoiadores && apoiadoresColetados.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8', fontSize: '13px' }}>
+            Carregando auditoria de campo...
+          </div>
+        ) : apoiadoresColetados.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '36px', color: '#64748b', fontSize: '13px' }}>
+            Nenhum apoiador de rua encontrado com os filtros informados.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
+                  <th style={{ padding: '10px 12px', fontWeight: 800 }}>APOIADOR</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 800 }}>WHATSAPP</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 800 }}>BAIRRO</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 800 }}>QUEM CADASTROU</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 800 }}>MOMENTO DO CADASTRO</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 800 }}>GEOLOCALIZAÇÃO GPS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {apoiadoresColetados.map((a: any) => (
+                  <tr
+                    key={a.id}
+                    style={{
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      transition: 'background 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '12px', fontWeight: 700, color: '#f8fafc' }}>
+                      {a.nome}
+                    </td>
+                    <td style={{ padding: '12px', color: '#cbd5e1' }}>
+                      {a.whatsapp || a.telefone || '—'}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#93c5fd',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '11px'
+                      }}>
+                        {a.bairro || 'Santos'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          color: '#6ee7b7',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          fontSize: '11px'
+                        }}>
+                          👤 {a.cadastrado_por_nome || a.cadastradoPor || 'Equipe de Rua'}
+                        </span>
+                        {a.cadastrado_por_id && (
+                          <span style={{ fontSize: '10px', color: '#64748b' }}>
+                            ({String(a.cadastrado_por_id).slice(0, 8)})
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px', color: '#94a3b8', fontSize: '11px' }}>
+                      {a.created_at ? new Date(a.created_at).toLocaleString('pt-BR') : '—'}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      {a.latitude && a.longitude ? (
+                        <a
+                          href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'rgba(255, 230, 0, 0.12)',
+                            color: '#ffe600',
+                            border: '1px solid rgba(255, 230, 0, 0.3)',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            textDecoration: 'none'
+                          }}
+                        >
+                          <MapPin size={12} />
+                          {Number(a.latitude).toFixed(4)}, {Number(a.longitude).toFixed(4)}
+                          <ExternalLink size={10} style={{ marginLeft: '2px' }} />
+                        </a>
+                      ) : (
+                        <span style={{ color: '#64748b', fontSize: '11px' }}>Sem GPS</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal de Instalação do App de Campo com QR Code */}

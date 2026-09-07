@@ -22,6 +22,10 @@ export const usuarios = pgTable(
     total_indicados_rede: integer('total_indicados_rede').default(0).notNull(),
     opt_out: boolean('opt_out').default(false).notNull(), // Conformidade TSE / LGPD
     notas: text('notas'),
+    latitude: numeric('latitude'),
+    longitude: numeric('longitude'),
+    cadastrado_por_nome: text('cadastrado_por_nome'),
+    cadastrado_por_id: text('cadastrado_por_id'),
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -628,6 +632,11 @@ export const equipeRua = pgTable(
     carimbo_tempo_assinatura: timestamp('carimbo_tempo_assinatura', { withTimezone: true }),
     dados_signatario_gov: text('dados_signatario_gov'), // Metadados Gov.br (nível Prata/Ouro, IP, protocolo ITI)
     observacoes: text('observacoes'),
+
+    // Autenticação Restrita de Campo & Primeiro Acesso
+    senha_hash: text('senha_hash'),
+    primeiro_acesso_realizado: boolean('primeiro_acesso_realizado').default(false).notNull(),
+    ultimo_login_at: timestamp('ultimo_login_at', { withTimezone: true }),
 
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

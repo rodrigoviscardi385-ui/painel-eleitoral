@@ -27,6 +27,8 @@ import {
   LogOut,
   Clock,
   IdCard,
+  Lock,
+  Key,
   Briefcase
 } from 'lucide-react';
 import { ModalQRCodeAppRua } from './ModalQRCodeAppRua.tsx';
@@ -80,12 +82,21 @@ export const StreetAppPWA: React.FC = () => {
     }
   });
 
-  // Formulário de Cadastro / Entrada do Colaborador
-  const [authNome, setAuthNome] = useState('');
-  const [authWhatsapp, setAuthWhatsapp] = useState('');
-  const [authCpf, setAuthCpf] = useState('');
-  const [authBairro, setAuthBairro] = useState('Gonzaga');
-  const [authFuncao, setAuthFuncao] = useState('Mobilizador de Calçada');
+  // Fluxo de Autenticação Segura (Cruzamento com Colaboradores Cadastrados)
+  const [authIdentificador, setAuthIdentificador] = useState('');
+  const [authSenha, setAuthSenha] = useState('');
+  const [authConfirmaSenha, setAuthConfirmaSenha] = useState('');
+  const [authStep, setAuthStep] = useState<'IDENTIFICAR' | 'CRIAR_SENHA' | 'DIGITAR_SENHA'>('IDENTIFICAR');
+  const [colaboradorValidado, setColaboradorValidado] = useState<{
+    id: string;
+    nome: string;
+    cpf: string;
+    telefone: string;
+    bairro: string;
+    funcao: string;
+    precisaCriarSenha: boolean;
+  } | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
   const [authErro, setAuthErro] = useState<string | null>(null);
 
   // ─── 2. PONTO ELETRÔNICO (CHECK-IN / CHECK-OUT) ───────────────────────────
@@ -280,30 +291,142 @@ export const StreetAppPWA: React.FC = () => {
     return () => clearInterval(timer);
   }, [pontoAtual, colaborador, gpsCoords, velocidadeKmh, isMoving, statusCinetico, tempoParadoMinutos, passosAcumulados, bateriaPct, selectedBairro, cadastrosTurno]);
 
-  // ─── LOGIN / IDENTIFICAÇÃO DO COLABORADOR ─────────────────────────────────
-  const handleLoginColaborador = (e: React.FormEvent) => {
+  // ─── CAPTURA DE GPS DE HARDWARE EM TEMPO REAL ───────────────────────────
+  const getLiveGps = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setGpsCoords({ lat: coords.lat, lng: coords.lng, precisao: Math.round(pos.coords.accuracy || 5) });
+            resolve(coords);
+          },
+          (err) => {
+            console.warn('GPS hardware timeout/erro, usando última coordenada válida:', err);
+            resolve({ lat: gpsCoords.lat, lng: gpsCoords.lng });
+          },
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+        );
+      } else {
+        resolve({ lat: gpsCoords.lat, lng: gpsCoords.lng });
+      }
+    });
+  };
+
+  // ─── ETAPA 1: VALIDAR SE O IDENTIFICADOR (CPF OU WHATSAPP) CONSTA NA EQUIPE DE RUA ────
+  const handleIdentificarColaborador = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authNome.trim() || authWhatsapp.replace(/\D/g, '').length < 10) {
-      setAuthErro('Informe seu Nome e WhatsApp válido com DDD (13).');
+    const cleanId = authIdentificador.trim();
+    if (!cleanId || cleanId.replace(/\D/g, '').length < 9) {
+      setAuthErro('Informe um CPF (11 dígitos) ou WhatsApp válido com DDD (ex: 13 99999-9999).');
       return;
     }
 
-    const session: ColaboradorSession = {
-      id: 'colab_' + Date.now(),
-      nome: authNome.trim(),
-      whatsapp: authWhatsapp,
-      cpf: authCpf || 'Não informado',
-      bairro: authBairro,
-      funcao: authFuncao,
-      createdAt: new Date().toISOString()
-    };
-
-    localStorage.setItem('santos_colaborador_session', JSON.stringify(session));
-    setColaborador(session);
-    setSelectedBairro(authBairro);
+    setAuthLoading(true);
     setAuthErro(null);
 
-    if (navigator.vibrate) navigator.vibrate([100]);
+    try {
+      const res = await api.validarColaboradorRua(cleanId);
+      if (res && res.colaborador_id) {
+        setColaboradorValidado({
+          id: res.colaborador_id,
+          nome: res.nome,
+          cpf: res.cpf,
+          telefone: res.telefone,
+          bairro: res.bairro,
+          funcao: res.funcao,
+          precisaCriarSenha: res.precisaCriarSenha
+        });
+
+        if (res.precisaCriarSenha) {
+          setAuthStep('CRIAR_SENHA');
+        } else {
+          setAuthStep('DIGITAR_SENHA');
+        }
+      }
+    } catch (err: any) {
+      setAuthErro(err.message || 'Acesso não autorizado. Você precisa estar previamente cadastrado pela coordenação da campanha como Colaborador de Rua.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // ─── ETAPA 2A: PRIMEIRO ACESSO - CRIAÇÃO DE SENHA DO COLABORADOR ───────────
+  const handlePrimeiroAcesso = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authSenha || authSenha.length < 4) {
+      setAuthErro('A senha deve ter no mínimo 4 caracteres.');
+      return;
+    }
+    if (authSenha !== authConfirmaSenha) {
+      setAuthErro('A confirmação de senha não confere com a senha digitada.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthErro(null);
+
+    try {
+      const res = await api.primeiroAcessoColaboradorRua(authIdentificador, authSenha);
+      if (res && res.colaborador) {
+        const c = res.colaborador;
+        const session: ColaboradorSession = {
+          id: c.id,
+          nome: c.nome,
+          whatsapp: c.telefone || authIdentificador,
+          cpf: c.cpf || 'Cadastrado',
+          bairro: c.bairro || 'Gonzaga',
+          funcao: c.funcao || 'Mobilizador de Rua',
+          createdAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('santos_colaborador_session', JSON.stringify(session));
+        setColaborador(session);
+        setSelectedBairro(session.bairro);
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      }
+    } catch (err: any) {
+      setAuthErro(err.message || 'Erro ao registrar senha de primeiro acesso.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // ─── ETAPA 2B: LOGIN COM SENHA CADASTRADA ──────────────────────────────────
+  const handleLoginComSenha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authSenha) {
+      setAuthErro('Informe sua senha cadastrada.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthErro(null);
+
+    try {
+      const res = await api.loginColaboradorRua(authIdentificador, authSenha);
+      if (res && res.colaborador) {
+        const c = res.colaborador;
+        const session: ColaboradorSession = {
+          id: c.id,
+          nome: c.nome,
+          whatsapp: c.telefone || authIdentificador,
+          cpf: c.cpf || 'Cadastrado',
+          bairro: c.bairro || 'Gonzaga',
+          funcao: c.funcao || 'Mobilizador de Rua',
+          createdAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('santos_colaborador_session', JSON.stringify(session));
+        setColaborador(session);
+        setSelectedBairro(session.bairro);
+        if (navigator.vibrate) navigator.vibrate([100]);
+      }
+    } catch (err: any) {
+      setAuthErro(err.message || 'Senha incorreta ou acesso não autorizado.');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleLogoutColaborador = () => {
@@ -315,6 +438,10 @@ export const StreetAppPWA: React.FC = () => {
     localStorage.removeItem('santos_ponto_atual');
     setColaborador(null);
     setPontoAtual(null);
+    setAuthStep('IDENTIFICAR');
+    setColaboradorValidado(null);
+    setAuthSenha('');
+    setAuthConfirmaSenha('');
   };
 
   // ─── EXECUÇÃO DO CHECK-IN DE ENTRADA ──────────────────────────────────────
@@ -409,7 +536,7 @@ export const StreetAppPWA: React.FC = () => {
     setter(formatted);
   };
 
-  // ─── CADASTRO TWO-TAP DE APOIADOR ──────────────────────────────────────────
+  // ─── CADASTRO TWO-TAP DE APOIADOR COM GPS REAL DO APARELHO ────────────────
   const handleCadastrarApoiador = async () => {
     const cleanPhone = inputWhatsapp.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
@@ -420,14 +547,17 @@ export const StreetAppPWA: React.FC = () => {
 
     if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
 
+    // Obtém a coordenada em tempo real diretamente do hardware GPS do celular
+    const liveCoords = await getLiveGps();
+
     const novo: ApoiadorLocal = {
       id: 'local_' + Date.now(),
       nome: nomeFinal,
       whatsapp: inputWhatsapp,
       bairro: selectedBairro,
       tags: tagsApoio,
-      lat: gpsCoords.lat,
-      lng: gpsCoords.lng,
+      lat: liveCoords.lat,
+      lng: liveCoords.lng,
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       sincronizado: true
     };
@@ -445,8 +575,8 @@ export const StreetAppPWA: React.FC = () => {
           whatsapp: cleanPhone,
           bairro: selectedBairro,
           tags: tagsApoio,
-          lat: gpsCoords.lat,
-          lng: gpsCoords.lng,
+          lat: liveCoords.lat,
+          lng: liveCoords.lng,
           membro_id: colaborador?.id,
           cadastradoPor: colaborador?.nome || 'Colaborador de Rua'
         })
@@ -508,7 +638,7 @@ export const StreetAppPWA: React.FC = () => {
   const borderCard = solarMode ? '2px solid #262626' : '1px solid rgba(255, 255, 255, 0.1)';
 
   // ──────────────────────────────────────────────────────────────────────────
-  // TELA 1: IDENTIFICAÇÃO DO COLABORADOR (SE NÃO ESTIVER IDENTIFICADO)
+  // TELA 1: AUTENTICAÇÃO E CONTROLE DE ACESSO RESTRITO (EQUIPE DE RUA OFICIAL)
   // ──────────────────────────────────────────────────────────────────────────
   if (!colaborador) {
     return (
@@ -533,10 +663,10 @@ export const StreetAppPWA: React.FC = () => {
             border: '2px solid #ffe600',
             borderRadius: '20px',
             padding: '24px',
-            boxShadow: '0 0 25px rgba(255, 230, 0, 0.15)'
+            boxShadow: '0 0 30px rgba(255, 230, 0, 0.15)'
           }}
         >
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '22px' }}>
             <div
               style={{
                 width: '60px',
@@ -556,179 +686,266 @@ export const StreetAppPWA: React.FC = () => {
               SANTOS EM CAMPO 2026
             </h1>
             <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
-              Aplicativo Oficial da Equipe de Rua e Panfletagem
+              Acesso Restrito à Equipe Oficial de Rua e Panfletagem
             </p>
           </div>
 
-          <form onSubmit={handleLoginColaborador} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
-                SEU NOME COMPLETO *
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Carlos Eduardo Mendes"
-                  value={authNome}
-                  onChange={(e) => setAuthNome(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 12px 12px 40px',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    backgroundColor: '#000000',
-                    color: '#ffffff',
-                    border: '1px solid #333333',
-                    borderRadius: '10px',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-                <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+          {/* ─── PASSO 1: IDENTIFICAR CPF OU WHATSAPP (CRUZAMENTO COM EQUIPE DE RUA) ─── */}
+          {authStep === 'IDENTIFICAR' && (
+            <form onSubmit={handleIdentificarColaborador} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ background: 'rgba(255, 230, 0, 0.06)', border: '1px solid rgba(255, 230, 0, 0.2)', padding: '12px', borderRadius: '10px', fontSize: '12px', color: '#f1f5f9', lineHeight: '1.4' }}>
+                🛡️ <b>Acesso Exclusivo:</b> Para entrar, digite seu <b>CPF</b> ou <b>WhatsApp</b> previamente cadastrado pela coordenação da campanha.
               </div>
-            </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
-                SEU WHATSAPP COM DDD *
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="tel"
-                  required
-                  placeholder="(13) 9XXXX-XXXX"
-                  value={authWhatsapp}
-                  onChange={(e) => handlePhoneChange(e.target.value, setAuthWhatsapp)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 12px 12px 40px',
-                    fontSize: '15px',
-                    fontWeight: 800,
-                    backgroundColor: '#000000',
-                    color: '#ffffff',
-                    border: '1px solid #333333',
-                    borderRadius: '10px',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-                <Phone size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
-                SEU CPF (OPCIONAL / CONTRATO TSE)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  placeholder="000.000.000-00"
-                  value={authCpf}
-                  onChange={(e) => setAuthCpf(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 12px 12px 40px',
-                    fontSize: '14px',
-                    backgroundColor: '#000000',
-                    color: '#ffffff',
-                    border: '1px solid #333333',
-                    borderRadius: '10px',
-                    boxSizing: 'border-box',
-                    outline: 'none'
-                  }}
-                />
-                <IdCard size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
-                  BAIRRO PRINCIPAL
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '6px' }}>
+                  SEU CPF OU WHATSAPP CADASTRADO *
                 </label>
-                <select
-                  value={authBairro}
-                  onChange={(e) => setAuthBairro(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    backgroundColor: '#000000',
-                    color: '#ffffff',
-                    border: '1px solid #333333',
-                    borderRadius: '8px'
-                  }}
-                >
-                  {bairrosSantos.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Digite seu CPF ou WhatsApp com DDD"
+                    value={authIdentificador}
+                    onChange={(e) => setAuthIdentificador(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <IdCard size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
+              </div>
+
+              {authErro && (
+                <div style={{ padding: '10px', background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', color: '#fca5a5', fontSize: '12px', borderRadius: '8px', textAlign: 'center', lineHeight: '1.4' }}>
+                  {authErro}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                style={{
+                  marginTop: '6px',
+                  padding: '16px',
+                  backgroundColor: authLoading ? '#475569' : '#ffe600',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  cursor: authLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                <LogIn size={18} />
+                {authLoading ? 'VERIFICANDO CREDENCIAIS...' : 'VERIFICAR MEU CADASTRO'}
+              </button>
+            </form>
+          )}
+
+          {/* ─── PASSO 2A: PRIMEIRO ACESSO (CRIAR SENHA) ─────────────────────────── */}
+          {authStep === 'CRIAR_SENHA' && colaboradorValidado && (
+            <form onSubmit={handlePrimeiroAcesso} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '12px', borderRadius: '10px', fontSize: '12px', color: '#6ee7b7' }}>
+                👋 Olá, <b>{colaboradorValidado.nome}</b>! Seu cadastro foi localizado. Por ser seu <b>primeiro acesso</b>, crie sua senha de segurança.
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                  CRIE UMA SENHA DE ACESSO *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Mínimo 4 caracteres"
+                    value={authSenha}
+                    onChange={(e) => setAuthSenha(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <Lock size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
-                  FUNÇÃO NA RUA
+                  CONFIRME SUA SENHA *
                 </label>
-                <select
-                  value={authFuncao}
-                  onChange={(e) => setAuthFuncao(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    backgroundColor: '#000000',
-                    color: '#ffffff',
-                    border: '1px solid #333333',
-                    borderRadius: '8px'
-                  }}
-                >
-                  <option value="Mobilizador de Calçada">Mobilizador de Calçada</option>
-                  <option value="Equipe de Tenda Fixa">Equipe de Tenda Fixa</option>
-                  <option value="Panfletagem de Bairro">Panfletagem de Bairro</option>
-                  <option value="Líder Comunitário">Líder Comunitário</option>
-                  <option value="Voluntário Cívico">Voluntário Cívico</option>
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Repita a senha criada"
+                    value={authConfirmaSenha}
+                    onChange={(e) => setAuthConfirmaSenha(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
               </div>
-            </div>
 
-            {authErro && (
-              <div style={{ padding: '8px', background: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '12px', borderRadius: '6px', textAlign: 'center' }}>
-                {authErro}
+              {authErro && (
+                <div style={{ padding: '8px', background: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '12px', borderRadius: '6px', textAlign: 'center' }}>
+                  {authErro}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                style={{
+                  marginTop: '4px',
+                  padding: '16px',
+                  backgroundColor: authLoading ? '#475569' : '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  cursor: authLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <CheckCircle size={18} />
+                {authLoading ? 'SALVANDO...' : 'CRIAR MINHA SENHA E ENTRAR'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setAuthStep('IDENTIFICAR'); setAuthErro(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Voltar e alterar CPF/WhatsApp
+              </button>
+            </form>
+          )}
+
+          {/* ─── PASSO 2B: DIGITAR SENHA EXISTENTE ───────────────────────────────── */}
+          {authStep === 'DIGITAR_SENHA' && colaboradorValidado && (
+            <form onSubmit={handleLoginComSenha} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ background: 'rgba(255, 230, 0, 0.08)', border: '1px solid rgba(255, 230, 0, 0.3)', padding: '12px', borderRadius: '10px', fontSize: '12px', color: '#fef08a' }}>
+                👋 Olá, <b>{colaboradorValidado.nome}</b>! Informe sua senha para liberar o turno de campo.
               </div>
-            )}
 
-            <button
-              type="submit"
-              style={{
-                marginTop: '10px',
-                padding: '16px',
-                backgroundColor: '#ffe600',
-                color: '#000000',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '15px',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                letterSpacing: '0.5px'
-              }}
-            >
-              <LogIn size={20} />
-              IDENTIFICAR E ENTRAR NO TURNO
-            </button>
-          </form>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                  DIGITE SUA SENHA *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Sua senha cadastrada"
+                    value={authSenha}
+                    onChange={(e) => setAuthSenha(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <Lock size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
+              </div>
 
-          <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '11px', color: '#64748b' }}>
-            🔒 Acesso estrito da equipe de campo. Seus dados ficam salvos de forma segura neste dispositivo.
+              {authErro && (
+                <div style={{ padding: '8px', background: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '12px', borderRadius: '6px', textAlign: 'center' }}>
+                  {authErro}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                style={{
+                  marginTop: '4px',
+                  padding: '16px',
+                  backgroundColor: authLoading ? '#475569' : '#ffe600',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  cursor: authLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <LogIn size={18} />
+                {authLoading ? 'AUTENTICANDO...' : 'ENTRAR NO TURNO'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setAuthStep('IDENTIFICAR'); setAuthErro(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Voltar e alterar CPF/WhatsApp
+              </button>
+            </form>
+          )}
+
+          <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '11px', color: '#64748b' }}>
+            🔒 Sistema de auditoria eleitoral com rastreamento criptografado de presença e geolocalização.
           </div>
         </div>
       </div>
@@ -1042,7 +1259,7 @@ export const StreetAppPWA: React.FC = () => {
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 800 }}>
                   {statusCinetico === 'EM_MOVIMENTO' && '🟢 EM MOVIMENTO (PANFLETANDO)'}
-                  {statusCinetico === 'PARADO_BASE' && '🔵 PARADO EM BASE / TENDA'}
+                  {statusCinetico === 'PARADO_BASE' && '🔵 EM PAUSA / PONTO DE ENCONTRO'}
                   {statusCinetico === 'PARADO_ALERTA' && '🔴 PARADO HÁ MAIS DE 15 MIN'}
                 </div>
                 <div style={{ fontSize: '10px', color: '#94a3b8' }}>
@@ -1256,53 +1473,30 @@ export const StreetAppPWA: React.FC = () => {
         </div>
       )}
 
-      {/* ─── AÇÕES DE SUPORTE ────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+      {/* ─── AÇÃO DE SUPORTE: REPOSIÇÃO DE MATERIAL (SEM TENDAS FIXAS) ─────── */}
+      <div style={{ marginBottom: '14px' }}>
         <button
           onClick={handleSolicitarMaterial}
           disabled={solicitandoMaterial || !pontoAtual}
           style={{
-            padding: '12px',
+            width: '100%',
+            padding: '14px',
             backgroundColor: !pontoAtual ? '#334155' : '#ef4444',
             color: '#ffffff',
             border: 'none',
-            borderRadius: '10px',
-            fontSize: '12px',
+            borderRadius: '12px',
+            fontSize: '13px',
             fontWeight: 800,
             cursor: !pontoAtual ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px'
+            gap: '8px',
+            boxShadow: pontoAtual ? '0 4px 14px rgba(239, 68, 68, 0.35)' : 'none'
           }}
         >
-          <PackageCheck size={16} />
-          {solicitandoMaterial ? 'Enviando...' : '🚨 PEDIR SANTINHOS'}
-        </button>
-
-        <button
-          onClick={() => {
-            if (navigator.vibrate) navigator.vibrate([60]);
-            alert(`Check-in de Presença registrado com sucesso na tenda de ${selectedBairro}!`);
-          }}
-          disabled={!pontoAtual}
-          style={{
-            padding: '12px',
-            backgroundColor: !pontoAtual ? '#334155' : '#3b82f6',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '10px',
-            fontSize: '12px',
-            fontWeight: 800,
-            cursor: !pontoAtual ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
-        >
-          <CheckCircle size={16} />
-          CONFIRMAR TENDA
+          <PackageCheck size={18} />
+          {solicitandoMaterial ? 'Enviando alerta para a Sala de Guerra...' : '🚨 PEDIR SANTINHOS E MATERIAL (VAN DE APOIO)'}
         </button>
       </div>
 

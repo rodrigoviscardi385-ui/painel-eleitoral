@@ -4,6 +4,10 @@ import * as schema from '../db/schema.js';
 import { eq, desc, sql, and, or, ilike } from 'drizzle-orm';
 import { generateStreetContract, computeContractSha256 } from '../services/streetContractService.js';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'painel_eleitoral_2026_super_secret_jwt_key';
 
 export async function equipeRuaRoutes(app: FastifyInstance) {
   // ─── 1. Listagem de Equipe de Rua com Métricas & Filtros ────────────────────
@@ -625,6 +629,10 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
           .set({
             nome: nomeFormatado,
             bairro: bairro || 'Santos',
+            latitude: lat ? String(lat) : undefined,
+            longitude: lng ? String(lng) : undefined,
+            cadastrado_por_nome: cadastradoPor || undefined,
+            cadastrado_por_id: membro_id || undefined,
             notas: existente.notas ? `${existente.notas} | Atualizado por ${cadastradoPor || 'Colaborador'}` : nota,
             updated_at: new Date()
           })
@@ -639,6 +647,10 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
             whatsapp: cleanWhatsapp,
             cargo: 'APOIADOR',
             bairro: bairro || 'Santos',
+            latitude: lat ? String(lat) : null,
+            longitude: lng ? String(lng) : null,
+            cadastrado_por_nome: cadastradoPor || null,
+            cadastrado_por_id: membro_id || null,
             status_onboarding: 'COMPLETO',
             notas: nota,
           })
@@ -663,18 +675,234 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
         }
       }
 
-      await logAuditLGPD('COLETA_RUA_APOIADOR', `Cadastro real de apoiador de rua: ${nomeFormatado} (${cleanWhatsapp}) por ${cadastradoPor || 'Equipe'}`);
+      await logAuditLGPD('COLETA_RUA_APOIADOR', `Cadastro real de apoiador de rua: ${nomeFormatado} (${cleanWhatsapp}) por ${cadastradoPor || 'Equipe'} [GPS: ${lat}, ${lng}]`);
 
       return reply.status(201).send({
         success: true,
         usuarioId: usuarioGravado?.id,
         mensagem: `Apoiador ${nomeFormatado} gravado com sucesso no banco de dados!`,
-        whatsapp: cleanWhatsapp
+        whatsapp: cleanWhatsapp,
+        gps: lat && lng ? { lat: Number(lat), lng: Number(lng) } : null,
+        cadastradoPor: cadastradoPor || 'Colaborador'
       });
     } catch (err: any) {
       request.log.error(err, 'Erro ao gravar apoiador de rua no banco de dados');
       return reply.status(500).send({ error: 'Falha ao persistir apoiador no banco de dados.' });
     }
+  });
+
+  // ─── 13.1. Listagem de Apoiadores Coletados na Rua com Auditoria de GPS e Colaborador ──
+  app.get('/api/equipe-rua/apoiadores-coletados', async (request: FastifyRequest) => {
+    const { busca, membro_id, limite = '100' } = request.query as any;
+
+    let query = db
+      .select({
+        id: schema.usuarios.id,
+        nome: schema.usuarios.nome,
+        whatsapp: schema.usuarios.whatsapp,
+        bairro: schema.usuarios.bairro,
+        latitude: schema.usuarios.latitude,
+        longitude: schema.usuarios.longitude,
+        cadastrado_por_nome: schema.usuarios.cadastrado_por_nome,
+        cadastrado_por_id: schema.usuarios.cadastrado_por_id,
+        notas: schema.usuarios.notas,
+        created_at: schema.usuarios.created_at,
+      })
+      .from(schema.usuarios)
+      .where(eq(schema.usuarios.cargo, 'APOIADOR'))
+      .orderBy(desc(schema.usuarios.created_at))
+      .limit(Number(limite));
+
+    const rows = await query;
+    return {
+      success: true,
+      total: rows.length,
+      apoiadores: rows
+    };
+  });
+
+  // ─── 13.2. Autenticação Restrita de Colaboradores de Rua (Whitelist & Primeiro Acesso) ─
+  app.post('/api/equipe-rua/auth/validar-colaborador', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { identificador } = (request.body as any) || {};
+    const cleanDigits = String(identificador || '').replace(/\D/g, '');
+
+    if (!cleanDigits || cleanDigits.length < 9) {
+      return reply.status(400).send({ error: 'Informe um CPF válido ou WhatsApp com DDD.' });
+    }
+
+    // Busca apenas na lista oficial de colaboradores contratados pela campanha
+    const membro = await db
+      .select({
+        id: schema.equipeRua.id,
+        nome: schema.equipeRua.nome_completo,
+        cpf: schema.equipeRua.cpf,
+        telefone: schema.equipeRua.telefone_whatsapp,
+        bairro: schema.equipeRua.bairro,
+        funcao: schema.equipeRua.funcao_atividade,
+        senha_hash: schema.equipeRua.senha_hash,
+        primeiro_acesso_realizado: schema.equipeRua.primeiro_acesso_realizado,
+      })
+      .from(schema.equipeRua)
+      .where(
+        or(
+          sql`replace(replace(${schema.equipeRua.cpf}, '.', ''), '-', '') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
+        )
+      )
+      .limit(1)
+      .then((r) => r[0]);
+
+    if (!membro) {
+      return reply.status(403).send({
+        error: 'Acesso Restrito: Seu CPF ou Telefone não consta no cadastro oficial de colaboradores da campanha de Santos. Procure a coordenação.',
+        bloqueado: true,
+      });
+    }
+
+    const primeiroAcesso = !membro.senha_hash || !membro.primeiro_acesso_realizado;
+
+    return {
+      autorizado: true,
+      id: membro.id,
+      nome: membro.nome,
+      cpf: membro.cpf,
+      telefone: membro.telefone,
+      bairro: membro.bairro,
+      funcao: membro.funcao,
+      primeiroAcesso,
+      mensagem: primeiroAcesso
+        ? 'Colaborador oficial identificado. Crie sua senha no primeiro acesso.'
+        : 'Colaborador oficial identificado. Digite sua senha de acesso.'
+    };
+  });
+
+  app.post('/api/equipe-rua/auth/primeiro-acesso', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { identificador, novaSenha } = (request.body as any) || {};
+    const cleanDigits = String(identificador || '').replace(/\D/g, '');
+
+    if (!cleanDigits || !novaSenha || String(novaSenha).length < 4) {
+      return reply.status(400).send({ error: 'A senha de segurança deve ter pelo menos 4 caracteres.' });
+    }
+
+    const membro = await db
+      .select()
+      .from(schema.equipeRua)
+      .where(
+        or(
+          sql`replace(replace(${schema.equipeRua.cpf}, '.', ''), '-', '') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
+        )
+      )
+      .limit(1)
+      .then((r) => r[0]);
+
+    if (!membro) {
+      return reply.status(403).send({ error: 'Colaborador não autorizado no sistema.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(String(novaSenha), salt);
+
+    await db
+      .update(schema.equipeRua)
+      .set({
+        senha_hash: hash,
+        primeiro_acesso_realizado: true,
+        ultimo_login_at: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(schema.equipeRua.id, membro.id));
+
+    const token = jwt.sign(
+      { id: membro.id, nome: membro.nome_completo, role: 'COLABORADOR_RUA' },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    await logAuditLGPD('PRIMEIRO_ACESSO_RUA', `Criação de senha no primeiro acesso para o colaborador ${membro.nome_completo} (${membro.cpf})`);
+
+    return reply.status(200).send({
+      success: true,
+      token,
+      colaborador: {
+        id: membro.id,
+        nome: membro.nome_completo,
+        cpf: membro.cpf,
+        telefone: membro.telefone_whatsapp,
+        bairro: membro.bairro,
+        funcao: membro.funcao_atividade,
+      }
+    });
+  });
+
+  app.post('/api/equipe-rua/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { identificador, senha } = (request.body as any) || {};
+    const cleanDigits = String(identificador || '').replace(/\D/g, '');
+
+    if (!cleanDigits || !senha) {
+      return reply.status(400).send({ error: 'Informe seu CPF/WhatsApp e a senha cadastrada.' });
+    }
+
+    const membro = await db
+      .select()
+      .from(schema.equipeRua)
+      .where(
+        or(
+          sql`replace(replace(${schema.equipeRua.cpf}, '.', ''), '-', '') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
+        )
+      )
+      .limit(1)
+      .then((r) => r[0]);
+
+    if (!membro) {
+      return reply.status(403).send({
+        error: 'Acesso Restrito: Usuário não cadastrado como colaborador oficial de rua.',
+        bloqueado: true
+      });
+    }
+
+    if (!membro.senha_hash) {
+      return reply.status(200).send({
+        precisaCriarSenha: true,
+        mensagem: 'Primeiro acesso detectado. Crie sua senha de segurança.',
+        colaborador: {
+          id: membro.id,
+          nome: membro.nome_completo,
+          cpf: membro.cpf,
+          telefone: membro.telefone_whatsapp,
+        }
+      });
+    }
+
+    const isValid = await bcrypt.compare(String(senha), membro.senha_hash);
+    if (!isValid) {
+      return reply.status(401).send({ error: 'Senha incorreta. Tente novamente ou procure a coordenação.' });
+    }
+
+    await db
+      .update(schema.equipeRua)
+      .set({ ultimo_login_at: new Date() })
+      .where(eq(schema.equipeRua.id, membro.id));
+
+    const token = jwt.sign(
+      { id: membro.id, nome: membro.nome_completo, role: 'COLABORADOR_RUA' },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return reply.status(200).send({
+      success: true,
+      token,
+      colaborador: {
+        id: membro.id,
+        nome: membro.nome_completo,
+        cpf: membro.cpf,
+        telefone: membro.telefone_whatsapp,
+        bairro: membro.bairro,
+        funcao: membro.funcao_atividade,
+      }
+    });
   });
 
   // ─── 14. Alerta Real de Suprimentos para Van de Apoio ──────────────────────
