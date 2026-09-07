@@ -295,6 +295,12 @@ export const App: React.FC = () => {
           api.logout();
           setCurrentUser(null);
         }}
+        onOpenNewLeader={() => {
+          setInitialParentId(undefined);
+          setIsNewLeaderOpen(true);
+        }}
+        onOpenNewExpense={() => setIsNewExpenseOpen(true)}
+        onOpenNewMeta={() => setIsNewMetaOpen(true)}
       />
 
       {/* Conteúdo da Aba Ativa */}

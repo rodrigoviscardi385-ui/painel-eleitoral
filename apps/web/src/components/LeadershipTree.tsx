@@ -147,7 +147,7 @@ export const LeadershipTree: React.FC<LeadershipTreeProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: level === 0 ? 'rgba(30, 41, 59, 0.7)' : 'rgba(15, 23, 42, 0.5)',
+            background: level === 0 ? 'var(--bg-card-hover)' : 'var(--bg-input)',
             border: '1px solid var(--border-color)',
             borderRadius: 'var(--radius-md)',
             padding: '12px 16px',
@@ -194,7 +194,7 @@ export const LeadershipTree: React.FC<LeadershipTreeProps> = ({
 
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '14px' }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px' }}>
                   {node.nome}
                 </span>
                 <span
@@ -244,7 +244,7 @@ export const LeadershipTree: React.FC<LeadershipTreeProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Indicados Diretos</div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {node.total_indicados_diretos || 0}
               </div>
             </div>
@@ -374,7 +374,7 @@ export const LeadershipTree: React.FC<LeadershipTreeProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2 style={{ fontSize: '20px', color: '#ffffff' }}>Rede Hierárquica de Lideranças</h2>
+            <h2 style={{ fontSize: '20px', color: 'var(--text-primary)' }}>Rede Hierárquica de Lideranças</h2>
             {maskLGPD && (
               <span className="badge badge-verde" style={{ display: 'inline-flex', gap: '4px' }}>
                 <Shield size={12} />

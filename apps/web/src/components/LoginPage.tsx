@@ -103,64 +103,47 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'radial-gradient(ellipse at top, #064e3b 0%, #0b0f17 65%, #05080e 100%)',
-        padding: '20px',
+        background: 'var(--bg-main)',
+        padding: '24px',
         position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      {/* Luzes de Fundo Estilizadas */}
       <div
-        style={{
-          position: 'absolute',
-          width: '500px',
-          height: '500px',
-          background: 'rgba(16, 185, 129, 0.08)',
-          borderRadius: '50%',
-          filter: 'blur(120px)',
-          top: '-10%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      <div
+        className="glass-panel"
         style={{
           width: '100%',
-          maxWidth: '460px',
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '20px',
+          maxWidth: '440px',
           padding: '36px 32px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: 'var(--shadow-dropdown)',
           position: 'relative',
           zIndex: 1,
         }}
       >
         {/* Identidade e Brasão */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div
             style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #10b981, #047857)',
+              width: '52px',
+              height: '52px',
+              borderRadius: 'var(--radius-lg)',
+              background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(16, 185, 129, 0.35)',
+              boxShadow: '0 4px 16px var(--primary-glow)',
               marginBottom: '14px',
+              color: '#ffffff',
             }}
           >
-            <Shield size={30} color="#ffffff" />
+            <Shield size={26} />
           </div>
 
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', margin: 0 }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--text-primary)', margin: 0 }}>
             {candidate?.nome_urna || 'Painel Eleitoral 2026'}
           </h1>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: 0 }}>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: 0 }}>
             {candidate?.cargo ? `${candidate.cargo} • ` : ''}
             {candidate?.partido ? `${candidate.partido} ` : ''}
             {candidate?.numero_candidato ? `(${candidate.numero_candidato}) • ` : ''}
@@ -173,11 +156,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            background: 'rgba(30, 41, 59, 0.7)',
-            padding: '4px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            marginBottom: '24px',
+            background: 'var(--bg-input)',
+            padding: '3px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+            marginBottom: '20px',
           }}
         >
           <button
@@ -187,19 +170,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
               setErrorMsg(null);
             }}
             style={{
-              padding: '10px',
-              borderRadius: '9px',
+              padding: '8px',
+              borderRadius: 'var(--radius-sm)',
               border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
+              fontSize: '12.5px',
+              fontWeight: 600,
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              background: mode === 'login' ? '#10b981' : 'transparent',
+              transition: 'all 0.15s ease',
+              background: mode === 'login' ? 'var(--primary)' : 'transparent',
               color: mode === 'login' ? '#ffffff' : 'var(--text-secondary)',
-              boxShadow: mode === 'login' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
+              boxShadow: mode === 'login' ? '0 2px 6px var(--primary-glow)' : 'none',
             }}
           >
-            Entrar no Painel
+            Entrar
           </button>
 
           <button
@@ -209,19 +192,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
               setErrorMsg(null);
             }}
             style={{
-              padding: '10px',
-              borderRadius: '9px',
+              padding: '8px',
+              borderRadius: 'var(--radius-sm)',
               border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
+              fontSize: '12.5px',
+              fontWeight: 600,
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              background: mode === 'register' ? '#10b981' : 'transparent',
+              transition: 'all 0.15s ease',
+              background: mode === 'register' ? 'var(--primary)' : 'transparent',
               color: mode === 'register' ? '#ffffff' : 'var(--text-secondary)',
-              boxShadow: mode === 'register' ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
+              boxShadow: mode === 'register' ? '0 2px 6px var(--primary-glow)' : 'none',
             }}
           >
-            Cadastrar Login
+            Cadastrar
           </button>
         </div>
 
@@ -229,19 +212,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
         {errorMsg && (
           <div
             style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '10px',
-              padding: '12px',
+              background: 'rgba(244, 63, 94, 0.12)',
+              border: '1px solid rgba(244, 63, 94, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
               fontSize: '12px',
-              color: '#f87171',
-              marginBottom: '20px',
+              color: 'var(--danger)',
+              marginBottom: '16px',
             }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <AlertCircle size={15} style={{ flexShrink: 0 }} />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -249,37 +232,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
         {successMsg && (
           <div
             style={{
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '10px',
-              padding: '12px',
+              background: 'var(--primary-light)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
               fontSize: '12px',
-              color: '#34d399',
-              marginBottom: '20px',
+              color: 'var(--primary)',
+              marginBottom: '16px',
             }}
           >
-            <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+            <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
             <span>{successMsg}</span>
           </div>
         )}
 
         {/* FORMULÁRIO DE LOGIN */}
         {mode === 'login' && (
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Usuário ou E-mail de Acesso
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '5px' }}>
+                Usuário ou E-mail
               </label>
               <div style={{ position: 'relative' }}>
-                <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
                   className="input-field"
-                  style={{ paddingLeft: '40px' }}
-                  placeholder="Ex: Rodrigo ou seu e-mail"
+                  style={{ paddingLeft: '36px' }}
+                  placeholder="Seu usuário ou e-mail"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="username"
@@ -289,15 +272,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '5px' }}>
                 Senha
               </label>
               <div style={{ position: 'relative' }}>
-                <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="password"
                   className="input-field"
-                  style={{ paddingLeft: '40px' }}
+                  style={{ paddingLeft: '36px' }}
                   placeholder="••••••••"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
@@ -312,13 +295,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
               disabled={isLoading}
               className="btn btn-primary"
               style={{
-                padding: '13px',
-                fontSize: '14px',
-                fontWeight: 700,
-                marginTop: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                padding: '11px',
+                fontSize: '13.5px',
+                marginTop: '4px',
                 gap: '8px',
               }}
             >
@@ -327,18 +306,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
               ) : (
                 <>
                   <span>Acessar Painel</span>
-                  <ArrowRight size={16} />
+                  <ArrowRight size={15} />
                 </>
               )}
             </button>
 
-            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+            <div style={{ textAlign: 'center', marginTop: '6px' }}>
               <button
                 type="button"
                 onClick={() => setMode('register')}
-                style={{ background: 'none', border: 'none', color: '#10b981', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
               >
-                Primeiro acesso? Clique aqui para cadastrar seu login
+                Primeiro acesso? Crie seu login
               </button>
             </div>
           </form>
@@ -346,17 +325,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
 
         {/* FORMULÁRIO DE CADASTRO DE LOGIN */}
         {mode === 'register' && (
-          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
                 Nome Completo *
               </label>
               <div style={{ position: 'relative' }}>
-                <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
                   className="input-field"
-                  style={{ paddingLeft: '40px' }}
+                  style={{ paddingLeft: '36px' }}
                   placeholder="Nome do operador ou coordenador"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
@@ -367,14 +346,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
 
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                E-mail Corporativo / Pessoal *
+                E-mail *
               </label>
               <div style={{ position: 'relative' }}>
-                <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="email"
                   className="input-field"
-                  style={{ paddingLeft: '40px' }}
+                  style={{ paddingLeft: '36px' }}
                   placeholder="seuemail@campanha.com.br"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -388,11 +367,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
                 WhatsApp (Opcional)
               </label>
               <div style={{ position: 'relative' }}>
-                <Phone size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <Phone size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
                   className="input-field"
-                  style={{ paddingLeft: '40px' }}
+                  style={{ paddingLeft: '36px' }}
                   placeholder="13999998888"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
@@ -402,14 +381,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
 
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                Senha de Acesso (Mín. 6 dígitos) *
+                Senha de Acesso (Mín. 6 caracteres) *
               </label>
               <div style={{ position: 'relative' }}>
-                <KeyRound size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <KeyRound size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="password"
                   className="input-field"
-                  style={{ paddingLeft: '40px' }}
+                  style={{ paddingLeft: '36px' }}
                   placeholder="••••••••"
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
@@ -437,13 +416,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
               disabled={isLoading}
               className="btn btn-primary"
               style={{
-                padding: '13px',
-                fontSize: '14px',
-                fontWeight: 700,
-                marginTop: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                padding: '11px',
+                fontSize: '13.5px',
+                marginTop: '4px',
                 gap: '8px',
               }}
             >
@@ -451,19 +426,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
                 <span>Criando Acesso...</span>
               ) : (
                 <>
-                  <UserPlus size={16} />
+                  <UserPlus size={15} />
                   <span>Cadastrar e Entrar</span>
                 </>
               )}
             </button>
 
-            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+            <div style={{ textAlign: 'center', marginTop: '6px' }}>
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                style={{ background: 'none', border: 'none', color: '#10b981', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
               >
-                Já possui conta? Clique para entrar
+                Já possui conta? Fazer login
               </button>
             </div>
           </form>
@@ -472,9 +447,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
         {/* Rodapé de Segurança e LGPD */}
         <div
           style={{
-            marginTop: '28px',
-            paddingTop: '16px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            marginTop: '24px',
+            paddingTop: '14px',
+            borderTop: '1px solid var(--border-color)',
             textAlign: 'center',
             fontSize: '11px',
             color: 'var(--text-muted)',
@@ -484,7 +459,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, candidate 
             gap: '6px',
           }}
         >
-          <Sparkles size={12} color="#10b981" />
+          <Sparkles size={12} color="var(--primary)" />
           <span>Eleições 2026 • Criptografia e Auditoria LGPD Ativas</span>
         </div>
       </div>

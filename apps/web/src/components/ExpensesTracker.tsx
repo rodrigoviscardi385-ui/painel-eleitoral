@@ -106,7 +106,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
             <span className="badge badge-verde">Controle e Auditoria TSE</span>
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Prestação de Contas SPCE</span>
           </div>
-          <h2 style={{ fontSize: '24px', color: '#ffffff' }}>Controle Financeiro de Campanha</h2>
+          <h2 style={{ fontSize: '24px', color: 'var(--text-primary)' }}>Controle Financeiro de Campanha</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '650px', marginTop: '4px' }}>
             Acompanhamento contábil oficial, categorização TSE, conciliação e auditoria das despesas operacionais da campanha.
           </p>
@@ -125,7 +125,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
         className="glass-panel"
         style={{
           padding: '20px 24px',
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))',
+          background: 'var(--bg-card)',
           border: '1px solid rgba(59, 130, 246, 0.3)',
         }}
       >
@@ -135,7 +135,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
               <ShieldCheck size={20} color="#3b82f6" />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 Teto Legal de Gastos TSE: R$ {TETO_LEGAL_TSE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -176,7 +176,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
             Total Desembolsado
           </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#ffffff' }}>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)' }}>
             R$ {gastosData.totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div style={{ fontSize: '12px', color: '#34d399', marginTop: '4px' }}>
@@ -236,7 +236,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
       {/* Tabela de Despesas com Filtros */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <h3 style={{ fontSize: '18px', color: '#ffffff' }}>Lançamentos e Extrato de Despesas</h3>
+          <h3 style={{ fontSize: '18px', color: 'var(--text-primary)' }}>Lançamentos e Extrato de Despesas</h3>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Filtro Status */}
@@ -299,7 +299,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
                         {new Date(g.data_gasto).toLocaleDateString('pt-BR')}
                       </td>
                       <td style={{ padding: '12px 10px' }}>
-                        <div style={{ fontWeight: 600, color: '#ffffff' }}>{g.descricao}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{g.descricao}</div>
                         {g.fornecedor_nome && (
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             Fornecedor: {g.fornecedor_nome}
@@ -315,7 +315,7 @@ export const ExpensesTracker: React.FC<ExpensesTrackerProps> = ({
                       <td style={{ padding: '12px 10px', color: 'var(--text-secondary)' }}>
                         {g.forma_pagamento || 'PIX'}
                       </td>
-                      <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 700, color: '#ffffff' }}>
+                      <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
                         R$ {Number(g.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>

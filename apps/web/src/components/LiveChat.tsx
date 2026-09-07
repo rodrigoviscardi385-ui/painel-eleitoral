@@ -123,7 +123,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({ conversas, onRefreshConversa
           height: '100%',
           maxHeight: '100%',
           minHeight: 0,
-          background: 'rgba(11, 15, 23, 0.55)',
+          background: 'var(--bg-card)',
           overflow: 'hidden',
         }}
       >
@@ -263,7 +263,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({ conversas, onRefreshConversa
             maxHeight: '100%',
             minHeight: 0,
             overflow: 'hidden',
-            background: 'rgba(11, 15, 23, 0.3)',
+            background: 'var(--bg-input)',
           }}
         >
           {/* Header do Contato */}
@@ -275,7 +275,7 @@ export const LiveChat: React.FC<LiveChatProps> = ({ conversas, onRefreshConversa
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: 'rgba(15, 23, 42, 0.65)',
+              background: 'var(--bg-card)',
               gap: '12px',
             }}
           >
