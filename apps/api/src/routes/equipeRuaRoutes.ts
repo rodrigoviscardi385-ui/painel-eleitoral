@@ -88,9 +88,9 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
   app.post('/api/equipe-rua', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as any;
 
-    if (!body.nome_completo || !body.cpf || !body.rg || !body.telefone_whatsapp || !body.endereco_completo || !body.bairro) {
+    if (!body.nome_completo || !body.cpf || !body.telefone_whatsapp) {
       return reply.status(400).send({
-        error: 'Campos obrigatórios ausentes: nome completo, CPF, RG, telefone/WhatsApp, endereço e bairro são necessários para formalização eleitoral TSE.',
+        error: 'Campos obrigatórios ausentes: Nome completo, CPF e WhatsApp são necessários.',
       });
     }
 
@@ -122,14 +122,14 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       .values({
         nome_completo: body.nome_completo.trim(),
         cpf: formattedCpf,
-        rg: String(body.rg).trim(),
+        rg: body.rg ? String(body.rg).trim() : 'Não informado',
         rg_orgao_emissor: body.rg_orgao_emissor ? String(body.rg_orgao_emissor).trim() : 'SSP/SP',
         titulo_eleitor: body.titulo_eleitor ? String(body.titulo_eleitor).trim() : null,
         zona_eleitoral: body.zona_eleitoral ? String(body.zona_eleitoral).trim() : null,
         secao_eleitoral: body.secao_eleitoral ? String(body.secao_eleitoral).trim() : null,
         telefone_whatsapp: String(body.telefone_whatsapp).replace(/\D/g, ''),
-        endereco_completo: String(body.endereco_completo).trim(),
-        bairro: String(body.bairro).trim(),
+        endereco_completo: body.endereco_completo ? String(body.endereco_completo).trim() : 'Santos/SP',
+        bairro: body.bairro ? String(body.bairro).trim() : 'Santos',
         cidade: body.cidade ? String(body.cidade).trim() : 'Santos',
         uf: body.uf ? String(body.uf).trim() : 'SP',
         cep: body.cep ? String(body.cep).trim() : '11000-000',
@@ -726,12 +726,15 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
     const { identificador } = (request.body as any) || {};
     const cleanDigits = String(identificador || '').replace(/\D/g, '');
 
-    if (!cleanDigits || cleanDigits.length < 9) {
+    if (!cleanDigits || cleanDigits.length < 8) {
       return reply.status(400).send({ error: 'Informe um CPF válido ou WhatsApp com DDD.' });
     }
 
-    // Busca apenas na lista oficial de colaboradores contratados pela campanha
-    const membro = await db
+    const last9 = cleanDigits.slice(-9);
+    const sem55 = cleanDigits.startsWith('55') && cleanDigits.length > 11 ? cleanDigits.slice(2) : cleanDigits;
+
+    // 1. Busca flexível na equipe de rua oficial
+    let membro = await db
       .select({
         id: schema.equipeRua.id,
         nome: schema.equipeRua.nome_completo,
@@ -746,15 +749,73 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       .where(
         or(
           sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanDigits}`,
-          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
+          sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${sem55}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${sem55}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') LIKE ${'%' + last9}`
         )
       )
       .limit(1)
       .then((r) => r[0]);
 
+    // 2. Se não estiver em equipeRua, verifica na base geral de lideranças/apoiadores da campanha
+    if (!membro) {
+      const usuarioCampanha = await db
+        .select()
+        .from(schema.usuarios)
+        .where(
+          or(
+            sql`regexp_replace(${schema.usuarios.whatsapp}, '\\D', '', 'g') = ${cleanDigits}`,
+            sql`regexp_replace(${schema.usuarios.whatsapp}, '\\D', '', 'g') = ${sem55}`,
+            sql`regexp_replace(${schema.usuarios.whatsapp}, '\\D', '', 'g') LIKE ${'%' + last9}`
+          )
+        )
+        .limit(1)
+        .then((r) => r[0]);
+
+      if (usuarioCampanha) {
+        const cpfFormatado = cleanDigits.length === 11
+          ? `${cleanDigits.slice(0, 3)}.${cleanDigits.slice(3, 6)}.${cleanDigits.slice(6, 9)}-${cleanDigits.slice(9, 11)}`
+          : '000.000.000-00';
+
+        const [novo] = await db
+          .insert(schema.equipeRua)
+          .values({
+            nome_completo: usuarioCampanha.nome,
+            cpf: cpfFormatado,
+            rg: 'Importado Campanha',
+            rg_orgao_emissor: 'SSP/SP',
+            telefone_whatsapp: usuarioCampanha.whatsapp,
+            endereco_completo: 'Santos/SP',
+            bairro: usuarioCampanha.bairro || 'Santos',
+            cidade: 'Santos',
+            uf: 'SP',
+            cep: '11000-000',
+            funcao_atividade: usuarioCampanha.cargo || 'MOBILIZADOR_RUA',
+            tipo_jornada: 'MEIO_PERIODO',
+            remuneracao_pactuada: '1500.00',
+            data_inicio: new Date(),
+            data_fim: new Date('2026-10-04T23:59:59.000Z'),
+            status_contrato: 'MINUTA_GERADA',
+          })
+          .returning();
+
+        membro = {
+          id: novo.id,
+          nome: novo.nome_completo,
+          cpf: novo.cpf,
+          telefone: novo.telefone_whatsapp,
+          bairro: novo.bairro,
+          funcao: novo.funcao_atividade,
+          senha_hash: null,
+          primeiro_acesso_realizado: false,
+        };
+      }
+    }
+
     if (!membro) {
       return reply.status(403).send({
-        error: 'Acesso Restrito: Seu CPF ou Telefone não consta no cadastro oficial de colaboradores da campanha de Santos. Procure a coordenação.',
+        error: 'Acesso Restrito: Seu CPF ou Telefone não consta no cadastro oficial. Utilize a aba "Cadastrar-se" para registrar seu acesso.',
         bloqueado: true,
       });
     }
@@ -786,13 +847,19 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'A senha de segurança deve ter pelo menos 4 caracteres.' });
     }
 
+    const last9 = cleanDigits.slice(-9);
+    const sem55 = cleanDigits.startsWith('55') && cleanDigits.length > 11 ? cleanDigits.slice(2) : cleanDigits;
+
     const membro = await db
       .select()
       .from(schema.equipeRua)
       .where(
         or(
           sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanDigits}`,
-          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
+          sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${sem55}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${sem55}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') LIKE ${'%' + last9}`
         )
       )
       .limit(1)
@@ -845,13 +912,19 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Informe seu CPF/WhatsApp e a senha cadastrada.' });
     }
 
+    const last9 = cleanDigits.slice(-9);
+    const sem55 = cleanDigits.startsWith('55') && cleanDigits.length > 11 ? cleanDigits.slice(2) : cleanDigits;
+
     const membro = await db
       .select()
       .from(schema.equipeRua)
       .where(
         or(
           sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanDigits}`,
-          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
+          sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${sem55}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${sem55}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') LIKE ${'%' + last9}`
         )
       )
       .limit(1)
@@ -873,13 +946,15 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
           nome: membro.nome_completo,
           cpf: membro.cpf,
           telefone: membro.telefone_whatsapp,
+          bairro: membro.bairro,
+          funcao: membro.funcao_atividade,
         }
       });
     }
 
-    const isValid = await bcrypt.compare(String(senha), membro.senha_hash);
-    if (!isValid) {
-      return reply.status(401).send({ error: 'Senha incorreta. Tente novamente ou procure a coordenação.' });
+    const senhaCorreta = await bcrypt.compare(String(senha), membro.senha_hash);
+    if (!senhaCorreta) {
+      return reply.status(401).send({ error: 'Senha incorreta.' });
     }
 
     await db
@@ -904,6 +979,108 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
         bairro: membro.bairro,
         funcao: membro.funcao_atividade,
       }
+    });
+  });
+
+  // ─── 13.5. Cadastro Rápido de Colaborador de Rua (Auto-Cadastro pelo PWA) ────
+  app.post('/api/equipe-rua/cadastro-rapido', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { nome, whatsapp, cpf, bairro, senha } = (request.body as any) || {};
+
+    if (!nome || !whatsapp || !senha) {
+      return reply.status(400).send({ error: 'Nome, WhatsApp e senha são obrigatórios para cadastro.' });
+    }
+
+    const cleanCpf = cpf ? String(cpf).replace(/\D/g, '') : '';
+    const cleanPhone = String(whatsapp).replace(/\D/g, '');
+
+    if (cleanPhone.length < 10) {
+      return reply.status(400).send({ error: 'WhatsApp inválido. Informe com DDD (ex: 13 99999-9999).' });
+    }
+
+    const formattedCpf = cleanCpf.length === 11
+      ? `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9, 11)}`
+      : `000.${cleanPhone.slice(-6, -3)}.${cleanPhone.slice(-3)}-00`;
+
+    const last9 = cleanPhone.slice(-9);
+
+    // Verifica se já existe por telefone ou CPF
+    const existe = await db
+      .select()
+      .from(schema.equipeRua)
+      .where(
+        or(
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanPhone}`,
+          sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') LIKE ${'%' + last9}`,
+          cleanCpf.length === 11 ? sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanCpf}` : sql`1=0`
+        )
+      )
+      .limit(1)
+      .then((r) => r[0]);
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(String(senha), salt);
+
+    let colaboradorFinal: any;
+    if (existe) {
+      const [updated] = await db
+        .update(schema.equipeRua)
+        .set({
+          nome_completo: nome.trim(),
+          bairro: bairro ? String(bairro).trim() : existe.bairro,
+          senha_hash: hash,
+          primeiro_acesso_realizado: true,
+          ultimo_login_at: new Date(),
+          updated_at: new Date(),
+        })
+        .where(eq(schema.equipeRua.id, existe.id))
+        .returning();
+      colaboradorFinal = updated;
+    } else {
+      const [created] = await db
+        .insert(schema.equipeRua)
+        .values({
+          nome_completo: nome.trim(),
+          cpf: formattedCpf,
+          rg: 'Cadastro Rápido App',
+          rg_orgao_emissor: 'SSP/SP',
+          telefone_whatsapp: cleanPhone,
+          endereco_completo: 'Santos/SP',
+          bairro: bairro ? String(bairro).trim() : 'Santos',
+          cidade: 'Santos',
+          uf: 'SP',
+          cep: '11000-000',
+          funcao_atividade: 'MOBILIZADOR_RUA',
+          tipo_jornada: 'MEIO_PERIODO',
+          remuneracao_pactuada: '1500.00',
+          data_inicio: new Date(),
+          data_fim: new Date('2026-10-04T23:59:59.000Z'),
+          status_contrato: 'MINUTA_GERADA',
+          senha_hash: hash,
+          primeiro_acesso_realizado: true,
+          ultimo_login_at: new Date(),
+        })
+        .returning();
+      colaboradorFinal = created;
+    }
+
+    const token = jwt.sign(
+      { id: colaboradorFinal.id, nome: colaboradorFinal.nome_completo, role: 'COLABORADOR_RUA' },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return reply.status(201).send({
+      success: true,
+      mensagem: 'Cadastro de colaborador realizado com sucesso!',
+      token,
+      colaborador: {
+        id: colaboradorFinal.id,
+        nome: colaboradorFinal.nome_completo,
+        cpf: colaboradorFinal.cpf,
+        telefone: colaboradorFinal.telefone_whatsapp,
+        bairro: colaboradorFinal.bairro,
+        funcao: colaboradorFinal.funcao_atividade,
+      },
     });
   });
 

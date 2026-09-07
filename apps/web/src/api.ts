@@ -460,6 +460,23 @@ export const api = {
       body: JSON.stringify({ identificador, senha }),
     }),
 
+  cadastroRapidoColaboradorRua: (data: {
+    nome: string;
+    whatsapp: string;
+    cpf?: string;
+    bairro?: string;
+    senha: string;
+  }) =>
+    request<{
+      success: boolean;
+      mensagem: string;
+      token: string;
+      colaborador: any;
+    }>('/api/equipe-rua/cadastro-rapido', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Auditoria de Apoiadores Coletados em Campo (com GPS e Colaborador)
   getApoiadoresColetados: (params: { busca?: string; limite?: number } = {}) => {
     const query = new URLSearchParams();

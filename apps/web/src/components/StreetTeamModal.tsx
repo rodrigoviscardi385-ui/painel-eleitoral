@@ -157,18 +157,24 @@ export const StreetTeamModal: React.FC<StreetTeamModalProps> = ({
       return;
     }
 
-    if (!formData.nome_completo.trim() || !formData.rg.trim() || !formData.telefone_whatsapp.trim()) {
+    if (!formData.nome_completo.trim() || !formData.telefone_whatsapp.trim()) {
       setErrorMsg('Por favor, preencha todos os campos obrigatórios (*).');
       return;
     }
+
+    const payload = {
+      ...formData,
+      rg: formData.rg.trim() || 'Não informado',
+      endereco_completo: formData.endereco_completo.trim() || 'Santos/SP',
+    };
 
     try {
       setSaving(true);
       let res;
       if (isEditing) {
-        res = await api.updateEquipeRua(memberToEdit.id, formData);
+        res = await api.updateEquipeRua(memberToEdit.id, payload);
       } else {
-        res = await api.createEquipeRua(formData);
+        res = await api.createEquipeRua(payload);
       }
       onSuccess(res);
     } catch (err: any) {

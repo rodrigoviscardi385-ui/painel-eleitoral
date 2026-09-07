@@ -96,6 +96,7 @@ export const StreetAppPWA: React.FC = () => {
   });
 
   // Fluxo de Autenticação Segura (Cruzamento com Colaboradores Cadastrados)
+  const [authModo, setAuthModo] = useState<'LOGIN' | 'NOVO_CADASTRO'>('LOGIN');
   const [authIdentificador, setAuthIdentificador] = useState('');
   const [authSenha, setAuthSenha] = useState('');
   const [authConfirmaSenha, setAuthConfirmaSenha] = useState('');
@@ -111,6 +112,14 @@ export const StreetAppPWA: React.FC = () => {
   } | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authErro, setAuthErro] = useState<string | null>(null);
+
+  // Campos para Auto-Cadastro Imediato de Novo Colaborador de Rua
+  const [cadNome, setCadNome] = useState('');
+  const [cadWhatsapp, setCadWhatsapp] = useState('');
+  const [cadCpf, setCadCpf] = useState('');
+  const [cadBairro, setCadBairro] = useState('Vila Belmiro');
+  const [cadSenha, setCadSenha] = useState('');
+  const [cadConfirmaSenha, setCadConfirmaSenha] = useState('');
 
   // ─── 2. PONTO ELETRÔNICO (CHECK-IN / CHECK-OUT) ───────────────────────────
   const [pontoAtual, setPontoAtual] = useState<RegistroPonto | null>(() => {
@@ -585,6 +594,65 @@ export const StreetAppPWA: React.FC = () => {
     }
   };
 
+  // ─── ETAPA 2C: CADASTRO NOVO COLABORADOR DE RUA ────────────────────────────
+  const handleCadastrarNovoColaborador = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cadNome.trim()) {
+      setAuthErro('Informe seu nome completo.');
+      return;
+    }
+    const cleanPhone = cadWhatsapp.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setAuthErro('Informe seu WhatsApp com DDD (ex: 13 99999-9999).');
+      return;
+    }
+    if (!cadSenha || cadSenha.length < 4) {
+      setAuthErro('A senha deve ter pelo menos 4 caracteres.');
+      return;
+    }
+    if (cadSenha !== cadConfirmaSenha) {
+      setAuthErro('As senhas digitadas não coincidem.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthErro(null);
+
+    try {
+      const res = await api.cadastroRapidoColaboradorRua({
+        nome: cadNome.trim(),
+        whatsapp: cleanPhone,
+        cpf: cadCpf.trim() || undefined,
+        bairro: cadBairro || selectedBairro || 'Santos',
+        senha: cadSenha,
+      });
+
+      if (res && res.colaborador) {
+        const c = res.colaborador;
+        const session: ColaboradorSession = {
+          id: c.id,
+          nome: c.nome,
+          whatsapp: c.telefone || cleanPhone,
+          cpf: c.cpf || 'Cadastrado',
+          bairro: c.bairro || 'Santos',
+          funcao: c.funcao || 'Mobilizador de Rua',
+          token: res.token,
+          authenticated: true,
+          createdAt: new Date().toISOString()
+        };
+
+        localStorage.setItem('santos_colaborador_session', JSON.stringify(session));
+        setColaborador(session);
+        setSelectedBairro(session.bairro);
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      }
+    } catch (err: any) {
+      setAuthErro(err.message || 'Erro ao realizar cadastro de colaborador.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleLogoutColaborador = () => {
     if (pontoAtual) {
       if (!confirm('Você possui um turno de trabalho em andamento! Deseja mesmo sair e encerrar seu ponto?')) return;
@@ -730,6 +798,11 @@ export const StreetAppPWA: React.FC = () => {
     setCadastrosTurno((c) => c + 1);
     setUltimoCadastrado(nomeFinal);
 
+    // Ativação automática do turno para nunca perder a geolocalização e o ponto de entrada
+    if (!pontoAtual && colaborador) {
+      handleCheckIn();
+    }
+
     try {
       await fetch('/api/equipe-rua/coleta-voto', {
         method: 'POST',
@@ -854,8 +927,271 @@ export const StreetAppPWA: React.FC = () => {
             </p>
           </div>
 
+          {/* ─── ALTERNADOR DE ABAS: ENTRAR VS NOVO CADASTRO ─── */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              background: '#111827',
+              padding: '4px',
+              borderRadius: '12px',
+              border: '1px solid #374151',
+              marginBottom: '18px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setAuthModo('LOGIN');
+                setAuthErro(null);
+              }}
+              style={{
+                padding: '10px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: authModo === 'LOGIN' ? '#ffe600' : 'transparent',
+                color: authModo === 'LOGIN' ? '#000000' : '#94a3b8',
+                boxShadow: authModo === 'LOGIN' ? '0 2px 8px rgba(255, 230, 0, 0.3)' : 'none',
+              }}
+            >
+              JÁ SOU CADASTRADO
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthModo('NOVO_CADASTRO');
+                setAuthErro(null);
+              }}
+              style={{
+                padding: '10px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: authModo === 'NOVO_CADASTRO' ? '#ffe600' : 'transparent',
+                color: authModo === 'NOVO_CADASTRO' ? '#000000' : '#94a3b8',
+                boxShadow: authModo === 'NOVO_CADASTRO' ? '0 2px 8px rgba(255, 230, 0, 0.3)' : 'none',
+              }}
+            >
+              NOVO CADASTRO
+            </button>
+          </div>
+
+          {/* ─── FLUXO DE NOVO CADASTRO DE COLABORADOR DE RUA ─── */}
+          {authModo === 'NOVO_CADASTRO' && (
+            <form onSubmit={handleCadastrarNovoColaborador} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '12px', borderRadius: '10px', fontSize: '12px', color: '#6ee7b7', lineHeight: '1.4' }}>
+                ✍️ <b>Cadastro de Colaborador:</b> Preencha seus dados para começar a atuar na equipe de campo e registrar eleitores.
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                  NOME COMPLETO *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Seu nome completo"
+                    value={cadNome}
+                    onChange={(e) => setCadNome(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <User size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                  WHATSAPP COM DDD *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="(13) 99999-9999"
+                    value={cadWhatsapp}
+                    onChange={(e) => handlePhoneChange(e.target.value, setCadWhatsapp)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <Phone size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
+                  CPF (OPCIONAL)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="000.000.000-00"
+                    value={cadCpf}
+                    onChange={(e) => setCadCpf(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 12px 12px 40px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                  <IdCard size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
+                  BAIRRO DE ATUAÇÃO (SANTOS)
+                </label>
+                <select
+                  value={cadBairro}
+                  onChange={(e) => setCadBairro(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: '1px solid #333333',
+                    borderRadius: '10px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                >
+                  {bairrosSantos.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                    CRIE UMA SENHA *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Mín. 4 dígitos"
+                    value={cadSenha}
+                    onChange={(e) => setCadSenha(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                    CONFIRMAR SENHA *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Repita a senha"
+                    value={cadConfirmaSenha}
+                    onChange={(e) => setCadConfirmaSenha(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      backgroundColor: '#000000',
+                      color: '#ffffff',
+                      border: '1px solid #333333',
+                      borderRadius: '10px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {authErro && (
+                <div style={{ padding: '10px', background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', color: '#fca5a5', fontSize: '12px', borderRadius: '8px', textAlign: 'center', lineHeight: '1.4' }}>
+                  {authErro}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                style={{
+                  marginTop: '6px',
+                  padding: '16px',
+                  backgroundColor: authLoading ? '#475569' : '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  cursor: authLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                <UserCheck size={18} />
+                {authLoading ? 'CADASTRANDO...' : 'CADASTRAR E COMEÇAR A TRABALHAR'}
+              </button>
+
+              <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setAuthModo('LOGIN'); setAuthErro(null); }}
+                  style={{ background: 'none', border: 'none', color: '#ffe600', fontSize: '12px', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  Já é cadastrado? Fazer login com CPF/WhatsApp
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* ─── PASSO 1: IDENTIFICAR CPF OU WHATSAPP (CRUZAMENTO COM EQUIPE DE RUA) ─── */}
-          {authStep === 'IDENTIFICAR' && (
+          {authModo === 'LOGIN' && authStep === 'IDENTIFICAR' && (
             <form onSubmit={handleIdentificarColaborador} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ background: 'rgba(255, 230, 0, 0.06)', border: '1px solid rgba(255, 230, 0, 0.2)', padding: '12px', borderRadius: '10px', fontSize: '12px', color: '#f1f5f9', lineHeight: '1.4' }}>
                 🛡️ <b>Acesso Exclusivo:</b> Para entrar, digite seu <b>CPF</b> ou <b>WhatsApp</b> previamente cadastrado pela coordenação da campanha.
@@ -918,6 +1254,16 @@ export const StreetAppPWA: React.FC = () => {
                 <LogIn size={18} />
                 {authLoading ? 'VERIFICANDO CREDENCIAIS...' : 'VERIFICAR MEU CADASTRO'}
               </button>
+
+              <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setAuthModo('NOVO_CADASTRO'); setAuthErro(null); }}
+                  style={{ background: 'none', border: 'none', color: '#ffe600', fontSize: '12px', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  Não possui cadastro? Cadastre-se na Equipe de Rua
+                </button>
+              </div>
             </form>
           )}
 
@@ -1484,17 +1830,16 @@ export const StreetAppPWA: React.FC = () => {
         </div>
       )}
 
-      {/* ─── CADASTRO TWO-TAP: SÓ DISPONÍVEL QUANDO EM TURNO ────────────────── */}
-      {pontoAtual ? (
-        <div
-          style={{
-            background: cardBg,
-            border: solarMode ? '2px solid #ffe600' : '1px solid #10b981',
-            borderRadius: '16px',
-            padding: '14px',
-            marginBottom: '14px'
-          }}
-        >
+      {/* ─── CADASTRO TWO-TAP: DISPONÍVEL CONTÍNUO (CHECK-IN AUTOMÁTICO SE PENDENTE) ──── */}
+      <div
+        style={{
+          background: cardBg,
+          border: solarMode ? '2px solid #ffe600' : '1px solid #10b981',
+          borderRadius: '16px',
+          padding: '14px',
+          marginBottom: '14px'
+        }}
+      >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <Zap size={18} color={accentColor} />
             <span style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
@@ -1738,24 +2083,6 @@ export const StreetAppPWA: React.FC = () => {
             </div>
           )}
         </div>
-      ) : (
-        <div
-          style={{
-            background: cardBg,
-            border: borderCard,
-            borderRadius: '14px',
-            padding: '20px',
-            textAlign: 'center',
-            marginBottom: '14px'
-          }}
-        >
-          <AlertTriangle size={32} color="#f59e0b" style={{ margin: '0 auto 8px' }} />
-          <div style={{ fontSize: '14px', fontWeight: 800 }}>CADASTRO DE APOIADORES BLOQUEADO</div>
-          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-            Para registrar eleitores na rua, clique no botão <strong>"REGISTRAR CHECK-IN DE ENTRADA"</strong> acima.
-          </div>
-        </div>
-      )}
 
       {/* ─── AÇÃO DE SUPORTE: REPOSIÇÃO DE MATERIAL (SEM TENDAS FIXAS) ─────── */}
       <div style={{ marginBottom: '14px' }}>
