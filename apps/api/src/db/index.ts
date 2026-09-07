@@ -384,6 +384,50 @@ export async function initDatabase() {
     );
   `;
 
+  // 22. Tabela bi_quociente_eleitoral (BI Executivo / Métrica da Vitória)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS bi_quociente_eleitoral (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      cargo TEXT NOT NULL DEFAULT 'DEPUTADO_FEDERAL',
+      total_aptos_projetado INT NOT NULL DEFAULT 340000,
+      abstencao_esperada_pct NUMERIC(4,2) NOT NULL DEFAULT 21.50,
+      brancos_nulos_esperado_pct NUMERIC(4,2) NOT NULL DEFAULT 8.50,
+      total_vagas_casa INT NOT NULL DEFAULT 70,
+      quociente_eleitoral INT NOT NULL DEFAULT 68000,
+      meta_nominal_candidato INT NOT NULL DEFAULT 55000,
+      votos_auditados_atual INT NOT NULL DEFAULT 0,
+      votos_declarados_atual INT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // 23. Tabela fraude_auditoria_log (Anti-Fraud Guard)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS fraude_auditoria_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      device_id TEXT NOT NULL,
+      coordenador_nome TEXT,
+      status TEXT NOT NULL DEFAULT 'CLEAN',
+      fraud_score NUMERIC NOT NULL DEFAULT 0.0,
+      flags_json TEXT NOT NULL DEFAULT '[]',
+      total_auditados INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // 24. Tabela push_subscriptions (WebPush RFC 8030 / VAPID)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      usuario_id TEXT NOT NULL,
+      cargo TEXT NOT NULL DEFAULT 'COORDENACAO',
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
   // Criação de índices estratégicos de performance
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_whatsapp ON usuarios(whatsapp);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_lider_acima ON usuarios(lider_acima_id);`;
@@ -398,6 +442,8 @@ export async function initDatabase() {
   await queryClient`CREATE INDEX IF NOT EXISTS idx_sync_mutations_clock ON sync_mutations_log(device_id, logical_clock);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_territorio_hex_rov ON territorio_hex_analytics(indice_rov);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_sirene_crise_status ON sirene_crise_incidentes(status);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_fraude_device_id ON fraude_auditoria_log(device_id);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_push_endpoint ON push_subscriptions(endpoint);`;
 
   // Seed da Configuração da Campanha se vazia
   const existingConfig = await db.select().from(schema.campanhaConfig).limit(1);

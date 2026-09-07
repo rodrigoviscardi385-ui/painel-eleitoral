@@ -125,6 +125,49 @@ async function runSprintValidationSuite() {
     'Sirene de Crise: Geração de hash SHA-256 imutável para instrução em AIJE/TSE'
   );
 
+  // ─── GAP ANALYSIS: BI DO QUOCIENTE, ANTI-FRAUDE & PUSH RFC 8030 ─────────────
+  console.log('\n--- [GAP ANALYSIS: MÓDULOS DE GUERRA POLÍTICA] ---');
+
+  // Teste 4.1: Anti-Fraud Guard - Detecção de Cadastros em Velocidade Inumana
+  const now = Date.now();
+  const fakeBatch = [
+    { timestamp: now, whatsapp: '13991110001', latitude: -23.96, longitude: -46.33 },
+    { timestamp: now + 5000, whatsapp: '13991110002', latitude: -23.96, longitude: -46.33 },
+    { timestamp: now + 9000, whatsapp: '13991110003', latitude: -23.96, longitude: -46.33 },
+    { timestamp: now + 12000, whatsapp: '13991110004', latitude: -23.96, longitude: -46.33 },
+  ];
+  const { AntiFraudGuardService } = await import('../apps/api/src/services/antiFraudGuardService.js');
+  const fraudReport = await AntiFraudGuardService.auditBatch('dev_bot_test', 'Cabo Suspeito', fakeBatch);
+  assert(
+    fraudReport.fraudScore >= 45.0 && fraudReport.flags.includes('VELOCIDADE_INUMANA_CADASTRO'),
+    'Anti-Fraud Guard: Detecção imediata de rajada inumana de cadastros e números sequenciais'
+  );
+
+  // Teste 4.2: Anti-Fraud Guard - Lote limpo com velocidade e espaçamento natural
+  const cleanBatch = [
+    { timestamp: now, whatsapp: '13997812041', latitude: -23.961, longitude: -46.332 },
+    { timestamp: now + 180000, whatsapp: '13988223399', latitude: -23.968, longitude: -46.339 },
+  ];
+  const cleanReport = await AntiFraudGuardService.auditBatch('dev_human_test', 'Líder Genuíno', cleanBatch);
+  assert(
+    cleanReport.status === 'CLEAN' && cleanReport.fraudScore === 0,
+    'Anti-Fraud Guard: Aprovação de militância com ritmo humano e dispersão geográfica'
+  );
+
+  // Teste 4.3: Push Notification Service - Estrutura RFC 8030 High Priority
+  const { PushNotificationService } = await import('../apps/api/src/services/pushNotificationService.js');
+  const pushBroadcast = await PushNotificationService.broadcastUrgentCrisis({
+    incidentId: 'crs_test_01',
+    topic: 'Denúncia Infundada sobre Postos de Saúde',
+    synthesis: 'Áudio manipulado tentando desestabilizar a campanha na Zona Noroeste.',
+    threatLevel: 'CRITICAL',
+    actionUrl: '/warroom?incident=crs_test_01',
+  });
+  assert(
+    pushBroadcast.status === 'BROADCAST_COMPLETED',
+    'Push High Priority: Disparo de emergência com bypass sonoro e Full-Screen Intent'
+  );
+
   // ─── RESULTADO FINAL ───────────────────────────────────────────────────────
   console.log('\n================================================================');
   console.log(`📊 RESULTADO DA SUÍTE: ${passedTests} APROVADOS | ${failedTests} FALHAS`);

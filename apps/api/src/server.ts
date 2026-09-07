@@ -38,6 +38,7 @@ import { metaWebhookRoutes } from './routes/metaWebhook.js';
 import { syncRoutes } from './routes/sync.js';
 import { h3AnalyticsRoutes } from './routes/h3Analytics.js';
 import { sireneCriseRoutes } from './routes/sireneCrise.js';
+import { gapAnalysisRoutes } from './routes/gapAnalysisRoutes.js';
 
 dotenv.config();
 
@@ -145,6 +146,7 @@ await app.register(metaWebhookRoutes);
 await app.register(syncRoutes);
 await app.register(h3AnalyticsRoutes);
 await app.register(sireneCriseRoutes);
+await app.register(gapAnalysisRoutes);
 
 // 5. Inicialização do Servidor
 async function startServer() {

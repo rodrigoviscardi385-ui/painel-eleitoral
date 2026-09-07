@@ -28,6 +28,7 @@ import { LoginPage } from './components/LoginPage.tsx';
 import { AdminPage } from './components/AdminPage.tsx';
 import { ApuracaoBU } from './components/ApuracaoBU.tsx';
 import { QuocienteEleitoralSimulator } from './components/QuocienteEleitoralSimulator.tsx';
+import { QuocienteBiDashboard } from './components/QuocienteBiDashboard.tsx';
 import { WarRoomDiaD } from './components/WarRoomDiaD.tsx';
 import { ComplianceTSEModal } from './components/ComplianceTSEModal.tsx';
 import { H3HeatmapWarRoom } from './components/H3HeatmapWarRoom.tsx';
@@ -430,7 +431,10 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'simulador' && (
-          <QuocienteEleitoralSimulator />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <QuocienteBiDashboard />
+            <QuocienteEleitoralSimulator />
+          </div>
         )}
 
         {activeTab === 'warroom' && (

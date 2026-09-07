@@ -523,4 +523,63 @@ export const sireneCriseIncidentes = pgTable(
   ]
 );
 
+// ─── BI / Simulador de Quociente Eleitoral (Métrica da Vitória) ───────────────
+export const biQuocienteEleitoral = pgTable(
+  'bi_quociente_eleitoral',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    cargo: text('cargo').default('DEPUTADO_FEDERAL').notNull(),
+    total_aptos_projetado: integer('total_aptos_projetado').default(340000).notNull(),
+    abstencao_esperada_pct: numeric('abstencao_esperada_pct').default('21.50').notNull(),
+    brancos_nulos_esperado_pct: numeric('brancos_nulos_esperado_pct').default('8.50').notNull(),
+    total_vagas_casa: integer('total_vagas_casa').default(70).notNull(),
+    quociente_eleitoral: integer('quociente_eleitoral').default(68000).notNull(),
+    meta_nominal_candidato: integer('meta_nominal_candidato').default(55000).notNull(),
+    votos_auditados_atual: integer('votos_auditados_atual').default(0).notNull(),
+    votos_declarados_atual: integer('votos_declarados_atual').default(0).notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+
+// ─── Auditoria Anti-Fraude de Dados Internos (Guerra contra Bots e Fantasmas) ─
+export const fraudeAuditoriaLog = pgTable(
+  'fraude_auditoria_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    device_id: text('device_id').notNull(),
+    coordenador_nome: text('coordenador_nome'),
+    status: text('status', {
+      enum: ['CLEAN', 'INVESTIGACAO_SUSPEITA', 'FRAUDE_CONFIRMADA_QUARANTINE'],
+    }).default('CLEAN').notNull(),
+    fraud_score: numeric('fraud_score').default('0.0').notNull(),
+    flags_json: text('flags_json').default('[]').notNull(),
+    total_auditados: integer('total_auditados').default(0).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_fraude_device_id').on(table.device_id),
+    index('idx_fraude_status').on(table.status),
+    index('idx_fraude_created_at').on(table.created_at),
+  ]
+);
+
+// ─── Inscrições WebPush / VAPID para a Sirene de Crise ────────────────────────
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    usuario_id: text('usuario_id').notNull(),
+    cargo: text('cargo').default('COORDENACAO').notNull(),
+    endpoint: text('endpoint').notNull().unique(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_push_usuario').on(table.usuario_id),
+    index('idx_push_endpoint').on(table.endpoint),
+  ]
+);
+
+
 
