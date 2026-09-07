@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   UserPlus,
@@ -1318,9 +1318,12 @@ export const ModalLGPD: React.FC<{
 export const ModalEditarLideranca: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  node: any | null;
+  node?: any | null;
+  leader?: any | null;
+  leadersList?: any[];
   onSuccess: () => void;
-}> = ({ isOpen, onClose, node, onSuccess }) => {
+}> = ({ isOpen, onClose, node, leader, leadersList: _leadersList, onSuccess }) => {
+  const targetNode = node || leader;
   const [nome, setNome] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [cargo, setCargo] = useState('APOIADOR');
@@ -1332,19 +1335,19 @@ export const ModalEditarLideranca: React.FC<{
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    if (node) {
-      setNome(node.nome || '');
-      setWhatsapp(node.whatsapp || '');
-      setCargo(node.cargo || 'APOIADOR');
-      setBairro(node.bairro || '');
-      setZona(node.zona_eleitoral || '');
-      setSecao(node.secao_eleitoral || '');
-      setGrupoLink(node.grupo_link_convite || '');
+    if (targetNode) {
+      setNome(targetNode.nome || '');
+      setWhatsapp(targetNode.whatsapp || '');
+      setCargo(targetNode.cargo || 'APOIADOR');
+      setBairro(targetNode.bairro || '');
+      setZona(targetNode.zona_eleitoral || '');
+      setSecao(targetNode.secao_eleitoral || '');
+      setGrupoLink(targetNode.grupo_link_convite || '');
       setErrorMsg('');
     }
-  }, [node]);
+  }, [targetNode]);
 
-  if (!isOpen || !node) return null;
+  if (!isOpen || !targetNode) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1353,7 +1356,7 @@ export const ModalEditarLideranca: React.FC<{
     try {
       setIsSaving(true);
       setErrorMsg('');
-      await api.updateLideranca(node.id, {
+      await api.updateLideranca(targetNode.id, {
         nome: nome.trim(),
         whatsapp: whatsapp.trim(),
         cargo,
@@ -1496,19 +1499,21 @@ export const ModalEditarLideranca: React.FC<{
 export const ModalConfirmarExclusao: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  node: any | null;
+  node?: any | null;
+  leader?: any | null;
   onSuccess: () => void;
-}> = ({ isOpen, onClose, node, onSuccess }) => {
+}> = ({ isOpen, onClose, node, leader, onSuccess }) => {
+  const targetNode = node || leader;
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  if (!isOpen || !node) return null;
+  if (!isOpen || !targetNode) return null;
 
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
       setErrorMsg('');
-      await api.deleteLideranca(node.id);
+      await api.deleteLideranca(targetNode.id);
       onSuccess();
       onClose();
     } catch (err: any) {

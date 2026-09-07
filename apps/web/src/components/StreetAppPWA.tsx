@@ -39,6 +39,7 @@ interface ColaboradorSession {
   id: string;
   nome: string;
   whatsapp: string;
+  telefone?: string;
   cpf: string;
   bairro: string;
   funcao: string;

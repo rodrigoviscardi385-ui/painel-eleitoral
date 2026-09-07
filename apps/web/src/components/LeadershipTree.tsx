@@ -72,9 +72,11 @@ export const LeadershipTree: React.FC<LeadershipTreeProps> = ({
   // Flatten para extrair estatísticas de lideranças e bairros
   const flatten = (nodes: any[]): any[] => {
     let list: any[] = [];
+    if (!nodes || !Array.isArray(nodes)) return list;
     for (const n of nodes) {
+      if (!n) continue;
       list.push(n);
-      if (n.children && n.children.length > 0) {
+      if (n.children && Array.isArray(n.children) && n.children.length > 0) {
         list = list.concat(flatten(n.children));
       }
     }

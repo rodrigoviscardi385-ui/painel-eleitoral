@@ -18,6 +18,7 @@ import {
   Sparkles,
   Lock,
   RefreshCw,
+  CheckCircle,
 } from 'lucide-react';
 import { api } from '../api.ts';
 
