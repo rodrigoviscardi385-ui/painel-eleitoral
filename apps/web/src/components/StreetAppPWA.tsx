@@ -22,10 +22,40 @@ import {
   AlertOctagon,
   Eye,
   Award,
-  QrCode
+  QrCode,
+  LogIn,
+  LogOut,
+  Clock,
+  IdCard,
+  Briefcase
 } from 'lucide-react';
 import { ModalQRCodeAppRua } from './ModalQRCodeAppRua.tsx';
 import { api } from '../api.ts';
+
+interface ColaboradorSession {
+  id: string;
+  nome: string;
+  whatsapp: string;
+  cpf: string;
+  bairro: string;
+  funcao: string;
+  createdAt: string;
+}
+
+interface RegistroPonto {
+  id: string;
+  colaboradorId: string;
+  horarioEntrada: string;
+  horarioSaida?: string;
+  duracaoMinutos?: number;
+  latEntrada: number;
+  lngEntrada: number;
+  latSaida?: number;
+  lngSaida?: number;
+  cadastrosNoTurno: number;
+  kmNoTurno: number;
+  status: 'EM_ANDAMENTO' | 'FINALIZADO';
+}
 
 interface ApoiadorLocal {
   id: string;
@@ -40,17 +70,45 @@ interface ApoiadorLocal {
 }
 
 export const StreetAppPWA: React.FC = () => {
-  // ─── Estados de Modo Solar & Ergonomia ──────────────────────────────────────
-  const [solarMode, setSolarMode] = useState<boolean>(true); // Padrão Solar Ativo para Rua
-  const [turnoAtivo, setTurnoAtivo] = useState<boolean>(true);
+  // ─── 1. SESSÃO ISOLADA DO COLABORADOR ──────────────────────────────────────
+  const [colaborador, setColaborador] = useState<ColaboradorSession | null>(() => {
+    try {
+      const saved = localStorage.getItem('santos_colaborador_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+
+  // Formulário de Cadastro / Entrada do Colaborador
+  const [authNome, setAuthNome] = useState('');
+  const [authWhatsapp, setAuthWhatsapp] = useState('');
+  const [authCpf, setAuthCpf] = useState('');
+  const [authBairro, setAuthBairro] = useState('Gonzaga');
+  const [authFuncao, setAuthFuncao] = useState('Mobilizador de Calçada');
+  const [authErro, setAuthErro] = useState<string | null>(null);
+
+  // ─── 2. PONTO ELETRÔNICO (CHECK-IN / CHECK-OUT) ───────────────────────────
+  const [pontoAtual, setPontoAtual] = useState<RegistroPonto | null>(() => {
+    try {
+      const saved = localStorage.getItem('santos_ponto_atual');
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [resumoSaida, setResumoSaida] = useState<RegistroPonto | null>(null);
+
+  // ─── 3. ESTADOS DE MODO SOLAR & ERGONOMIA ─────────────────────────────────
+  const [solarMode, setSolarMode] = useState<boolean>(true);
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [panicClicks, setPanicClicks] = useState<number>(0);
   const [panicMsg, setPanicMsg] = useState<string | null>(null);
-  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
 
-  // ─── Estados de Telemetria Cinética (Acelerômetro + GPS) ────────────────────
+  // ─── 4. TELEMETRIA CINÉTICA ───────────────────────────────────────────────
   const [isMoving, setIsMoving] = useState<boolean>(true);
   const [velocidadeKmh, setVelocidadeKmh] = useState<number>(3.8);
-  const [passosAcumulados, setPassosAcumulados] = useState<number>(412);
+  const [passosAcumulados, setPassosAcumulados] = useState<number>(0);
   const [tempoParadoMinutos, setTempoParadoMinutos] = useState<number>(0);
   const [statusCinetico, setStatusCinetico] = useState<'EM_MOVIMENTO' | 'PARADO_BASE' | 'PARADO_ALERTA'>('EM_MOVIMENTO');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; precisao: number }>({
@@ -58,33 +116,32 @@ export const StreetAppPWA: React.FC = () => {
     lng: -46.3322,
     precisao: 4.5
   });
-  const [bateriaPct, setBateriaPct] = useState<number>(84);
-  const [bairroAtual, setBairroAtual] = useState<string>('Gonzaga');
+  const [bateriaPct, setBateriaPct] = useState<number>(85);
 
-  // ─── Estados do Cadastro Two-Tap ──────────────────────────────────────────
+  // ─── 5. CADASTRO TWO-TAP ──────────────────────────────────────────────────
   const [inputNome, setInputNome] = useState('');
   const [inputWhatsapp, setInputWhatsapp] = useState('');
   const [selectedBairro, setSelectedBairro] = useState('Gonzaga');
   const [tagsApoio, setTagsApoio] = useState<string[]>(['Apoio 100%']);
   const [apoiadoresLocais, setApoiadoresLocais] = useState<ApoiadorLocal[]>([]);
-  const [metaDiaria] = useState(30);
-  const [cadastrosHoje, setCadastrosHoje] = useState(14);
+  const [cadastrosTurno, setCadastrosTurno] = useState<number>(0);
   const [ultimoCadastrado, setUltimoCadastrado] = useState<string | null>(null);
   const [solicitandoMaterial, setSolicitandoMaterial] = useState(false);
   const [materialFeedback, setMaterialFeedback] = useState<string | null>(null);
 
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
-  // Lista dos Bairros Oficiais de Santos
   const bairrosSantos = [
     'Gonzaga', 'Boqueirão', 'Ponta da Praia', 'Embaré', 'Aparecida',
     'Centro', 'Vila Mathias', 'Encruzilhada', 'Marapé', 'José Menino',
     'Bom Retiro', 'Rádio Clube', 'Castelo', 'Areia Branca', 'Monte Serrat', 'Nova Cintra'
   ];
 
-  // ─── 1. Ciclo de Captura de Sensores Reais (Web API) ────────────────────────
+  // ─── CICLO DE SENSORES E GPS QUANDO EM TURNO ──────────────────────────────
   useEffect(() => {
-    // Escuta de Acelerômetro Real se disponível no navegador
+    if (!pontoAtual) return;
+
+    // Escuta de Acelerômetro
     const handleMotion = (e: DeviceMotionEvent) => {
       const acc = e.accelerationIncludingGravity;
       if (!acc) return;
@@ -97,13 +154,13 @@ export const StreetAppPWA: React.FC = () => {
       }
     };
 
-    if (window.DeviceMotionEvent && turnoAtivo) {
+    if (window.DeviceMotionEvent) {
       window.addEventListener('devicemotion', handleMotion);
     }
 
-    // Escuta de Geolocalização Real
+    // Escuta de GPS Real
     let watchId: number | null = null;
-    if (navigator.geolocation && turnoAtivo) {
+    if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const speed = pos.coords.speed ? pos.coords.speed * 3.6 : (isMoving ? 3.6 : 0);
@@ -114,12 +171,12 @@ export const StreetAppPWA: React.FC = () => {
             precisao: Number(pos.coords.accuracy.toFixed(1))
           });
         },
-        (err) => console.log('Modo Simulação de GPS Santos ativo:', err.message),
+        () => {},
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
       );
     }
 
-    // Leitura real da bateria
+    // Bateria
     if ((navigator as any).getBattery) {
       (navigator as any).getBattery().then((battery: any) => {
         setBateriaPct(Math.round(battery.level * 100));
@@ -133,65 +190,148 @@ export const StreetAppPWA: React.FC = () => {
       if (window.DeviceMotionEvent) window.removeEventListener('devicemotion', handleMotion);
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
-  }, [turnoAtivo, isMoving]);
+  }, [pontoAtual, isMoving]);
 
-  // ─── 2. Simulação Tática de Ritmo de Rua (Alterna Movimento e Parada) ─────────
+  // Envio contínuo de telemetria para a Sala de Guerra
   useEffect(() => {
+    if (!pontoAtual || !colaborador) return;
+
     const timer = setInterval(() => {
-      if (!turnoAtivo) return;
-
-      // Simulação cinética realista de caminhada rua a rua
-      setPassosAcumulados((p) => p + (isMoving ? 12 : 0));
-      if (!isMoving) {
-        setTempoParadoMinutos((m) => {
-          const novo = m + 1;
-          if (novo > 15) {
-            setStatusCinetico('PARADO_ALERTA');
-          } else {
-            setStatusCinetico('PARADO_BASE');
-          }
-          return novo;
-        });
-      }
-
-      // Envia telemetria para o backend em segundo plano
-      try {
-        fetch('/api/equipe-rua/telemetria', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            latitude: gpsCoords.lat,
-            longitude: gpsCoords.lng,
-            velocidade_kmh: velocidadeKmh,
-            is_moving: isMoving,
-            estado: statusCinetico,
-            tempo_parado_minutos: tempoParadoMinutos,
-            passos: passosAcumulados,
-            bateria_pct: bateriaPct,
-            bairro: selectedBairro
-          })
-        }).catch(() => {});
-      } catch (_) {}
+      fetch('/api/equipe-rua/telemetria', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          membro_id: colaborador.id,
+          nome: colaborador.nome,
+          latitude: gpsCoords.lat,
+          longitude: gpsCoords.lng,
+          velocidade_kmh: velocidadeKmh,
+          is_moving: isMoving,
+          estado: statusCinetico,
+          tempo_parado_minutos: tempoParadoMinutos,
+          passos: passosAcumulados,
+          bateria_pct: bateriaPct,
+          bairro: selectedBairro
+        })
+      }).catch(() => {});
     }, 45000);
 
     return () => clearInterval(timer);
-  }, [turnoAtivo, isMoving, statusCinetico, tempoParadoMinutos, gpsCoords, velocidadeKmh, passosAcumulados, bateriaPct, selectedBairro]);
+  }, [pontoAtual, colaborador, gpsCoords, velocidadeKmh, isMoving, statusCinetico, tempoParadoMinutos, passosAcumulados, bateriaPct, selectedBairro]);
 
-  // ─── 3. Formatação Rápida de Telefone WhatsApp ─────────────────────────────
-  const handlePhoneChange = (val: string) => {
+  // ─── LOGIN / IDENTIFICAÇÃO DO COLABORADOR ─────────────────────────────────
+  const handleLoginColaborador = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authNome.trim() || authWhatsapp.replace(/\D/g, '').length < 10) {
+      setAuthErro('Informe seu Nome e WhatsApp válido com DDD (13).');
+      return;
+    }
+
+    const session: ColaboradorSession = {
+      id: 'colab_' + Date.now(),
+      nome: authNome.trim(),
+      whatsapp: authWhatsapp,
+      cpf: authCpf || 'Não informado',
+      bairro: authBairro,
+      funcao: authFuncao,
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem('santos_colaborador_session', JSON.stringify(session));
+    setColaborador(session);
+    setSelectedBairro(authBairro);
+    setAuthErro(null);
+
+    if (navigator.vibrate) navigator.vibrate([100]);
+  };
+
+  const handleLogoutColaborador = () => {
+    if (pontoAtual) {
+      if (!confirm('Você possui um turno de trabalho em andamento! Deseja mesmo sair e encerrar seu ponto?')) return;
+      handleCheckOut();
+    }
+    localStorage.removeItem('santos_colaborador_session');
+    localStorage.removeItem('santos_ponto_atual');
+    setColaborador(null);
+    setPontoAtual(null);
+  };
+
+  // ─── EXECUÇÃO DO CHECK-IN DE ENTRADA ──────────────────────────────────────
+  const handleCheckIn = async () => {
+    if (!colaborador) return;
+    if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+
+    const novoPonto: RegistroPonto = {
+      id: 'ponto_' + Date.now(),
+      colaboradorId: colaborador.id,
+      horarioEntrada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      latEntrada: gpsCoords.lat,
+      lngEntrada: gpsCoords.lng,
+      cadastrosNoTurno: 0,
+      kmNoTurno: 0,
+      status: 'EM_ANDAMENTO'
+    };
+
+    localStorage.setItem('santos_ponto_atual', JSON.stringify(novoPonto));
+    setPontoAtual(novoPonto);
+    setPassosAcumulados(0);
+    setCadastrosTurno(0);
+    setResumoSaida(null);
+
+    // Notifica o backend
+    try {
+      await fetch('/api/equipe-rua/telemetria', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          membro_id: colaborador.id,
+          nome: colaborador.nome,
+          latitude: gpsCoords.lat,
+          longitude: gpsCoords.lng,
+          velocidade_kmh: 0,
+          is_moving: true,
+          estado: 'EM_MOVIMENTO',
+          tempo_parado_minutos: 0,
+          passos: 0,
+          bateria_pct: bateriaPct,
+          bairro: selectedBairro
+        })
+      });
+    } catch (_) {}
+  };
+
+  // ─── EXECUÇÃO DO CHECK-OUT DE SAÍDA ───────────────────────────────────────
+  const handleCheckOut = async () => {
+    if (!pontoAtual || !colaborador) return;
+    if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+
+    const horaSaida = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const pontoFinalizado: RegistroPonto = {
+      ...pontoAtual,
+      horarioSaida: horaSaida,
+      latSaida: gpsCoords.lat,
+      lngSaida: gpsCoords.lng,
+      cadastrosNoTurno: cadastrosTurno,
+      kmNoTurno: Number(((passosAcumulados * 0.75) / 1000).toFixed(2)),
+      status: 'FINALIZADO'
+    };
+
+    localStorage.removeItem('santos_ponto_atual');
+    setPontoAtual(null);
+    setResumoSaida(pontoFinalizado);
+  };
+
+  // ─── FORMATAÇÃO DE WHATSAPP ────────────────────────────────────────────────
+  const handlePhoneChange = (val: string, setter: (s: string) => void) => {
     let clean = val.replace(/\D/g, '');
     if (clean.length > 11) clean = clean.slice(0, 11);
     let formatted = clean;
-    if (clean.length > 2) {
-      formatted = `(${clean.slice(0, 2)}) ${clean.slice(2)}`;
-    }
-    if (clean.length > 7) {
-      formatted = `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
-    }
-    setInputWhatsapp(formatted);
+    if (clean.length > 2) formatted = `(${clean.slice(0, 2)}) ${clean.slice(2)}`;
+    if (clean.length > 7) formatted = `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
+    setter(formatted);
   };
 
-  // ─── 4. Gravação Two-Tap com Vibração Háptica ──────────────────────────────
+  // ─── CADASTRO TWO-TAP DE APOIADOR ──────────────────────────────────────────
   const handleCadastrarApoiador = async () => {
     const cleanPhone = inputWhatsapp.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
@@ -200,10 +340,7 @@ export const StreetAppPWA: React.FC = () => {
     }
     const nomeFinal = inputNome.trim() || 'Apoiador Cívico';
 
-    // Vibração háptica no celular
-    if (navigator.vibrate) {
-      navigator.vibrate([80, 50, 80]);
-    }
+    if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
 
     const novo: ApoiadorLocal = {
       id: 'local_' + Date.now(),
@@ -218,10 +355,9 @@ export const StreetAppPWA: React.FC = () => {
     };
 
     setApoiadoresLocais([novo, ...apoiadoresLocais]);
-    setCadastrosHoje((c) => c + 1);
+    setCadastrosTurno((c) => c + 1);
     setUltimoCadastrado(nomeFinal);
 
-    // Envio para a API com acionamento do WhatsApp de Boas-Vindas
     try {
       await fetch('/api/equipe-rua/coleta-voto', {
         method: 'POST',
@@ -232,35 +368,19 @@ export const StreetAppPWA: React.FC = () => {
           bairro: selectedBairro,
           tags: tagsApoio,
           lat: gpsCoords.lat,
-          lng: gpsCoords.lng
+          lng: gpsCoords.lng,
+          cadastradoPor: colaborador?.nome || 'Colaborador de Rua'
         })
       });
     } catch (_) {}
 
-    // Limpa campos e foca novamente no telefone para o próximo da fila
     setInputNome('');
     setInputWhatsapp('');
     if (phoneInputRef.current) phoneInputRef.current.focus();
-
     setTimeout(() => setUltimoCadastrado(null), 4000);
   };
 
-  // ─── 5. Pânico / Quick Wipe (5 toques no escudo) ───────────────────────────
-  const handleShieldPanic = () => {
-    const next = panicClicks + 1;
-    setPanicClicks(next);
-    if (next >= 5) {
-      setApoiadoresLocais([]);
-      setPanicMsg('⚠️ PROTOCOLO DE SEGURANÇA: DADOS LOCAIS LIMPOS COM SUCESSO.');
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
-      setTimeout(() => {
-        setPanicClicks(0);
-        setPanicMsg(null);
-      }, 3000);
-    }
-  };
-
-  // ─── 6. Solicitação de Suprimentos para a Van ──────────────────────────────
+  // ─── SOLICITAÇÃO DE SUPRIMENTOS ────────────────────────────────────────────
   const handleSolicitarMaterial = async () => {
     setSolicitandoMaterial(true);
     if (navigator.vibrate) navigator.vibrate([100]);
@@ -272,7 +392,7 @@ export const StreetAppPWA: React.FC = () => {
           bairro: selectedBairro,
           lat: gpsCoords.lat,
           lng: gpsCoords.lng,
-          solicitante: 'Equipe de Campo Santos',
+          solicitante: colaborador?.nome || 'Equipe de Campo Santos',
           item: 'Santinhos e Adesivos de Carro'
         })
       });
@@ -285,13 +405,259 @@ export const StreetAppPWA: React.FC = () => {
     }
   };
 
-  // ─── ESTILOS DINÂMICOS DO MODO SOLAR ───────────────────────────────────────
+  // ─── PÂNICO / QUICK WIPE ──────────────────────────────────────────────────
+  const handleShieldPanic = () => {
+    const next = panicClicks + 1;
+    setPanicClicks(next);
+    if (next >= 5) {
+      setApoiadoresLocais([]);
+      setPanicMsg('⚠️ PROTOCOLO DE SEGURANÇA: DADOS LOCAIS LIMPOS.');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+      setTimeout(() => {
+        setPanicClicks(0);
+        setPanicMsg(null);
+      }, 3000);
+    }
+  };
+
+  // Cores dinâmicas do Modo Solar
   const bgMain = solarMode ? '#000000' : '#090d16';
   const textPrimary = solarMode ? '#ffffff' : '#f8fafc';
-  const accentColor = solarMode ? '#ffe600' : '#10b981'; // Amarelo Solar Fluorescente ou Verde Esmeralda
+  const accentColor = solarMode ? '#ffe600' : '#10b981';
   const cardBg = solarMode ? '#0d0d0d' : 'rgba(30, 41, 59, 0.6)';
   const borderCard = solarMode ? '2px solid #262626' : '1px solid rgba(255, 255, 255, 0.1)';
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // TELA 1: IDENTIFICAÇÃO DO COLABORADOR (SE NÃO ESTIVER IDENTIFICADO)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (!colaborador) {
+    return (
+      <div
+        style={{
+          backgroundColor: '#000000',
+          color: '#ffffff',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px',
+          fontFamily: 'Inter, -apple-system, sans-serif'
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '440px',
+            width: '100%',
+            background: '#0d0d0d',
+            border: '2px solid #ffe600',
+            borderRadius: '20px',
+            padding: '24px',
+            boxShadow: '0 0 25px rgba(255, 230, 0, 0.15)'
+          }}
+        >
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                backgroundColor: '#ffe600',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                color: '#000000'
+              }}
+            >
+              <Shield size={32} />
+            </div>
+            <h1 style={{ fontSize: '20px', fontWeight: 900, margin: '0 0 4px', letterSpacing: '0.5px' }}>
+              SANTOS EM CAMPO 2026
+            </h1>
+            <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+              Aplicativo Oficial da Equipe de Rua e Panfletagem
+            </p>
+          </div>
+
+          <form onSubmit={handleLoginColaborador} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                SEU NOME COMPLETO *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Carlos Eduardo Mendes"
+                  value={authNome}
+                  onChange={(e) => setAuthNome(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 40px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: '1px solid #333333',
+                    borderRadius: '10px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
+                <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#ffe600', marginBottom: '4px' }}>
+                SEU WHATSAPP COM DDD *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="tel"
+                  required
+                  placeholder="(13) 9XXXX-XXXX"
+                  value={authWhatsapp}
+                  onChange={(e) => handlePhoneChange(e.target.value, setAuthWhatsapp)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 40px',
+                    fontSize: '15px',
+                    fontWeight: 800,
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: '1px solid #333333',
+                    borderRadius: '10px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
+                <Phone size={18} color="#ffe600" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
+                SEU CPF (OPCIONAL / CONTRATO TSE)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="000.000.000-00"
+                  value={authCpf}
+                  onChange={(e) => setAuthCpf(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 40px',
+                    fontSize: '14px',
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: '1px solid #333333',
+                    borderRadius: '10px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
+                />
+                <IdCard size={18} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '13px' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
+                  BAIRRO PRINCIPAL
+                </label>
+                <select
+                  value={authBairro}
+                  onChange={(e) => setAuthBairro(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: '1px solid #333333',
+                    borderRadius: '8px'
+                  }}
+                >
+                  {bairrosSantos.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', marginBottom: '4px' }}>
+                  FUNÇÃO NA RUA
+                </label>
+                <select
+                  value={authFuncao}
+                  onChange={(e) => setAuthFuncao(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    border: '1px solid #333333',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <option value="Mobilizador de Calçada">Mobilizador de Calçada</option>
+                  <option value="Equipe de Tenda Fixa">Equipe de Tenda Fixa</option>
+                  <option value="Panfletagem de Bairro">Panfletagem de Bairro</option>
+                  <option value="Líder Comunitário">Líder Comunitário</option>
+                  <option value="Voluntário Cívico">Voluntário Cívico</option>
+                </select>
+              </div>
+            </div>
+
+            {authErro && (
+              <div style={{ padding: '8px', background: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '12px', borderRadius: '6px', textAlign: 'center' }}>
+                {authErro}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              style={{
+                marginTop: '10px',
+                padding: '16px',
+                backgroundColor: '#ffe600',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '15px',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                letterSpacing: '0.5px'
+              }}
+            >
+              <LogIn size={20} />
+              IDENTIFICAR E ENTRAR NO TURNO
+            </button>
+          </form>
+
+          <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '11px', color: '#64748b' }}>
+            🔒 Acesso estrito da equipe de campo. Seus dados ficam salvos de forma segura neste dispositivo.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // TELA 2 & 3: APLICATIVO DO COLABORADOR (CONTROLE DE PONTO + CADASTRO DE RUA)
+  // ──────────────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -305,7 +671,7 @@ export const StreetAppPWA: React.FC = () => {
         boxSizing: 'border-box'
       }}
     >
-      {/* ─── BARRA SUPERIOR TÁTICA DE CAMPO ─────────────────────────────────── */}
+      {/* ─── BARRA SUPERIOR DO COLABORADOR ─────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
@@ -335,25 +701,24 @@ export const StreetAppPWA: React.FC = () => {
           </button>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.5px' }}>
-              SANTOS EM CAMPO
+              {colaborador.nome.split(' ')[0]} ({colaborador.bairro})
             </div>
             <div style={{ fontSize: '10px', color: solarMode ? '#ffe600' : '#94a3b8' }}>
-              PWA 2026 • EQUIPE DE RUA
+              {colaborador.funcao}
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Botão de QR Code para Instalação */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button
             onClick={() => setIsQrModalOpen(true)}
-            title="Abrir QR Code para outro colaborador escanear"
+            title="Abrir QR Code para outro colaborador instalar"
             style={{
               background: solarMode ? '#ffe600' : '#10b981',
               color: '#000000',
               border: 'none',
-              padding: '6px 10px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
               fontWeight: 800,
               fontSize: '11px',
               cursor: 'pointer',
@@ -362,458 +727,473 @@ export const StreetAppPWA: React.FC = () => {
               gap: '4px'
             }}
           >
-            <QrCode size={14} />
-            QR CODE
+            <QrCode size={13} />
+            QR
           </button>
 
-          {/* Alternador de Modo Solar */}
           <button
             onClick={() => setSolarMode(!solarMode)}
             style={{
-              background: solarMode ? '#ffe600' : '#334155',
-              color: solarMode ? '#000000' : '#ffffff',
+              background: solarMode ? '#333' : '#334155',
+              color: '#fff',
               border: 'none',
-              padding: '6px 10px',
-              borderRadius: '8px',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              fontWeight: 700,
+              fontSize: '11px',
+              cursor: 'pointer'
+            }}
+          >
+            {solarMode ? <Sun size={13} /> : <Moon size={13} />}
+          </button>
+
+          <button
+            onClick={handleLogoutColaborador}
+            title="Sair da conta"
+            style={{
+              background: 'rgba(239, 68, 68, 0.2)',
+              color: '#ef4444',
+              border: '1px solid #ef4444',
+              padding: '6px 8px',
+              borderRadius: '6px',
               fontWeight: 700,
               fontSize: '11px',
               cursor: 'pointer',
               display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
+              alignItems: 'center'
             }}
           >
-            {solarMode ? <Sun size={13} /> : <Moon size={13} />}
-            {solarMode ? 'SOL MAX' : 'DARK'}
+            <LogOut size={13} />
           </button>
-
-          {/* Indicador de Bateria */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '11px',
-              fontWeight: 700,
-              color: bateriaPct < 25 ? '#ef4444' : (solarMode ? '#ffffff' : '#10b981')
-            }}
-          >
-            <Battery size={15} />
-            {bateriaPct}%
-          </div>
         </div>
       </div>
 
       {panicMsg && (
-        <div
-          style={{
-            background: '#ef4444',
-            color: '#fff',
-            padding: '10px',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: 800,
-            textAlign: 'center',
-            marginBottom: '10px'
-          }}
-        >
+        <div style={{ background: '#ef4444', color: '#fff', padding: '10px', borderRadius: '8px', fontSize: '12px', fontWeight: 800, textAlign: 'center', marginBottom: '10px' }}>
           {panicMsg}
         </div>
       )}
 
-      {/* ─── RADAR CINÉTICO: PARADO VS. EM MOVIMENTO ─────────────────────────── */}
+      {/* ─── PONTO ELETRÔNICO: CHECK-IN & CHECK-OUT DE TRABALHO ──────────────── */}
       <div
         style={{
-          background: cardBg,
-          border: borderCard,
-          borderRadius: '14px',
-          padding: '12px',
-          marginBottom: '12px',
-          boxShadow: solarMode ? '0 0 10px rgba(255, 230, 0, 0.1)' : 'none'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Activity size={16} color={accentColor} />
-            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-              Telemetria Cinética & GPS
-            </span>
-          </div>
-
-          <button
-            onClick={() => {
-              const nextMoving = !isMoving;
-              setIsMoving(nextMoving);
-              setStatusCinetico(nextMoving ? 'EM_MOVIMENTO' : 'PARADO_BASE');
-              if (nextMoving) setTempoParadoMinutos(0);
-            }}
-            style={{
-              background: isMoving ? '#10b981' : '#f59e0b',
-              color: '#000',
-              border: 'none',
-              padding: '3px 8px',
-              borderRadius: '6px',
-              fontSize: '10px',
-              fontWeight: 800,
-              cursor: 'pointer'
-            }}
-          >
-            {isMoving ? 'SIMULANDO: ANDANDO' : 'SIMULANDO: PARADO'}
-          </button>
-        </div>
-
-        {/* Banner de Status Cinético Ativo */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 12px',
-            borderRadius: '10px',
-            backgroundColor:
-              statusCinetico === 'EM_MOVIMENTO'
-                ? (solarMode ? '#0a2912' : 'rgba(16, 185, 129, 0.15)')
-                : statusCinetico === 'PARADO_BASE'
-                ? (solarMode ? '#081d33' : 'rgba(59, 130, 246, 0.15)')
-                : (solarMode ? '#3b0d0d' : 'rgba(239, 68, 68, 0.15)'),
-            border:
-              statusCinetico === 'EM_MOVIMENTO'
-                ? '1px solid #10b981'
-                : statusCinetico === 'PARADO_BASE'
-                ? '1px solid #3b82f6'
-                : '1px solid #ef4444',
-            marginBottom: '10px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {statusCinetico === 'EM_MOVIMENTO' ? (
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  boxShadow: '0 0 10px #10b981',
-                  animation: 'pulse 1.2s infinite'
-                }}
-              />
-            ) : statusCinetico === 'PARADO_BASE' ? (
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  backgroundColor: '#3b82f6'
-                }}
-              />
-            ) : (
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  backgroundColor: '#ef4444',
-                  boxShadow: '0 0 8px #ef4444'
-                }}
-              />
-            )}
-
-            <div>
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 900,
-                  color:
-                    statusCinetico === 'EM_MOVIMENTO'
-                      ? '#10b981'
-                      : statusCinetico === 'PARADO_BASE'
-                      ? '#60a5fa'
-                      : '#ef4444'
-                }}
-              >
-                {statusCinetico === 'EM_MOVIMENTO' && '🟢 EM MOVIMENTO (PANFLETANDO)'}
-                {statusCinetico === 'PARADO_BASE' && '🔵 PARADO EM BASE / TENDA'}
-                {statusCinetico === 'PARADO_ALERTA' && '🔴 ALERTA: PARADO HÁ MAIS DE 15 MIN'}
-              </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                {statusCinetico === 'EM_MOVIMENTO'
-                  ? `Velocidade: ${velocidadeKmh} km/h • Passos ritmo ativo`
-                  : `Tempo Parado: ${tempoParadoMinutos} min • Ponto Fixo`}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '14px', fontWeight: 900, color: accentColor }}>
-              {passosAcumulados}
-            </div>
-            <div style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>
-              Passos Hoje
-            </div>
-          </div>
-        </div>
-
-        {/* Coordenadas & Bairro Automático */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <MapPin size={13} color={accentColor} />
-            <span>Santos / <strong>{selectedBairro}</strong></span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Compass size={13} />
-            <span>{gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)} (±{gpsCoords.precisao}m)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── PAINEL DE META DIÁRIA DO VOLUNTÁRIO ────────────────────────────── */}
-      <div
-        style={{
-          background: cardBg,
-          border: borderCard,
-          borderRadius: '14px',
-          padding: '12px',
+          background: pontoAtual ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+          border: pontoAtual ? '2px solid #10b981' : '2px solid #ef4444',
+          borderRadius: '16px',
+          padding: '14px',
           marginBottom: '12px'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 800 }}>
-            🏆 META DO DIA: {cadastrosHoje} / {metaDiaria} APOIOS
-          </span>
-          <span
-            style={{
-              fontSize: '11px',
-              fontWeight: 800,
-              background: solarMode ? '#ffe600' : '#10b981',
-              color: '#000',
-              padding: '2px 8px',
-              borderRadius: '20px'
-            }}
-          >
-            NÍVEL: SARGENTO DE RUA
-          </span>
-        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Clock size={18} color={pontoAtual ? '#10b981' : '#ef4444'} />
+            <span style={{ fontSize: '13px', fontWeight: 900, letterSpacing: '0.5px' }}>
+              {pontoAtual ? 'PONTO ELETRÔNICO: EM TURNO ATIVO' : 'PONTO ELETRÔNICO: EXPEDIENTE FECHADO'}
+            </span>
+          </div>
 
-        {/* Barra de Progresso */}
-        <div
-          style={{
-            height: '10px',
-            backgroundColor: solarMode ? '#262626' : '#334155',
-            borderRadius: '5px',
-            overflow: 'hidden'
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${Math.min(Math.round((cadastrosHoje / metaDiaria) * 100), 100)}%`,
-              backgroundColor: accentColor,
-              transition: 'width 0.4s ease'
-            }}
-          />
-        </div>
-      </div>
-
-      {/* ─── CADASTRO TWO-TAP: O CORAÇÃO DO APP DE RUA ──────────────────────── */}
-      <div
-        style={{
-          background: cardBg,
-          border: solarMode ? '2px solid #ffe600' : '1px solid #10b981',
-          borderRadius: '16px',
-          padding: '14px',
-          marginBottom: '14px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-          <Zap size={18} color={accentColor} />
-          <span style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-            CADASTRO RÁPIDO TWO-TAP (2 TOQUES)
-          </span>
-        </div>
-
-        {/* TOQUE 1: WHATSAPP DO APOIADOR (TECLADO NUMÉRICO GIGANTE) */}
-        <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, marginBottom: '4px', color: accentColor }}>
-            1. WHATSAPP DO ELEITOR (OBRIGATÓRIO)
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              ref={phoneInputRef}
-              type="tel"
-              inputMode="numeric"
-              placeholder="(13) 9XXXX-XXXX"
-              value={inputWhatsapp}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '14px 14px 14px 44px',
-                fontSize: '18px',
-                fontWeight: 900,
-                color: '#ffffff',
-                backgroundColor: solarMode ? '#000000' : '#0f172a',
-                border: solarMode ? '2px solid #ffe600' : '2px solid #3b82f6',
-                borderRadius: '10px',
-                boxSizing: 'border-box',
-                outline: 'none',
-                letterSpacing: '1px'
-              }}
-            />
-            <Phone
-              size={20}
-              color={accentColor}
-              style={{ position: 'absolute', left: '14px', top: '16px' }}
-            />
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>
+            {pontoAtual ? `Desde às ${pontoAtual.horarioEntrada}` : 'Aguardando Entrada'}
           </div>
         </div>
 
-        {/* TOQUE 2: NOME DO APOIADOR */}
-        <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, marginBottom: '4px', color: '#94a3b8' }}>
-            2. NOME DO ELEITOR (OPCIONAL / RÁPIDO)
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              placeholder="Ex: Dona Maria, Seu Carlos..."
-              value={inputNome}
-              onChange={(e) => setInputNome(e.target.value)}
+        {!pontoAtual ? (
+          <div>
+            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
+              Você está fora do horário de trabalho. Ao registrar sua entrada, sua geolocalização e passos serão contabilizados para sua remuneração e prestação de contas do TSE.
+            </p>
+            <button
+              onClick={handleCheckIn}
               style={{
                 width: '100%',
-                padding: '12px 12px 12px 42px',
+                padding: '16px',
+                backgroundColor: '#10b981',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '12px',
                 fontSize: '15px',
-                fontWeight: 600,
-                color: '#ffffff',
-                backgroundColor: solarMode ? '#000000' : '#0f172a',
-                border: solarMode ? '2px solid #404040' : '1px solid #334155',
-                borderRadius: '10px',
-                boxSizing: 'border-box',
-                outline: 'none'
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
               }}
-            />
-            <User
-              size={18}
-              color="#94a3b8"
-              style={{ position: 'absolute', left: '14px', top: '14px' }}
-            />
+            >
+              <CheckCircle size={20} />
+              🟢 REGISTRAR CHECK-IN DE ENTRADA
+            </button>
           </div>
-        </div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px', textAlign: 'center' }}>
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>ENTRADA</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#10b981' }}>{pontoAtual.horarioEntrada}</div>
+              </div>
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>CADASTROS</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#ffe600' }}>{cadastrosTurno} apoios</div>
+              </div>
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>PASSOS / KM</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#60a5fa' }}>
+                  {passosAcumulados} ({((passosAcumulados * 0.75) / 1000).toFixed(1)} km)
+                </div>
+              </div>
+            </div>
 
-        {/* SELETOR DE BAIRRO (AUTO-DETECTADO) */}
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, marginBottom: '4px', color: '#94a3b8' }}>
-            BAIRRO DE SANTOS (GPS SUGERE: {selectedBairro})
-          </label>
-          <select
-            value={selectedBairro}
-            onChange={(e) => setSelectedBairro(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px',
-              fontSize: '13px',
-              fontWeight: 700,
-              backgroundColor: solarMode ? '#000000' : '#0f172a',
-              color: '#ffffff',
-              border: solarMode ? '1px solid #404040' : '1px solid #334155',
-              borderRadius: '8px'
-            }}
-          >
-            {bairrosSantos.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* TAGS RÁPIDAS COM 1 TOQUE */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
-          {['Apoio 100%', 'Quer Adesivo', 'Pede Visita', 'Líder Familiar'].map((tag) => {
-            const isSelected = tagsApoio.includes(tag);
-            return (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => {
-                  if (isSelected) setTagsApoio(tagsApoio.filter((t) => t !== tag));
-                  else setTagsApoio([...tagsApoio, tag]);
-                }}
-                style={{
-                  background: isSelected ? (solarMode ? '#ffe600' : '#10b981') : '#1e293b',
-                  color: isSelected ? '#000000' : '#ffffff',
-                  border: 'none',
-                  padding: '5px 9px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                {tag}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* BOTÃO GIGANTE DE CONFIRMAÇÃO & VIBRAÇÃO HÁPTICA */}
-        <button
-          onClick={handleCadastrarApoiador}
-          style={{
-            width: '100%',
-            padding: '16px',
-            backgroundColor: solarMode ? '#ffe600' : '#10b981',
-            color: '#000000',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '16px',
-            fontWeight: 900,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)'
-          }}
-        >
-          <UserCheck size={20} />
-          GRAVAR APOIADOR (VIBRAR)
-        </button>
-
-        {ultimoCadastrado && (
-          <div
-            style={{
-              marginTop: '10px',
-              padding: '8px',
-              borderRadius: '8px',
-              background: 'rgba(16, 185, 129, 0.2)',
-              border: '1px solid #10b981',
-              color: '#10b981',
-              fontSize: '12px',
-              fontWeight: 800,
-              textAlign: 'center'
-            }}
-          >
-            ✅ {ultimoCadastrado} cadastrado! WhatsApp oficial despachado em 15s.
+            <button
+              onClick={handleCheckOut}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                color: '#ef4444',
+                border: '1px solid #ef4444',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <LogOut size={16} />
+              🔴 REGISTRAR CHECK-OUT DE SAÍDA (ENCERRAR EXPEDIENTE)
+            </button>
           </div>
         )}
       </div>
 
-      {/* ─── AÇÕES DE SUPORTE EM CAMPO (REPOSIÇÃO DE MATERIAL) ───────────────── */}
+      {resumoSaida && (
+        <div
+          style={{
+            background: 'rgba(59, 130, 246, 0.15)',
+            border: '1px solid #3b82f6',
+            borderRadius: '14px',
+            padding: '12px',
+            marginBottom: '12px',
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ fontSize: '14px', fontWeight: 800, color: '#60a5fa', marginBottom: '4px' }}>
+            🎉 Turno Concluído com Sucesso!
+          </div>
+          <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+            Entrada: {resumoSaida.horarioEntrada} • Saída: {resumoSaida.horarioSaida} • {resumoSaida.cadastrosNoTurno} Apoiadores Coletados • {resumoSaida.kmNoTurno} km caminhados.
+          </div>
+        </div>
+      )}
+
+      {/* ─── RADAR CINÉTICO: PARADO VS. EM MOVIMENTO (SÓ QUANDO EM TURNO) ───── */}
+      {pontoAtual && (
+        <div
+          style={{
+            background: cardBg,
+            border: borderCard,
+            borderRadius: '14px',
+            padding: '12px',
+            marginBottom: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Activity size={16} color={accentColor} />
+              <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Telemetria Cinética de Campo
+              </span>
+            </div>
+
+            <button
+              onClick={() => {
+                const next = !isMoving;
+                setIsMoving(next);
+                setStatusCinetico(next ? 'EM_MOVIMENTO' : 'PARADO_BASE');
+                if (next) setTempoParadoMinutos(0);
+              }}
+              style={{
+                background: isMoving ? '#10b981' : '#f59e0b',
+                color: '#000',
+                border: 'none',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '10px',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              {isMoving ? 'SIMULANDO: ANDANDO' : 'SIMULANDO: PARADO'}
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 12px',
+              borderRadius: '10px',
+              backgroundColor:
+                statusCinetico === 'EM_MOVIMENTO'
+                  ? (solarMode ? '#0a2912' : 'rgba(16, 185, 129, 0.15)')
+                  : statusCinetico === 'PARADO_BASE'
+                  ? (solarMode ? '#081d33' : 'rgba(59, 130, 246, 0.15)')
+                  : (solarMode ? '#3b0d0d' : 'rgba(239, 68, 68, 0.15)'),
+              border:
+                statusCinetico === 'EM_MOVIMENTO'
+                  ? '1px solid #10b981'
+                  : statusCinetico === 'PARADO_BASE'
+                  ? '1px solid #3b82f6'
+                  : '1px solid #ef4444',
+              marginBottom: '8px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: statusCinetico === 'EM_MOVIMENTO' ? '#10b981' : statusCinetico === 'PARADO_BASE' ? '#3b82f6' : '#ef4444',
+                  boxShadow: statusCinetico === 'EM_MOVIMENTO' ? '0 0 8px #10b981' : 'none'
+                }}
+              />
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 800 }}>
+                  {statusCinetico === 'EM_MOVIMENTO' && '🟢 EM MOVIMENTO (PANFLETANDO)'}
+                  {statusCinetico === 'PARADO_BASE' && '🔵 PARADO EM BASE / TENDA'}
+                  {statusCinetico === 'PARADO_ALERTA' && '🔴 PARADO HÁ MAIS DE 15 MIN'}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                  {statusCinetico === 'EM_MOVIMENTO'
+                    ? `Velocidade: ${velocidadeKmh} km/h • Passos ativos`
+                    : `Tempo Parado: ${tempoParadoMinutos} min`}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '12px', fontWeight: 800, color: accentColor }}>
+              {bateriaPct}% BAT
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CADASTRO TWO-TAP: SÓ DISPONÍVEL QUANDO EM TURNO ────────────────── */}
+      {pontoAtual ? (
+        <div
+          style={{
+            background: cardBg,
+            border: solarMode ? '2px solid #ffe600' : '1px solid #10b981',
+            borderRadius: '16px',
+            padding: '14px',
+            marginBottom: '14px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+            <Zap size={18} color={accentColor} />
+            <span style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+              CADASTRO TWO-TAP (2 TOQUES)
+            </span>
+          </div>
+
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, marginBottom: '4px', color: accentColor }}>
+              1. WHATSAPP DO ELEITOR (OBRIGATÓRIO)
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                ref={phoneInputRef}
+                type="tel"
+                inputMode="numeric"
+                placeholder="(13) 9XXXX-XXXX"
+                value={inputWhatsapp}
+                onChange={(e) => handlePhoneChange(e.target.value, setInputWhatsapp)}
+                style={{
+                  width: '100%',
+                  padding: '14px 14px 14px 44px',
+                  fontSize: '18px',
+                  fontWeight: 900,
+                  color: '#ffffff',
+                  backgroundColor: solarMode ? '#000000' : '#0f172a',
+                  border: solarMode ? '2px solid #ffe600' : '2px solid #3b82f6',
+                  borderRadius: '10px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  letterSpacing: '1px'
+                }}
+              />
+              <Phone
+                size={20}
+                color={accentColor}
+                style={{ position: 'absolute', left: '14px', top: '16px' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, marginBottom: '4px', color: '#94a3b8' }}>
+              2. NOME DO ELEITOR (OPCIONAL / RÁPIDO)
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Ex: Dona Maria, Seu Carlos..."
+                value={inputNome}
+                onChange={(e) => setInputNome(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 12px 12px 42px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  backgroundColor: solarMode ? '#000000' : '#0f172a',
+                  border: solarMode ? '2px solid #404040' : '1px solid #334155',
+                  borderRadius: '10px',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+              <User
+                size={18}
+                color="#94a3b8"
+                style={{ position: 'absolute', left: '14px', top: '14px' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, marginBottom: '4px', color: '#94a3b8' }}>
+              BAIRRO DE SANTOS
+            </label>
+            <select
+              value={selectedBairro}
+              onChange={(e) => setSelectedBairro(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                fontSize: '13px',
+                fontWeight: 700,
+                backgroundColor: solarMode ? '#000000' : '#0f172a',
+                color: '#ffffff',
+                border: solarMode ? '1px solid #404040' : '1px solid #334155',
+                borderRadius: '8px'
+              }}
+            >
+              {bairrosSantos.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            {['Apoio 100%', 'Quer Adesivo', 'Pede Visita', 'Líder Familiar'].map((tag) => {
+              const isSelected = tagsApoio.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) setTagsApoio(tagsApoio.filter((t) => t !== tag));
+                    else setTagsApoio([...tagsApoio, tag]);
+                  }}
+                  style={{
+                    background: isSelected ? (solarMode ? '#ffe600' : '#10b981') : '#1e293b',
+                    color: isSelected ? '#000000' : '#ffffff',
+                    border: 'none',
+                    padding: '5px 9px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={handleCadastrarApoiador}
+            style={{
+              width: '100%',
+              padding: '16px',
+              backgroundColor: solarMode ? '#ffe600' : '#10b981',
+              color: '#000000',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '16px',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <UserCheck size={20} />
+            GRAVAR APOIADOR (VIBRAR)
+          </button>
+
+          {ultimoCadastrado && (
+            <div
+              style={{
+                marginTop: '10px',
+                padding: '8px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid #10b981',
+                color: '#10b981',
+                fontSize: '12px',
+                fontWeight: 800,
+                textAlign: 'center'
+              }}
+            >
+              ✅ {ultimoCadastrado} gravado com sucesso!
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            background: cardBg,
+            border: borderCard,
+            borderRadius: '14px',
+            padding: '20px',
+            textAlign: 'center',
+            marginBottom: '14px'
+          }}
+        >
+          <AlertTriangle size={32} color="#f59e0b" style={{ margin: '0 auto 8px' }} />
+          <div style={{ fontSize: '14px', fontWeight: 800 }}>CADASTRO DE APOIADORES BLOQUEADO</div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+            Para registrar eleitores na rua, clique no botão <strong>"REGISTRAR CHECK-IN DE ENTRADA"</strong> acima.
+          </div>
+        </div>
+      )}
+
+      {/* ─── AÇÕES DE SUPORTE ────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
         <button
           onClick={handleSolicitarMaterial}
-          disabled={solicitandoMaterial}
+          disabled={solicitandoMaterial || !pontoAtual}
           style={{
             padding: '12px',
-            backgroundColor: '#ef4444',
+            backgroundColor: !pontoAtual ? '#334155' : '#ef4444',
             color: '#ffffff',
             border: 'none',
             borderRadius: '10px',
             fontSize: '12px',
             fontWeight: 800,
-            cursor: 'pointer',
+            cursor: !pontoAtual ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -829,15 +1209,16 @@ export const StreetAppPWA: React.FC = () => {
             if (navigator.vibrate) navigator.vibrate([60]);
             alert(`Check-in de Presença registrado com sucesso na tenda de ${selectedBairro}!`);
           }}
+          disabled={!pontoAtual}
           style={{
             padding: '12px',
-            backgroundColor: '#3b82f6',
+            backgroundColor: !pontoAtual ? '#334155' : '#3b82f6',
             color: '#ffffff',
             border: 'none',
             borderRadius: '10px',
             fontSize: '12px',
             fontWeight: 800,
-            cursor: 'pointer',
+            cursor: !pontoAtual ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -845,29 +1226,17 @@ export const StreetAppPWA: React.FC = () => {
           }}
         >
           <CheckCircle size={16} />
-          CHECK-IN TENDA
+          CONFIRMAR TENDA
         </button>
       </div>
 
       {materialFeedback && (
-        <div
-          style={{
-            padding: '8px',
-            background: 'rgba(239, 68, 68, 0.2)',
-            border: '1px solid #ef4444',
-            borderRadius: '8px',
-            fontSize: '11px',
-            fontWeight: 700,
-            textAlign: 'center',
-            color: '#f87171',
-            marginBottom: '12px'
-          }}
-        >
+        <div style={{ padding: '8px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', borderRadius: '8px', fontSize: '11px', fontWeight: 700, textAlign: 'center', color: '#f87171', marginBottom: '12px' }}>
           {materialFeedback}
         </div>
       )}
 
-      {/* ─── HISTÓRICO DE APOIADORES DA EQUIPE HOJE (OFFLINE/LOCAL) ──────────── */}
+      {/* ─── HISTÓRICO DE APOIOS DO TURNO ATUAL ──────────────────────────────── */}
       <div
         style={{
           background: cardBg,
@@ -878,20 +1247,20 @@ export const StreetAppPWA: React.FC = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <span style={{ fontSize: '12px', fontWeight: 800 }}>
-            📋 APOIOS GRAVADOS NESTE TURNO ({apoiadoresLocais.length})
+            📋 APOIOS COLETADOS NO TURNO ({apoiadoresLocais.length})
           </span>
           <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 700 }}>
-            ● SINCRONIZADO COM API
+            ● SINCRONIZADO COM SERVIDOR
           </span>
         </div>
 
         {apoiadoresLocais.length === 0 ? (
           <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', padding: '16px' }}>
-            Nenhum apoiador gravado nos últimos minutos. Inicie a abordagem na calçada!
+            Nenhum apoiador gravado neste turno ainda.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {apoiadoresLocais.slice(0, 5).map((a) => (
+            {apoiadoresLocais.slice(0, 6).map((a) => (
               <div
                 key={a.id}
                 style={{

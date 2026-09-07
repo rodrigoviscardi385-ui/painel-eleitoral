@@ -541,5 +541,57 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       tempoEstimadoChegadaMinutos: 14
     });
   });
+
+  // ─── 15. Ponto Eletrônico: Check-in de Entrada ─────────────────────────────
+  const historicoPontos: any[] = [];
+
+  app.post('/api/equipe-rua/checkin', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { colaborador_id, nome, latitude, longitude, bairro } = request.body as any;
+    const registro = {
+      id: 'ponto_' + Date.now(),
+      colaborador_id,
+      nome,
+      horario_entrada: new Date().toISOString(),
+      lat_entrada: latitude,
+      lng_entrada: longitude,
+      bairro,
+      status: 'EM_ANDAMENTO'
+    };
+    historicoPontos.unshift(registro);
+    await logAuditLGPD('CHECKIN_PONTO_RUA', `Check-in de entrada registrado para ${nome} em ${bairro}`);
+
+    return reply.status(200).send({ success: true, registro });
+  });
+
+  // ─── 16. Ponto Eletrônico: Check-out de Saída ──────────────────────────────
+  app.post('/api/equipe-rua/checkout', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { colaborador_id, nome, horario_entrada, horario_saida, cadastros, km, latitude, longitude } = request.body as any;
+    const registroSaida = {
+      id: 'saida_' + Date.now(),
+      colaborador_id,
+      nome,
+      horario_entrada,
+      horario_saida: horario_saida || new Date().toISOString(),
+      cadastros_turno: cadastros || 0,
+      km_turno: km || 0,
+      lat_saida: latitude,
+      lng_saida: longitude,
+      status: 'FINALIZADO',
+      timestamp: new Date().toISOString()
+    };
+    historicoPontos.unshift(registroSaida);
+    await logAuditLGPD('CHECKOUT_PONTO_RUA', `Check-out de saída registrado para ${nome} (${cadastros} apoios, ${km} km)`);
+
+    return reply.status(200).send({ success: true, registro: registroSaida });
+  });
+
+  // ─── 17. Listagem de Pontos do Dia para a Sala de Guerra ────────────────────
+  app.get('/api/equipe-rua/pontos', async () => {
+    return {
+      success: true,
+      pontos: historicoPontos.slice(0, 50),
+      total: historicoPontos.length
+    };
+  });
 }
 

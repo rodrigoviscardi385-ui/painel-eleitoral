@@ -358,8 +358,14 @@ export const App: React.FC = () => {
     );
   }
 
-  // Se for acesso direto ao App de Rua do Colaborador (via QR Code / ?app=rua), exibe a interface móvel direta
-  if (activeTab === 'app-rua-mobile' && !currentUser) {
+  // Verificação de isolamento estrito do colaborador de rua:
+  const isCollaboratorDevice = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('app') === 'rua' ||
+    Boolean(localStorage.getItem('santos_colaborador_session'))
+  );
+
+  // Se for colaborador de rua, isola 100% sem nenhum acesso ao restante do sistema
+  if (activeTab === 'app-rua-mobile' || (isCollaboratorDevice && !currentUser)) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#000000' }}>
         <StreetAppPWA />
