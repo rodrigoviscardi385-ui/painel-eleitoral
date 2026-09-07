@@ -339,22 +339,27 @@ export const StreetAppPWA: React.FC = () => {
 
     try {
       const res = await api.validarColaboradorRua(cleanId);
-      if (res && res.colaborador_id) {
+      const colabId = (res as any)?.colaborador_id || (res as any)?.id;
+      const isPrimeiro = (res as any)?.precisaCriarSenha !== undefined ? (res as any).precisaCriarSenha : (res as any)?.primeiroAcesso;
+
+      if (res && colabId) {
         setColaboradorValidado({
-          id: res.colaborador_id,
+          id: colabId,
           nome: res.nome,
           cpf: res.cpf,
           telefone: res.telefone,
           bairro: res.bairro,
           funcao: res.funcao,
-          precisaCriarSenha: res.precisaCriarSenha
+          precisaCriarSenha: Boolean(isPrimeiro)
         });
 
-        if (res.precisaCriarSenha) {
+        if (isPrimeiro) {
           setAuthStep('CRIAR_SENHA');
         } else {
           setAuthStep('DIGITAR_SENHA');
         }
+      } else {
+        setAuthErro((res as any)?.mensagem || 'Cadastro não localizado. Verifique se digitou o CPF ou WhatsApp cadastrado.');
       }
     } catch (err: any) {
       setAuthErro(err.message || 'Acesso não autorizado. Você precisa estar previamente cadastrado pela coordenação da campanha como Colaborador de Rua.');

@@ -745,7 +745,7 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       .from(schema.equipeRua)
       .where(
         or(
-          sql`replace(replace(${schema.equipeRua.cpf}, '.', ''), '-', '') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanDigits}`,
           sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
         )
       )
@@ -764,12 +764,14 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
     return {
       autorizado: true,
       id: membro.id,
+      colaborador_id: membro.id,
       nome: membro.nome,
       cpf: membro.cpf,
       telefone: membro.telefone,
       bairro: membro.bairro,
       funcao: membro.funcao,
       primeiroAcesso,
+      precisaCriarSenha: primeiroAcesso,
       mensagem: primeiroAcesso
         ? 'Colaborador oficial identificado. Crie sua senha no primeiro acesso.'
         : 'Colaborador oficial identificado. Digite sua senha de acesso.'
@@ -789,7 +791,7 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       .from(schema.equipeRua)
       .where(
         or(
-          sql`replace(replace(${schema.equipeRua.cpf}, '.', ''), '-', '') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanDigits}`,
           sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
         )
       )
@@ -848,7 +850,7 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       .from(schema.equipeRua)
       .where(
         or(
-          sql`replace(replace(${schema.equipeRua.cpf}, '.', ''), '-', '') = ${cleanDigits}`,
+          sql`regexp_replace(${schema.equipeRua.cpf}, '\\D', '', 'g') = ${cleanDigits}`,
           sql`regexp_replace(${schema.equipeRua.telefone_whatsapp}, '\\D', '', 'g') = ${cleanDigits}`
         )
       )
