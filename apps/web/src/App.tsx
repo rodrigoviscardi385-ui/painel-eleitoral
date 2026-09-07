@@ -30,6 +30,10 @@ import { ApuracaoBU } from './components/ApuracaoBU.tsx';
 import { QuocienteEleitoralSimulator } from './components/QuocienteEleitoralSimulator.tsx';
 import { WarRoomDiaD } from './components/WarRoomDiaD.tsx';
 import { ComplianceTSEModal } from './components/ComplianceTSEModal.tsx';
+import { H3HeatmapWarRoom } from './components/H3HeatmapWarRoom.tsx';
+import { SireneCriseModal, CrisisIncidentData } from './components/SireneCriseModal.tsx';
+import { VoterVirtualList, VirtualVoterItem } from './components/VoterVirtualList.tsx';
+import { OfflineSyncClient } from './services/offlineSyncClient.ts';
 import { api } from './api.ts';
 
 export const App: React.FC = () => {
@@ -60,6 +64,86 @@ export const App: React.FC = () => {
   // Retirada de Materiais
   const [isRetiradaModalOpen, setIsRetiradaModalOpen] = useState(false);
   const [selectedRetiradaLeader, setSelectedRetiradaLeader] = useState<any>(null);
+
+  // Inteligência Tática e Sirene de Crise (Sprint 3)
+  const [activeCrisis, setActiveCrisis] = useState<CrisisIncidentData | null>(null);
+
+  const handleTriggerCrisisDemo = async () => {
+    try {
+      const res = await fetch('/api/v2/crise/simular', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topico: 'Boato de Fechamento de Unidades de Saúde na Baixada',
+          relatoBruto: 'Circulando montagem de áudio em grupos de WhatsApp afirmando falsamente que o candidato fechará as UBSs da Zona Noroeste.',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveCrisis({
+          id: data.incident.id,
+          threatLevel: data.incident.threatLevel,
+          topico: data.incident.topico,
+          sinteseNarrativa: data.incident.sinteseNarrativa,
+          contraNarrativas: data.incident.contraNarrativas,
+          minutaJuridica: data.incident.minutaJuridica,
+          evidenciaSha256: data.incident.evidenciaSha256,
+          createdAt: data.incident.createdAt,
+        });
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback de demonstração imediata
+    setActiveCrisis({
+      id: 'crs_demo_01',
+      threatLevel: 'CRITICAL',
+      topico: 'Boato de Fechamento de Unidades de Saúde',
+      sinteseNarrativa: 'Montagem criminosa tirada de contexto sobre reformas estruturais das UBSs da Zona Noroeste.',
+      contraNarrativas: [
+        {
+          publicoAlvo: 'Grupos de Mães e Famílias',
+          tom: 'Esclarecedor e Pacificador',
+          mensagem: '[Aviso Legal: Conteúdo informativo oficial da campanha gerado com auxílio de Inteligência Artificial - Resolução TSE nº 23.610/2019]\nAtenção: a notícia sobre fechamento de postos de saúde é mentira dos adversários. Nosso projeto prevê ampliação do horário até as 22h com mais médicos e remédios grátis.',
+        },
+        {
+          publicoAlvo: 'Militância Geral de Rua',
+          tom: 'Contundente e Tático',
+          mensagem: '[Aviso Legal: Conteúdo oficial - Res. TSE 23.610/2019]\nO desespero da oposição caiu no ridículo. Veja o documento assinado em cartório pelo nosso candidato garantindo atendimento pleno.',
+        },
+      ],
+      minutaJuridica: {
+        remedio: 'Direito de Resposta c/c Pedido de Tutela Provisória de Urgência',
+        fundamentoLegal: 'Art. 58 da Lei Federal nº 9.504/1997 e Resolução TSE nº 23.610/2019',
+        pedidoTutela: 'Cessação imediata do disparo do áudio calunioso sob pena de multa horária de R$ 10.000,00.',
+      },
+      evidenciaSha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  // Base Virtualizada de Eleitores (1.000 nós de alta densidade sem travamentos)
+  const [sampleElectors] = useState<VirtualVoterItem[]>(() => {
+    const bairros = ['Gonzaga', 'Boqueirão', 'Ponta da Praia', 'Embaré', 'Aparecida', 'Campo Grande', 'Marapé', 'Vila Mathias'];
+    const pautas = ['Saúde', 'Segurança', 'Educação Infantil', 'Infraestrutura', 'Esporte e Cultura'];
+    const nomes = [
+      'Ana Clara Silveira', 'Carlos Eduardo Mendes', 'Mariana Ferreira Gomes', 'Lucas Gabriel Ramos',
+      'Beatriz Albuquerque', 'Rodrigo Fagundes', 'Juliana Moreira Costa', 'Thiago Cavalcanti',
+      'Fernanda Vasconcellos', 'Guilherme Toledo', 'Camila Nogueira', 'Felipe Barreto',
+      'Larissa Antunes', 'Vinicius Prado', 'Amanda Diniz', 'Matheus Figueira',
+      'Patricia Queiroz', 'Renato Castelo', 'Bruna Rezende', 'Diego Marcondes'
+    ];
+    return Array.from({ length: 1000 }, (_, i) => ({
+      id: `voter_${i + 1}`,
+      nome: `${nomes[i % nomes.length]} #${i + 1}`,
+      bairro: bairros[i % bairros.length],
+      whatsapp: `(13) 99${Math.floor(1000000 + Math.random() * 9000000)}`,
+      engajamento: i % 5 === 0 ? 'BAIXO' : i % 3 === 0 ? 'MEDIO' : 'ALTO',
+      score: Math.min(99, Math.max(15, Math.floor(Math.random() * 85) + 15)),
+      consentimentoLgpd: i % 12 !== 0,
+      pautaPrioritaria: pautas[i % pautas.length],
+    }));
+  });
 
   // Estados de Dados da Campanha
   const [wppStatus, setWppStatus] = useState<any>({ status: 'CONNECTING' });
@@ -350,7 +434,16 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'warroom' && (
-          <WarRoomDiaD />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <H3HeatmapWarRoom onTriggerCrisisDemo={handleTriggerCrisisDemo} />
+            <WarRoomDiaD />
+          </div>
+        )}
+
+        {activeTab === 'eleitores' && (
+          <div style={{ height: 'calc(100vh - 180px)', padding: '0 4px' }}>
+            <VoterVirtualList items={sampleElectors} />
+          </div>
         )}
 
         {activeTab === 'apuracao' && (
@@ -561,6 +654,17 @@ export const App: React.FC = () => {
         onClose={() => setIsComplianceModalOpen(false)}
         candidate={candidate}
       />
+
+      {activeCrisis && (
+        <SireneCriseModal
+          incident={activeCrisis}
+          onClose={() => setActiveCrisis(null)}
+          onDispatchWhatsApp={(msg) => {
+            alert(`✅ Mensagem aprovada despachada para a fila oficial de WhatsApp da Campanha:\n\n${msg}`);
+            setActiveCrisis(null);
+          }}
+        />
+      )}
     </div>
   );
 };

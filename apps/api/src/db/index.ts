@@ -302,6 +302,88 @@ export async function initDatabase() {
     );
   `;
 
+  // 17. Tabela eleitores_identidade (PII Vault)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS eleitores_identidade (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      nome_enc TEXT NOT NULL,
+      whatsapp_enc TEXT NOT NULL,
+      cpf_enc TEXT,
+      blind_index_whatsapp TEXT NOT NULL,
+      blind_index_cpf TEXT,
+      key_version TEXT NOT NULL DEFAULT 'v1',
+      consentimento_lgpd BOOLEAN NOT NULL DEFAULT true,
+      opt_out_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // 18. Tabela eleitores_analitico (Métricas e Território)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS eleitores_analitico (
+      id UUID PRIMARY KEY REFERENCES eleitores_identidade(id) ON DELETE CASCADE,
+      h3_index TEXT NOT NULL,
+      bairro TEXT NOT NULL,
+      zona_eleitoral TEXT,
+      secao_eleitoral TEXT,
+      score_engajamento NUMERIC NOT NULL DEFAULT 50.0,
+      indice_sentimento NUMERIC NOT NULL DEFAULT 0.0,
+      votos_influenciados INTEGER NOT NULL DEFAULT 1,
+      pauta_prioritaria TEXT,
+      logical_clock INTEGER NOT NULL DEFAULT 0,
+      last_sync_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // 19. Tabela sync_mutations_log (Sincronização Offline-First e CRDT)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS sync_mutations_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      mutation_id TEXT NOT NULL UNIQUE,
+      device_id TEXT NOT NULL,
+      logical_clock INTEGER NOT NULL,
+      entity TEXT NOT NULL,
+      record_id UUID NOT NULL,
+      operation TEXT NOT NULL,
+      delta_payload TEXT NOT NULL,
+      hash_sha256 TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'COMMITTED',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // 20. Tabela territorio_hex_analytics (Uber H3 Resolução 8)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS territorio_hex_analytics (
+      h3_index TEXT PRIMARY KEY,
+      bairro TEXT NOT NULL,
+      zona_eleitoral INTEGER NOT NULL DEFAULT 118,
+      total_eleitores INTEGER NOT NULL DEFAULT 0,
+      votos_projetados INTEGER NOT NULL DEFAULT 0,
+      indice_sentimento_liquido NUMERIC NOT NULL DEFAULT 0.0,
+      indice_risco_perda NUMERIC NOT NULL DEFAULT 0.0,
+      indice_rov NUMERIC NOT NULL DEFAULT 0.0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  // 21. Tabela sirene_crise_incidentes (Alertas Táticos da Sirene de Crise)
+  await queryClient`
+    CREATE TABLE IF NOT EXISTS sirene_crise_incidentes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      threat_level TEXT NOT NULL DEFAULT 'HIGH',
+      topico TEXT NOT NULL,
+      sintese_narrativa TEXT NOT NULL,
+      contra_narrativas_json TEXT NOT NULL DEFAULT '[]',
+      minuta_juridica_json TEXT NOT NULL DEFAULT '{}',
+      evidencia_url TEXT,
+      evidencia_sha256 TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'DETECTADO',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
   // Criação de índices estratégicos de performance
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_whatsapp ON usuarios(whatsapp);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_lider_acima ON usuarios(lider_acima_id);`;
@@ -311,6 +393,11 @@ export async function initDatabase() {
   await queryClient`CREATE INDEX IF NOT EXISTS idx_gastos_categoria ON gastos_campanha(categoria);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_materiais_tipo ON materiais_campanha(tipo);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_gestores_whatsapp ON gestores_campanha(whatsapp);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_eleitores_blind_wpp ON eleitores_identidade(blind_index_whatsapp);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_eleitores_analitico_h3 ON eleitores_analitico(h3_index);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_sync_mutations_clock ON sync_mutations_log(device_id, logical_clock);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_territorio_hex_rov ON territorio_hex_analytics(indice_rov);`;
+  await queryClient`CREATE INDEX IF NOT EXISTS idx_sirene_crise_status ON sirene_crise_incidentes(status);`;
 
   // Seed da Configuração da Campanha se vazia
   const existingConfig = await db.select().from(schema.campanhaConfig).limit(1);

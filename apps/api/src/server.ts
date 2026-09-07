@@ -35,6 +35,9 @@ import { backupRoutes } from './routes/backup.js';
 import { locaisVotacaoRoutes } from './routes/locaisVotacao.js';
 import { buRoutes } from './routes/bu.js';
 import { metaWebhookRoutes } from './routes/metaWebhook.js';
+import { syncRoutes } from './routes/sync.js';
+import { h3AnalyticsRoutes } from './routes/h3Analytics.js';
+import { sireneCriseRoutes } from './routes/sireneCrise.js';
 
 dotenv.config();
 
@@ -139,6 +142,9 @@ await app.register(backupRoutes);
 await app.register(locaisVotacaoRoutes);
 await app.register(buRoutes);
 await app.register(metaWebhookRoutes);
+await app.register(syncRoutes);
+await app.register(h3AnalyticsRoutes);
+await app.register(sireneCriseRoutes);
 
 // 5. Inicialização do Servidor
 async function startServer() {

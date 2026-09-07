@@ -411,3 +411,116 @@ export const metaWppConfig = pgTable('meta_wpp_config', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── PII Vault (Dados Pessoais Criptografados - AES-256-GCM + Blind Index) ────
+export const eleitoresIdentidade = pgTable(
+  'eleitores_identidade',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    nome_enc: text('nome_enc').notNull(),
+    whatsapp_enc: text('whatsapp_enc').notNull(),
+    cpf_enc: text('cpf_enc'),
+    blind_index_whatsapp: text('blind_index_whatsapp').notNull(),
+    blind_index_cpf: text('blind_index_cpf'),
+    key_version: text('key_version').default('v1').notNull(),
+    consentimento_lgpd: boolean('consentimento_lgpd').default(true).notNull(),
+    opt_out_at: timestamp('opt_out_at', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_eleitores_blind_wpp').on(table.blind_index_whatsapp),
+    index('idx_eleitores_blind_cpf').on(table.blind_index_cpf),
+    index('idx_eleitores_consentimento').on(table.consentimento_lgpd),
+  ]
+);
+
+// ─── Dados Eleitorais Analíticos Descaracterizados (Estatística e Território) ──
+export const eleitoresAnalitico = pgTable(
+  'eleitores_analitico',
+  {
+    id: uuid('id').primaryKey().references(() => eleitoresIdentidade.id, { onDelete: 'cascade' }),
+    h3_index: text('h3_index').notNull(), // Uber H3 Resolução 8
+    bairro: text('bairro').notNull(),
+    zona_eleitoral: text('zona_eleitoral'),
+    secao_eleitoral: text('secao_eleitoral'),
+    score_engajamento: numeric('score_engajamento').default('50.0').notNull(),
+    indice_sentimento: numeric('indice_sentimento').default('0.0').notNull(), // -1.0 a +1.0
+    votos_influenciados: integer('votos_influenciados').default(1).notNull(),
+    pauta_prioritaria: text('pauta_prioritaria'),
+    logical_clock: integer('logical_clock').default(0).notNull(),
+    last_sync_at: timestamp('last_sync_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_eleitores_analitico_h3').on(table.h3_index),
+    index('idx_eleitores_analitico_bairro').on(table.bairro),
+    index('idx_eleitores_analitico_score').on(table.score_engajamento),
+  ]
+);
+
+// ─── Log Distribuído de Mutações Offline-First (CRDT / Vector Clocks) ─────────
+export const syncMutationsLog = pgTable(
+  'sync_mutations_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    mutation_id: text('mutation_id').notNull().unique(), // UUIDv7 do dispositivo
+    device_id: text('device_id').notNull(),
+    logical_clock: integer('logical_clock').notNull(),
+    entity: text('entity').notNull(),
+    record_id: uuid('record_id').notNull(),
+    operation: text('operation').notNull(), // INSERT, UPDATE, DELETE
+    delta_payload: text('delta_payload').notNull(),
+    hash_sha256: text('hash_sha256').notNull(),
+    status: text('status').default('COMMITTED').notNull(), // COMMITTED, REJECTED_LGPD, CONFLICT_RESOLVED
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_sync_device_clock').on(table.device_id, table.logical_clock),
+    index('idx_sync_record_id').on(table.record_id),
+    index('idx_sync_status').on(table.status),
+  ]
+);
+
+// ─── Inteligência Geoespacial Hexagonal (H3 Resolução 8) ────────────────────
+export const territorioHexAnalytics = pgTable(
+  'territorio_hex_analytics',
+  {
+    h3_index: text('h3_index').primaryKey(),
+    bairro: text('bairro').notNull(),
+    zona_eleitoral: integer('zona_eleitoral').default(118).notNull(),
+    total_eleitores: integer('total_eleitores').default(0).notNull(),
+    votos_projetados: integer('votos_projetados').default(0).notNull(),
+    indice_sentimento_liquido: numeric('indice_sentimento_liquido').default('0.0').notNull(),
+    indice_risco_perda: numeric('indice_risco_perda').default('0.0').notNull(),
+    indice_rov: numeric('indice_rov').default('0.0').notNull(), // Return on Visit
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_territorio_hex_bairro').on(table.bairro),
+    index('idx_territorio_hex_rov').on(table.indice_rov),
+    index('idx_territorio_hex_risco').on(table.indice_risco_perda),
+  ]
+);
+
+// ─── Sirene de Crise (Incidentes Táticos e Cadeia de Custódia Probatória) ────
+export const sireneCriseIncidentes = pgTable(
+  'sirene_crise_incidentes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    threat_level: text('threat_level', { enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] }).default('HIGH').notNull(),
+    topico: text('topico').notNull(),
+    sintese_narrativa: text('sintese_narrativa').notNull(),
+    contra_narrativas_json: text('contra_narrativas_json').default('[]').notNull(),
+    minuta_juridica_json: text('minuta_juridica_json').default('{}').notNull(),
+    evidencia_url: text('evidencia_url'),
+    evidencia_sha256: text('evidencia_sha256').notNull(),
+    status: text('status', { enum: ['DETECTADO', 'EM_RESPOSTA', 'NEUTRALIZADO', 'ARQUIVADO'] }).default('DETECTADO').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_sirene_crise_threat').on(table.threat_level),
+    index('idx_sirene_crise_status').on(table.status),
+    index('idx_sirene_crise_created').on(table.created_at),
+  ]
+);
+
+
