@@ -35,6 +35,8 @@ import { H3HeatmapWarRoom } from './components/H3HeatmapWarRoom.tsx';
 import { SireneCriseModal, CrisisIncidentData } from './components/SireneCriseModal.tsx';
 import { VoterVirtualList, VirtualVoterItem } from './components/VoterVirtualList.tsx';
 import { StreetTeamManager } from './components/StreetTeamManager.tsx';
+import { StreetAppPWA } from './components/StreetAppPWA.tsx';
+import { StreetTelemetryCockpit } from './components/StreetTelemetryCockpit.tsx';
 import { OfflineSyncClient } from './services/offlineSyncClient.ts';
 import { api } from './api.ts';
 
@@ -512,6 +514,14 @@ export const App: React.FC = () => {
 
         {activeTab === 'equipe-rua' && (
           <StreetTeamManager />
+        )}
+
+        {activeTab === 'telemetria-rua' && (
+          <StreetTelemetryCockpit />
+        )}
+
+        {activeTab === 'app-rua-mobile' && (
+          <StreetAppPWA />
         )}
 
         {activeTab === 'bot' && (

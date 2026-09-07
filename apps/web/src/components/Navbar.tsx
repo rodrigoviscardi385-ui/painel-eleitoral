@@ -32,6 +32,8 @@ import {
   PlusCircle,
   LayoutDashboard,
   TrendingUp,
+  Smartphone,
+  Compass,
 } from 'lucide-react';
 import { api } from '../api.ts';
 
@@ -132,6 +134,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       subTabs: [
         { id: 'liderancas', label: 'Árvore de Lideranças', icon: Users },
         { id: 'equipe-rua', label: 'Equipe de Rua & Contratos', icon: UsersRound },
+        { id: 'telemetria-rua', label: 'Radar Telemetria ao Vivo', icon: Radio },
+        { id: 'app-rua-mobile', label: 'Santos em Campo (PWA Rua)', icon: Smartphone },
         { id: 'materiais', label: 'Acervo Digital', icon: FolderOpen },
       ],
     },
