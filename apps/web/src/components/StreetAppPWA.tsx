@@ -105,18 +105,21 @@ export const StreetAppPWA: React.FC = () => {
   const [panicClicks, setPanicClicks] = useState<number>(0);
   const [panicMsg, setPanicMsg] = useState<string | null>(null);
 
-  // ─── 4. TELEMETRIA CINÉTICA ───────────────────────────────────────────────
-  const [isMoving, setIsMoving] = useState<boolean>(true);
-  const [velocidadeKmh, setVelocidadeKmh] = useState<number>(3.8);
+  // ─── 4. TELEMETRIA CINÉTICA (SENSORES REAIS DE HARDWARE) ─────────────────
+  const [isMoving, setIsMoving] = useState<boolean>(false);
+  const [velocidadeKmh, setVelocidadeKmh] = useState<number>(0);
   const [passosAcumulados, setPassosAcumulados] = useState<number>(0);
   const [tempoParadoMinutos, setTempoParadoMinutos] = useState<number>(0);
-  const [statusCinetico, setStatusCinetico] = useState<'EM_MOVIMENTO' | 'PARADO_BASE' | 'PARADO_ALERTA'>('EM_MOVIMENTO');
+  const [statusCinetico, setStatusCinetico] = useState<'EM_MOVIMENTO' | 'PARADO_BASE' | 'PARADO_ALERTA'>('PARADO_BASE');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; precisao: number }>({
     lat: -23.9618,
     lng: -46.3322,
-    precisao: 4.5
+    precisao: 5.0
   });
-  const [bateriaPct, setBateriaPct] = useState<number>(85);
+  const [bateriaPct, setBateriaPct] = useState<number>(100);
+
+  const ultimoMovimentoRef = useRef<number>(Date.now());
+  const ultimaPosicaoRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
 
   // ─── 5. CADASTRO TWO-TAP ──────────────────────────────────────────────────
   const [inputNome, setInputNome] = useState('');
@@ -137,16 +140,29 @@ export const StreetAppPWA: React.FC = () => {
     'Bom Retiro', 'Rádio Clube', 'Castelo', 'Areia Branca', 'Monte Serrat', 'Nova Cintra'
   ];
 
+  // Função para cálculo geodésico de distância em metros entre duas coordenadas
+  const calcDistanciaMetros = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3;
+    const p1 = (lat1 * Math.PI) / 180;
+    const p2 = (lat2 * Math.PI) / 180;
+    const dp = ((lat2 - lat1) * Math.PI) / 180;
+    const dl = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(dp / 2) * Math.sin(dp / 2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   // ─── CICLO DE SENSORES E GPS QUANDO EM TURNO ──────────────────────────────
   useEffect(() => {
     if (!pontoAtual) return;
 
-    // Escuta de Acelerômetro
+    // Escuta de Acelerômetro Real de Hardware
     const handleMotion = (e: DeviceMotionEvent) => {
       const acc = e.accelerationIncludingGravity;
       if (!acc) return;
       const magnitude = Math.sqrt((acc.x || 0)**2 + (acc.y || 0)**2 + (acc.z || 0)**2) - 9.8;
-      if (Math.abs(magnitude) > 1.2) {
+      if (Math.abs(magnitude) > 1.25) {
+        ultimoMovimentoRef.current = Date.now();
         setIsMoving(true);
         setStatusCinetico('EM_MOVIMENTO');
         setPassosAcumulados((prev) => prev + 1);
@@ -158,25 +174,47 @@ export const StreetAppPWA: React.FC = () => {
       window.addEventListener('devicemotion', handleMotion);
     }
 
-    // Escuta de GPS Real
+    // Escuta de GPS Real com alta precisão
     let watchId: number | null = null;
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          const speed = pos.coords.speed ? pos.coords.speed * 3.6 : (isMoving ? 3.6 : 0);
-          setVelocidadeKmh(Number(speed.toFixed(1)));
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const now = Date.now();
+
+          let speed = 0;
+          if (pos.coords.speed !== null && pos.coords.speed !== undefined && !isNaN(pos.coords.speed) && pos.coords.speed >= 0) {
+            speed = Number((pos.coords.speed * 3.6).toFixed(1));
+          } else if (ultimaPosicaoRef.current) {
+            const dt = (now - ultimaPosicaoRef.current.time) / 1000;
+            if (dt >= 2) {
+              const dM = calcDistanciaMetros(ultimaPosicaoRef.current.lat, ultimaPosicaoRef.current.lng, lat, lng);
+              speed = Number(((dM / dt) * 3.6).toFixed(1));
+            }
+          }
+          ultimaPosicaoRef.current = { lat, lng, time: now };
+
+          setVelocidadeKmh(speed);
           setGpsCoords({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
+            lat,
+            lng,
             precisao: Number(pos.coords.accuracy.toFixed(1))
           });
+
+          if (speed > 1.2) {
+            ultimoMovimentoRef.current = now;
+            setIsMoving(true);
+            setStatusCinetico('EM_MOVIMENTO');
+            setTempoParadoMinutos(0);
+          }
         },
         () => {},
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
       );
     }
 
-    // Bateria
+    // Leitura real do nível de Bateria
     if ((navigator as any).getBattery) {
       (navigator as any).getBattery().then((battery: any) => {
         setBateriaPct(Math.round(battery.level * 100));
@@ -186,23 +224,43 @@ export const StreetAppPWA: React.FC = () => {
       });
     }
 
+    // Monitoramento periódico de inatividade física
+    const idleCheckInterval = setInterval(() => {
+      const paradoSegundos = Math.floor((Date.now() - ultimoMovimentoRef.current) / 1000);
+      const paradoMin = Math.floor(paradoSegundos / 60);
+      setTempoParadoMinutos(paradoMin);
+
+      if (paradoSegundos > 25) {
+        setIsMoving(false);
+        if (paradoMin >= 15) {
+          setStatusCinetico('PARADO_ALERTA');
+        } else {
+          setStatusCinetico('PARADO_BASE');
+        }
+      }
+    }, 10000);
+
     return () => {
       if (window.DeviceMotionEvent) window.removeEventListener('devicemotion', handleMotion);
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearInterval(idleCheckInterval);
     };
-  }, [pontoAtual, isMoving]);
+  }, [pontoAtual]);
 
-  // Envio contínuo de telemetria para a Sala de Guerra
+  // Envio contínuo de telemetria real para a Sala de Guerra
   useEffect(() => {
     if (!pontoAtual || !colaborador) return;
 
-    const timer = setInterval(() => {
+    const enviarTelemetria = () => {
       fetch('/api/equipe-rua/telemetria', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           membro_id: colaborador.id,
           nome: colaborador.nome,
+          telefone: colaborador.whatsapp,
+          cpf: colaborador.cpf,
+          funcao: colaborador.funcao,
           latitude: gpsCoords.lat,
           longitude: gpsCoords.lng,
           velocidade_kmh: velocidadeKmh,
@@ -211,13 +269,16 @@ export const StreetAppPWA: React.FC = () => {
           tempo_parado_minutos: tempoParadoMinutos,
           passos: passosAcumulados,
           bateria_pct: bateriaPct,
-          bairro: selectedBairro
+          bairro: selectedBairro,
+          cadastros_hoje: cadastrosTurno
         })
       }).catch(() => {});
-    }, 45000);
+    };
 
+    enviarTelemetria(); // Envio imediato
+    const timer = setInterval(enviarTelemetria, 25000); // Batimento a cada 25 segundos
     return () => clearInterval(timer);
-  }, [pontoAtual, colaborador, gpsCoords, velocidadeKmh, isMoving, statusCinetico, tempoParadoMinutos, passosAcumulados, bateriaPct, selectedBairro]);
+  }, [pontoAtual, colaborador, gpsCoords, velocidadeKmh, isMoving, statusCinetico, tempoParadoMinutos, passosAcumulados, bateriaPct, selectedBairro, cadastrosTurno]);
 
   // ─── LOGIN / IDENTIFICAÇÃO DO COLABORADOR ─────────────────────────────────
   const handleLoginColaborador = (e: React.FormEvent) => {
@@ -261,10 +322,11 @@ export const StreetAppPWA: React.FC = () => {
     if (!colaborador) return;
     if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
 
+    const horaEntrada = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const novoPonto: RegistroPonto = {
       id: 'ponto_' + Date.now(),
       colaboradorId: colaborador.id,
-      horarioEntrada: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      horarioEntrada: horaEntrada,
       latEntrada: gpsCoords.lat,
       lngEntrada: gpsCoords.lng,
       cadastrosNoTurno: 0,
@@ -278,22 +340,19 @@ export const StreetAppPWA: React.FC = () => {
     setCadastrosTurno(0);
     setResumoSaida(null);
 
-    // Notifica o backend
+    // Grava no backend e ativa o colaborador na Sala de Guerra
     try {
-      await fetch('/api/equipe-rua/telemetria', {
+      await fetch('/api/equipe-rua/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          membro_id: colaborador.id,
+          colaborador_id: colaborador.id,
           nome: colaborador.nome,
+          telefone: colaborador.whatsapp,
+          cpf: colaborador.cpf,
+          funcao: colaborador.funcao,
           latitude: gpsCoords.lat,
           longitude: gpsCoords.lng,
-          velocidade_kmh: 0,
-          is_moving: true,
-          estado: 'EM_MOVIMENTO',
-          tempo_parado_minutos: 0,
-          passos: 0,
-          bateria_pct: bateriaPct,
           bairro: selectedBairro
         })
       });
@@ -306,19 +365,38 @@ export const StreetAppPWA: React.FC = () => {
     if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
 
     const horaSaida = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const kmPercorridos = Number(((passosAcumulados * 0.75) / 1000).toFixed(2));
     const pontoFinalizado: RegistroPonto = {
       ...pontoAtual,
       horarioSaida: horaSaida,
       latSaida: gpsCoords.lat,
       lngSaida: gpsCoords.lng,
       cadastrosNoTurno: cadastrosTurno,
-      kmNoTurno: Number(((passosAcumulados * 0.75) / 1000).toFixed(2)),
+      kmNoTurno: kmPercorridos,
       status: 'FINALIZADO'
     };
 
     localStorage.removeItem('santos_ponto_atual');
     setPontoAtual(null);
     setResumoSaida(pontoFinalizado);
+
+    // Grava encerramento oficial no backend
+    try {
+      await fetch('/api/equipe-rua/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          colaborador_id: colaborador.id,
+          nome: colaborador.nome,
+          horario_entrada: pontoAtual.horarioEntrada,
+          horario_saida: horaSaida,
+          cadastros: cadastrosTurno,
+          km: kmPercorridos,
+          latitude: gpsCoords.lat,
+          longitude: gpsCoords.lng
+        })
+      });
+    } catch (_) {}
   };
 
   // ─── FORMATAÇÃO DE WHATSAPP ────────────────────────────────────────────────
@@ -369,6 +447,7 @@ export const StreetAppPWA: React.FC = () => {
           tags: tagsApoio,
           lat: gpsCoords.lat,
           lng: gpsCoords.lng,
+          membro_id: colaborador?.id,
           cadastradoPor: colaborador?.nome || 'Colaborador de Rua'
         })
       });
@@ -908,26 +987,22 @@ export const StreetAppPWA: React.FC = () => {
               </span>
             </div>
 
-            <button
-              onClick={() => {
-                const next = !isMoving;
-                setIsMoving(next);
-                setStatusCinetico(next ? 'EM_MOVIMENTO' : 'PARADO_BASE');
-                if (next) setTempoParadoMinutos(0);
-              }}
+            <div
               style={{
-                background: isMoving ? '#10b981' : '#f59e0b',
-                color: '#000',
-                border: 'none',
-                padding: '2px 8px',
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#10b981',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                padding: '3px 8px',
                 borderRadius: '6px',
                 fontSize: '10px',
                 fontWeight: 800,
-                cursor: 'pointer'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
               }}
             >
-              {isMoving ? 'SIMULANDO: ANDANDO' : 'SIMULANDO: PARADO'}
-            </button>
+              <Radio size={11} className="animate-pulse" /> SENSOR DE HARDWARE ATIVO
+            </div>
           </div>
 
           <div

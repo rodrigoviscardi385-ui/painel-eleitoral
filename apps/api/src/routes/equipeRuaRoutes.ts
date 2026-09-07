@@ -449,96 +449,232 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
     };
   });
 
-  // ─── 11. Ingestão de Telemetria Cinética (Acelerômetro + GPS) ────────────────
-  const telemetriaCache = new Map<string, any>();
+  // ─── 11. Ingestão de Telemetria Cinética Real (Acelerômetro + GPS) ─────────
+  interface TelemetriaItem {
+    membro_id: string;
+    nome: string;
+    telefone?: string;
+    cpf?: string;
+    funcao?: string;
+    latitude: number;
+    longitude: number;
+    velocidade_kmh: number;
+    is_moving: boolean;
+    estado: 'EM_MOVIMENTO' | 'PARADO_BASE' | 'PARADO_ALERTA' | 'DESLOCAMENTO_VEICULO' | 'OFFLINE';
+    tempo_parado_minutos: number;
+    passos: number;
+    bateria_pct: number;
+    bairro: string;
+    cadastros_hoje: number;
+    status_turno: 'EM_ANDAMENTO' | 'FINALIZADO';
+    updated_at: string;
+    breadcrumbs: { lat: number; lng: number; hora: string }[];
+  }
+
+  const telemetriaCache = new Map<string, TelemetriaItem>();
+
+  function determinarRegiaoSantos(bairro: string): 'ORLA' | 'ZONA_NOROESTE' | 'CENTRO' | 'MORROS' {
+    const b = (bairro || '').toLowerCase();
+    if (b.includes('gonzaga') || b.includes('boqueir') || b.includes('ponta') || b.includes('embar') || b.includes('aparecida') || b.includes('josé menino') || b.includes('marap')) {
+      return 'ORLA';
+    }
+    if (b.includes('centro') || b.includes('vila mathias') || b.includes('encruzilhada') || b.includes('paquetá') || b.includes('valongo')) {
+      return 'CENTRO';
+    }
+    if (b.includes('monte') || b.includes('cintra') || b.includes('são bento') || b.includes('fontana') || b.includes('marapé')) {
+      return 'MORROS';
+    }
+    return 'ZONA_NOROESTE';
+  }
 
   app.post('/api/equipe-rua/telemetria', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as any;
-    const { membro_id = 'cabo_01', latitude, longitude, velocidade_kmh = 0, is_moving = false, estado = 'EM_MOVIMENTO', tempo_parado_minutos = 0, passos = 0, bateria_pct = 80, bairro = 'Santos' } = body || {};
-
-    const entry = {
+    const {
       membro_id,
+      nome = 'Colaborador',
+      telefone,
+      cpf,
+      funcao,
       latitude,
       longitude,
+      velocidade_kmh = 0,
+      is_moving = false,
+      estado = 'EM_MOVIMENTO',
+      tempo_parado_minutos = 0,
+      passos = 0,
+      bateria_pct = 80,
+      bairro = 'Santos',
+      cadastros_hoje
+    } = body || {};
+
+    if (!membro_id) {
+      return reply.status(400).send({ error: 'membro_id é obrigatório.' });
+    }
+
+    const anterior = telemetriaCache.get(membro_id);
+    const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const breadcrumbs = anterior ? [...anterior.breadcrumbs] : [];
+
+    // Adiciona ao rastro se houver coordenadas válidas
+    if (latitude && longitude) {
+      if (breadcrumbs.length === 0 || breadcrumbs[breadcrumbs.length - 1].lat !== latitude || breadcrumbs[breadcrumbs.length - 1].lng !== longitude) {
+        breadcrumbs.push({ lat: Number(latitude), lng: Number(longitude), hora: horaAtual });
+        if (breadcrumbs.length > 20) breadcrumbs.shift(); // Mantém os últimos 20 pontos reais
+      }
+    }
+
+    const entry: TelemetriaItem = {
+      membro_id,
+      nome: anterior?.nome || nome,
+      telefone: anterior?.telefone || telefone || '',
+      cpf: anterior?.cpf || cpf || '',
+      funcao: anterior?.funcao || funcao || 'Mobilizador de Campo',
+      latitude: Number(latitude || anterior?.latitude || -23.9618),
+      longitude: Number(longitude || anterior?.longitude || -46.3322),
       velocidade_kmh: Number(velocidade_kmh),
       is_moving: Boolean(is_moving),
-      estado,
+      estado: estado as any,
       tempo_parado_minutos: Number(tempo_parado_minutos),
       passos: Number(passos),
       bateria_pct: Number(bateria_pct),
-      bairro,
-      updated_at: new Date().toISOString()
+      bairro: bairro || anterior?.bairro || 'Santos',
+      cadastros_hoje: cadastros_hoje !== undefined ? Number(cadastros_hoje) : (anterior?.cadastros_hoje || 0),
+      status_turno: anterior?.status_turno || 'EM_ANDAMENTO',
+      updated_at: new Date().toISOString(),
+      breadcrumbs
     };
 
     telemetriaCache.set(membro_id, entry);
     return reply.status(200).send({ recorded: true, timestamp: entry.updated_at });
   });
 
-  // ─── 12. Listagem de Telemetria ao Vivo para a Sala de Guerra ────────────────
+  // ─── 12. Listagem de Telemetria Real ao Vivo para a Sala de Guerra ───────────
   app.get('/api/equipe-rua/telemetria/ao-vivo', async () => {
-    const membrosBanco = await db.select().from(schema.equipeRua).limit(20);
+    const lista: any[] = [];
+    const agora = Date.now();
 
-    const lista = membrosBanco.map((m, idx) => {
-      const cached = telemetriaCache.get(m.id) || {};
-      const speeds = [3.8, 4.2, 0.0, 3.4, 0.0, 2.9];
-      const speed = cached.velocidade_kmh !== undefined ? cached.velocidade_kmh : speeds[idx % speeds.length];
-      const isMov = cached.is_moving !== undefined ? cached.is_moving : speed > 1.5;
-      const estado = isMov ? 'EM_MOVIMENTO' : (idx === 2 ? 'PARADO_ALERTA' : 'PARADO_BASE');
+    // Itera apenas sobre colaboradores reais que reportaram dados do app móvel
+    for (const [id, item] of telemetriaCache.entries()) {
+      // Ignora se o turno estiver finalizado há mais de 12 horas
+      const diffMs = agora - new Date(item.updated_at).getTime();
+      if (item.status_turno === 'FINALIZADO' && diffMs > 12 * 3600 * 1000) {
+        continue;
+      }
 
-      return {
-        id: m.id,
-        nome: m.nome_completo,
-        cpf: m.cpf ? `${m.cpf.slice(0, 3)}.***.***-${m.cpf.slice(-2)}` : '000.***.***-00',
-        telefone: m.telefone_whatsapp || '(13) 99999-9999',
-        bairro: m.bairro || 'Gonzaga',
-        regiao: (idx % 3 === 0 ? 'ORLA' : idx % 3 === 1 ? 'ZONA_NOROESTE' : 'CENTRO') as any,
-        funcao: m.funcao_atividade || 'Mobilizador de Rua',
-        statusCinetico: estado,
-        velocidadeKmh: speed,
-        tempoParadoMinutos: isMov ? 0 : (idx === 2 ? 26 : 12),
-        passosHoje: isMov ? 4200 + (idx * 300) : 1100,
-        kmRodados: isMov ? 3.4 + (idx * 0.4) : 0.8,
-        cadastrosHoje: 12 + (idx * 3),
-        bateriaPct: cached.bateria_pct || (85 - idx * 3),
-        latitude: cached.latitude || (-23.9600 - (idx * 0.005)),
-        longitude: cached.longitude || (-46.3300 - (idx * 0.004)),
-        ultimaAtualizacao: 'Agora mesmo',
-        breadcrumbs: []
-      };
-    });
+      const diffMin = Math.round(diffMs / 60000);
+      const recency = diffMin <= 1 ? 'Agora mesmo' : `${diffMin} min atrás`;
+      const km = Number(((item.passos * 0.75) / 1000).toFixed(2));
+
+      lista.push({
+        id: item.membro_id,
+        nome: item.nome,
+        cpf: item.cpf ? (item.cpf.length >= 11 ? `${item.cpf.slice(0, 3)}.***.***-${item.cpf.slice(-2)}` : item.cpf) : 'Identificado',
+        telefone: item.telefone || 'App PWA',
+        bairro: item.bairro,
+        regiao: determinarRegiaoSantos(item.bairro),
+        funcao: item.funcao,
+        statusCinetico: item.status_turno === 'FINALIZADO' ? 'OFFLINE' : item.estado,
+        velocidadeKmh: item.velocidade_kmh,
+        tempoParadoMinutos: item.tempo_parado_minutos,
+        passosHoje: item.passos,
+        kmRodados: km,
+        cadastrosHoje: item.cadastros_hoje,
+        bateriaPct: item.bateria_pct,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        ultimaAtualizacao: recency,
+        breadcrumbs: item.breadcrumbs
+      });
+    }
 
     return {
       success: true,
       contratados: lista,
-      totalEmCampo: lista.length,
+      totalEmCampo: lista.filter((c) => c.statusCinetico !== 'OFFLINE').length,
       timestamp: new Date().toISOString()
     };
   });
 
-  // ─── 13. Coleta Rápida de Apoiador de Rua com WhatsApp de Boas-Vindas ───────
+  // ─── 13. Coleta Real de Apoiador de Rua -> Gravação no PostgreSQL ──────────
   app.post('/api/equipe-rua/coleta-voto', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { nome, whatsapp, bairro, tags, lat, lng } = request.body as any;
+    const { nome, whatsapp, bairro, tags, lat, lng, cadastradoPor, membro_id } = request.body as any;
 
-    await logAuditLGPD('COLETA_RUA_APOIADOR', `Cadastro de rua: ${nome} - ${whatsapp} (${bairro})`);
+    const cleanWhatsapp = String(whatsapp || '').replace(/\D/g, '');
+    if (!cleanWhatsapp || cleanWhatsapp.length < 10) {
+      return reply.status(400).send({ error: 'WhatsApp obrigatório com DDD.' });
+    }
 
-    // Registra log do disparo com delay de 15 segundos
-    console.log(`[STREET APP] WhatsApp oficial agendado para ${whatsapp} em 15 segundos.`);
+    const nomeFormatado = (nome || 'Apoiador de Rua').trim();
+    const tagsStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
+    const gpsStr = lat && lng ? ` (GPS: ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)})` : '';
+    const nota = `Cadastrado na rua por ${cadastradoPor || 'Colaborador'}${tagsStr ? ` | Tags: ${tagsStr}` : ''}${gpsStr}`;
 
-    return reply.status(201).send({
-      success: true,
-      mensagem: `Apoiador ${nome} gravado com sucesso! WhatsApp agendado.`,
-      disparoAgendadoEm: 15
-    });
+    try {
+      // Gravação direta na tabela oficial de apoiadores da campanha
+      const [usuarioGravado] = await db
+        .insert(schema.usuarios)
+        .values({
+          nome: nomeFormatado,
+          whatsapp: cleanWhatsapp,
+          cargo: 'APOIADOR',
+          bairro: bairro || 'Santos',
+          status_onboarding: 'COMPLETO',
+          notas: nota,
+        })
+        .onConflictDoUpdate({
+          target: schema.usuarios.whatsapp,
+          set: {
+            nome: nomeFormatado,
+            bairro: bairro || 'Santos',
+            notas: sql`CONCAT(COALESCE(${schema.usuarios.notas}, ''), ' | Atualizado por ', ${cadastradoPor || 'Colaborador'})`,
+            updated_at: new Date(),
+          },
+        })
+        .returning();
+
+      // Atualiza contador de cadastros em tempo real na telemetria do colaborador
+      const idChave = membro_id || (cadastradoPor ? `colab_${cadastradoPor}` : null);
+      if (idChave && telemetriaCache.has(idChave)) {
+        const item = telemetriaCache.get(idChave)!;
+        item.cadastros_hoje = (item.cadastros_hoje || 0) + 1;
+        telemetriaCache.set(idChave, item);
+      } else if (membro_id) {
+        // Se ainda não tiver entrada, busca ou incrementa
+        for (const [k, v] of telemetriaCache.entries()) {
+          if (v.membro_id === membro_id || v.nome === cadastradoPor) {
+            v.cadastros_hoje = (v.cadastros_hoje || 0) + 1;
+            telemetriaCache.set(k, v);
+            break;
+          }
+        }
+      }
+
+      await logAuditLGPD('COLETA_RUA_APOIADOR', `Cadastro real de apoiador de rua: ${nomeFormatado} (${cleanWhatsapp}) por ${cadastradoPor || 'Equipe'}`);
+
+      return reply.status(201).send({
+        success: true,
+        usuarioId: usuarioGravado?.id,
+        mensagem: `Apoiador ${nomeFormatado} gravado com sucesso no banco de dados!`,
+        whatsapp: cleanWhatsapp
+      });
+    } catch (err: any) {
+      request.log.error(err, 'Erro ao gravar apoiador de rua no banco de dados');
+      return reply.status(500).send({ error: 'Falha ao persistir apoiador no banco de dados.' });
+    }
   });
 
-  // ─── 14. Alerta de Suprimentos para Van de Apoio ────────────────────────────
+  // ─── 14. Alerta Real de Suprimentos para Van de Apoio ──────────────────────
   app.post('/api/equipe-rua/solicitar-material', async (request: FastifyRequest, reply: FastifyReply) => {
     const { bairro, lat, lng, solicitante, item } = request.body as any;
     console.log(`[SUPPLY ALERT] Alerta de material: ${item} para ${solicitante} em ${bairro} (${lat}, ${lng})`);
+    await logAuditLGPD('SOLICITACAO_MATERIAL_RUA', `Solicitação de material (${item}) por ${solicitante} em ${bairro}`);
+
     return reply.status(200).send({
       success: true,
       alertaEmitido: true,
-      tempoEstimadoChegadaMinutos: 14
+      solicitante,
+      bairro,
+      tempoEstimadoChegadaMinutos: 15
     });
   });
 
@@ -546,7 +682,7 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
   const historicoPontos: any[] = [];
 
   app.post('/api/equipe-rua/checkin', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { colaborador_id, nome, latitude, longitude, bairro } = request.body as any;
+    const { colaborador_id, nome, telefone, cpf, funcao, latitude, longitude, bairro } = request.body as any;
     const registro = {
       id: 'ponto_' + Date.now(),
       colaborador_id,
@@ -558,8 +694,32 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       status: 'EM_ANDAMENTO'
     };
     historicoPontos.unshift(registro);
-    await logAuditLGPD('CHECKIN_PONTO_RUA', `Check-in de entrada registrado para ${nome} em ${bairro}`);
 
+    // Inicializa o colaborador no cache de telemetria ativo
+    if (colaborador_id) {
+      telemetriaCache.set(colaborador_id, {
+        membro_id: colaborador_id,
+        nome: nome || 'Colaborador de Rua',
+        telefone: telefone || '',
+        cpf: cpf || '',
+        funcao: funcao || 'Mobilizador de Campo',
+        latitude: Number(latitude || -23.9618),
+        longitude: Number(longitude || -46.3322),
+        velocidade_kmh: 0,
+        is_moving: false,
+        estado: 'PARADO_BASE',
+        tempo_parado_minutos: 0,
+        passos: 0,
+        bateria_pct: 100,
+        bairro: bairro || 'Santos',
+        cadastros_hoje: 0,
+        status_turno: 'EM_ANDAMENTO',
+        updated_at: new Date().toISOString(),
+        breadcrumbs: [{ lat: Number(latitude || -23.9618), lng: Number(longitude || -46.3322), hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]
+      });
+    }
+
+    await logAuditLGPD('CHECKIN_PONTO_RUA', `Check-in de entrada registrado para ${nome} em ${bairro}`);
     return reply.status(200).send({ success: true, registro });
   });
 
@@ -580,8 +740,18 @@ export async function equipeRuaRoutes(app: FastifyInstance) {
       timestamp: new Date().toISOString()
     };
     historicoPontos.unshift(registroSaida);
-    await logAuditLGPD('CHECKOUT_PONTO_RUA', `Check-out de saída registrado para ${nome} (${cadastros} apoios, ${km} km)`);
 
+    // Atualiza estado do turno para FINALIZADO no cache
+    if (colaborador_id && telemetriaCache.has(colaborador_id)) {
+      const item = telemetriaCache.get(colaborador_id)!;
+      item.status_turno = 'FINALIZADO';
+      item.estado = 'OFFLINE';
+      item.velocidade_kmh = 0;
+      item.updated_at = new Date().toISOString();
+      telemetriaCache.set(colaborador_id, item);
+    }
+
+    await logAuditLGPD('CHECKOUT_PONTO_RUA', `Check-out de saída registrado para ${nome} (${cadastros} apoios, ${km} km)`);
     return reply.status(200).send({ success: true, registro: registroSaida });
   });
 

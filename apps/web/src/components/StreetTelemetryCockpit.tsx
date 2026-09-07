@@ -56,163 +56,30 @@ export const StreetTelemetryCockpit: React.FC = () => {
   const [selectedContratado, setSelectedContratado] = useState<ContratadoTelemetria | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
 
-  // ─── DADOS INICIAIS REALISTAS DE TELEMETRIA DA EQUIPE DE RUA EM SANTOS ───────
-  const [contratados, setContratados] = useState<ContratadoTelemetria[]>([
-    {
-      id: 'rua_01',
-      nome: 'Carlos Eduardo Mendes',
-      cpf: '342.***.***-18',
-      telefone: '(13) 99741-2290',
-      bairro: 'Gonzaga',
-      regiao: 'ORLA',
-      funcao: 'Mobilizador de Calçada',
-      statusCinetico: 'EM_MOVIMENTO',
-      velocidadeKmh: 4.1,
-      tempoParadoMinutos: 0,
-      passosHoje: 5820,
-      kmRodados: 4.6,
-      cadastrosHoje: 22,
-      bateriaPct: 78,
-      latitude: -23.9658,
-      longitude: -46.3335,
-      ultimaAtualizacao: 'Agora mesmo',
-      breadcrumbs: [
-        { lat: -23.9680, lng: -46.3310, hora: '10:00' },
-        { lat: -23.9665, lng: -46.3325, hora: '10:45' },
-        { lat: -23.9658, lng: -46.3335, hora: '11:30' }
-      ]
-    },
-    {
-      id: 'rua_02',
-      nome: 'Mariana Silveira Ramos',
-      cpf: '419.***.***-02',
-      telefone: '(13) 98832-1140',
-      bairro: 'Praça Mauá (Centro)',
-      regiao: 'CENTRO',
-      funcao: 'Coordenadora de Tenda Fixa',
-      statusCinetico: 'PARADO_BASE',
-      velocidadeKmh: 0.2,
-      tempoParadoMinutos: 45,
-      passosHoje: 1420,
-      kmRodados: 1.1,
-      cadastrosHoje: 38,
-      bateriaPct: 91,
-      latitude: -23.9332,
-      longitude: -46.3284,
-      ultimaAtualizacao: '1 min atrás',
-      breadcrumbs: [
-        { lat: -23.9332, lng: -46.3284, hora: '08:30' },
-        { lat: -23.9332, lng: -46.3284, hora: '11:30' }
-      ]
-    },
-    {
-      id: 'rua_03',
-      nome: 'Roberto Antunes Costa',
-      cpf: '280.***.***-67',
-      telefone: '(13) 99120-8877',
-      bairro: 'Rádio Clube (Zona Noroeste)',
-      regiao: 'ZONA_NOROESTE',
-      funcao: 'Panfletagem Volante',
-      statusCinetico: 'PARADO_ALERTA',
-      velocidadeKmh: 0.0,
-      tempoParadoMinutos: 28, // Parado há mais de 20 min sem base
-      passosHoje: 890,
-      kmRodados: 0.7,
-      cadastrosHoje: 4,
-      bateriaPct: 42,
-      latitude: -23.9421,
-      longitude: -46.3712,
-      ultimaAtualizacao: '2 min atrás',
-      breadcrumbs: [
-        { lat: -23.9410, lng: -46.3700, hora: '09:15' },
-        { lat: -23.9421, lng: -46.3712, hora: '11:00' }
-      ]
-    },
-    {
-      id: 'rua_04',
-      nome: 'Fernanda Lima Nogueira',
-      cpf: '388.***.***-91',
-      telefone: '(13) 99650-4411',
-      bairro: 'Ponta da Praia',
-      regiao: 'ORLA',
-      funcao: 'Apoio Saída da Balsa',
-      statusCinetico: 'EM_MOVIMENTO',
-      velocidadeKmh: 3.6,
-      tempoParadoMinutos: 0,
-      passosHoje: 7100,
-      kmRodados: 5.4,
-      cadastrosHoje: 31,
-      bateriaPct: 69,
-      latitude: -23.9872,
-      longitude: -46.3015,
-      ultimaAtualizacao: 'Agora mesmo',
-      breadcrumbs: [
-        { lat: -23.9850, lng: -46.3050, hora: '09:00' },
-        { lat: -23.9872, lng: -46.3015, hora: '11:30' }
-      ]
-    },
-    {
-      id: 'rua_05',
-      nome: 'Thiago Barreto Junior',
-      cpf: '512.***.***-55',
-      telefone: '(13) 99188-3322',
-      bairro: 'Monte Serrat',
-      regiao: 'MORROS',
-      funcao: 'Líder de Área Monte Serrat',
-      statusCinetico: 'EM_MOVIMENTO',
-      velocidadeKmh: 2.8, // Caminhada em subida de morro
-      tempoParadoMinutos: 0,
-      passosHoje: 8300,
-      kmRodados: 4.2,
-      cadastrosHoje: 19,
-      bateriaPct: 81,
-      latitude: -23.9380,
-      longitude: -46.3350,
-      ultimaAtualizacao: 'Agora mesmo',
-      breadcrumbs: [
-        { lat: -23.9360, lng: -46.3330, hora: '08:45' },
-        { lat: -23.9380, lng: -46.3350, hora: '11:30' }
-      ]
-    },
-    {
-      id: 'rua_06',
-      nome: 'Van Suprimentos 01 (Santos)',
-      cpf: 'Logística Campanha',
-      telefone: '(13) 99901-5500',
-      bairro: 'Av. Ana Costa',
-      regiao: 'ORLA',
-      funcao: 'Van Logística de Reabastecimento',
-      statusCinetico: 'DESLOCAMENTO_VEICULO',
-      velocidadeKmh: 32.5,
-      tempoParadoMinutos: 0,
-      passosHoje: 0,
-      kmRodados: 24.8,
-      cadastrosHoje: 0,
-      bateriaPct: 99,
-      latitude: -23.9520,
-      longitude: -46.3310,
-      ultimaAtualizacao: 'Agora mesmo',
-      breadcrumbs: []
-    }
-  ]);
+  // ─── TELEMETRIA REAL DA EQUIPE DE RUA EM SANTOS (ZERO SIMULAÇÃO) ─────────
+  const [contratados, setContratados] = useState<ContratadoTelemetria[]>([]);
 
-  // Carregar dados de telemetria reais do backend Fastify se disponível
+  // Carregar dados de telemetria reais do backend Fastify
   useEffect(() => {
     loadTelemetry();
-    const interval = setInterval(loadTelemetry, 15000);
+    const interval = setInterval(loadTelemetry, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const loadTelemetry = async () => {
+    setLoading(true);
     try {
       const res = await fetch('/api/equipe-rua/telemetria/ao-vivo');
       if (res.ok) {
         const data = await res.json();
-        if (data && data.contratados && data.contratados.length > 0) {
+        if (data && Array.isArray(data.contratados)) {
           setContratados(data.contratados);
         }
       }
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ─── CÁLCULO DE MÉTRICAS AO VIVO ───────────────────────────────────────────
@@ -456,18 +323,73 @@ export const StreetTelemetryCockpit: React.FC = () => {
               MONTE SERRAT & MORROS
             </div>
 
-            {/* PINOS INTERATIVOS DOS CONTRATADOS */}
+            {/* MENSAGEM SE NÃO HOUVER NENHUM COLABORADOR COM TURNO ATIVO */}
+            {contratados.length === 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(10, 15, 29, 0.88)',
+                  backdropFilter: 'blur(4px)',
+                  padding: '24px',
+                  textAlign: 'center',
+                  zIndex: 15
+                }}
+              >
+                <Smartphone size={42} color="#ffe600" style={{ marginBottom: '12px' }} />
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>
+                  Nenhum Colaborador com Turno Ativo no Momento
+                </div>
+                <div style={{ fontSize: '12px', color: '#94a3b8', maxWidth: '380px', marginBottom: '16px', lineHeight: '1.5' }}>
+                  Assim que a equipe de rua acessar o App no celular e registrar o <strong>Check-in de Entrada</strong>, a velocidade real, os passos e a localização GPS aparecerão neste radar ao vivo.
+                </div>
+                <button
+                  onClick={() => setIsQrModalOpen(true)}
+                  style={{
+                    backgroundColor: '#ffe600',
+                    color: '#000000',
+                    border: 'none',
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <QrCode size={16} /> Abrir QR Code para Equipes de Campo
+                </button>
+              </div>
+            )}
+
+            {/* PINOS INTERATIVOS DOS CONTRATADOS COM PROJEÇÃO GEOGRÁFICA REAL */}
             {contratados.map((c) => {
-              // Projeção fictícia de coordenadas de Santos no plano 2D
+              // Projeção geográfica real de Santos:
+              // Lat: de -23.9200 (Norte) a -23.9950 (Sul)
+              // Lng: de -46.3900 (Oeste) a -46.2950 (Leste)
+              const minLat = -23.9950;
+              const maxLat = -23.9200;
+              const minLng = -46.3900;
+              const maxLng = -46.2950;
+
               let top = '50%';
               let left = '50%';
-              if (c.regiao === 'CENTRO') { top = '22%'; left = '72%'; }
-              if (c.regiao === 'ZONA_NOROESTE') { top = '28%'; left = '20%'; }
-              if (c.regiao === 'MORROS') { top = '48%'; left = '45%'; }
-              if (c.regiao === 'ORLA') {
-                if (c.bairro === 'Gonzaga') { top = '78%'; left = '52%'; }
-                else if (c.bairro === 'Ponta da Praia') { top = '82%'; left = '82%'; }
-                else { top = '68%'; left = '60%'; }
+              if (c.latitude && c.longitude && c.latitude !== 0 && c.longitude !== 0) {
+                const latPct = ((maxLat - c.latitude) / (maxLat - minLat)) * 100;
+                const lngPct = ((c.longitude - minLng) / (maxLng - minLng)) * 100;
+                top = `${Math.max(12, Math.min(88, latPct))}%`;
+                left = `${Math.max(12, Math.min(88, lngPct))}%`;
+              } else {
+                if (c.regiao === 'CENTRO') { top = '22%'; left = '72%'; }
+                else if (c.regiao === 'ZONA_NOROESTE') { top = '28%'; left = '20%'; }
+                else if (c.regiao === 'MORROS') { top = '48%'; left = '45%'; }
+                else { top = '78%'; left = '52%'; }
               }
 
               const isSelected = selectedContratado?.id === c.id;
@@ -688,61 +610,76 @@ export const StreetTelemetryCockpit: React.FC = () => {
 
           {/* LISTA ROLÁVEL DE COLABORADORES */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
-            {contratadosFiltrados.map((c) => {
-              const isSelected = selectedContratado?.id === c.id;
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => setSelectedContratado(c)}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '10px',
-                    background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.4)',
-                    border: isSelected ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.08)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 800 }}>{c.nome}</div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                        {c.bairro} • {c.telefone}
+            {contratadosFiltrados.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8', fontSize: '13px' }}>
+                <Users size={32} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+                <div>Nenhum colaborador com turno ativo na rua.</div>
+                <div style={{ fontSize: '11px', marginTop: '6px', color: '#64748b' }}>
+                  Compartilhe o QR Code para a equipe iniciar o expediente.
+                </div>
+              </div>
+            ) : (
+              contratadosFiltrados.map((c) => {
+                const isSelected = selectedContratado?.id === c.id;
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => setSelectedContratado(c)}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '10px',
+                      background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.4)',
+                      border: isSelected ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.08)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 800 }}>{c.nome}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                          {c.bairro} • {c.telefone}
+                        </div>
+                      </div>
+
+                      {/* Tag de Status Cinético */}
+                      <div>
+                        {c.statusCinetico === 'EM_MOVIMENTO' && (
+                          <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
+                            🟢 ANDANDO ({c.velocidadeKmh} km/h)
+                          </span>
+                        )}
+                        {c.statusCinetico === 'PARADO_BASE' && (
+                          <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
+                            🔵 NA TENDA
+                          </span>
+                        )}
+                        {c.statusCinetico === 'PARADO_ALERTA' && (
+                          <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
+                            🔴 PARADO ({c.tempoParadoMinutos} min)
+                          </span>
+                        )}
+                        {c.statusCinetico === 'DESLOCAMENTO_VEICULO' && (
+                          <span style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
+                            🟣 EM VEÍCULO ({c.velocidadeKmh} km/h)
+                          </span>
+                        )}
+                        {c.statusCinetico === 'OFFLINE' && (
+                          <span style={{ background: 'rgba(100, 116, 139, 0.2)', color: '#94a3b8', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
+                            ⚪ OFFLINE
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Tag de Status Cinético */}
-                    <div>
-                      {c.statusCinetico === 'EM_MOVIMENTO' && (
-                        <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
-                          🟢 ANDANDO ({c.velocidadeKmh} km/h)
-                        </span>
-                      )}
-                      {c.statusCinetico === 'PARADO_BASE' && (
-                        <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
-                          🔵 NA TENDA
-                        </span>
-                      )}
-                      {c.statusCinetico === 'PARADO_ALERTA' && (
-                        <span style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
-                          🔴 PARADO ({c.tempoParadoMinutos} min)
-                        </span>
-                      )}
-                      {c.statusCinetico === 'DESLOCAMENTO_VEICULO' && (
-                        <span style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '3px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
-                          🟣 EM VEÍCULO ({c.velocidadeKmh} km/h)
-                        </span>
-                      )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: '#94a3b8' }}>
+                      <span>📍 {c.passosHoje} passos ({c.kmRodados} km)</span>
+                      <span style={{ color: '#ffe600', fontWeight: 700 }}>🏆 {c.cadastrosHoje} apoios hoje</span>
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: '#94a3b8' }}>
-                    <span>📍 {c.passosHoje} passos ({c.kmRodados} km)</span>
-                    <span style={{ color: '#ffe600', fontWeight: 700 }}>🏆 {c.cadastrosHoje} apoios hoje</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>
