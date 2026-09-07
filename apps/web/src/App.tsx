@@ -34,6 +34,7 @@ import { ComplianceTSEModal } from './components/ComplianceTSEModal.tsx';
 import { H3HeatmapWarRoom } from './components/H3HeatmapWarRoom.tsx';
 import { SireneCriseModal, CrisisIncidentData } from './components/SireneCriseModal.tsx';
 import { VoterVirtualList, VirtualVoterItem } from './components/VoterVirtualList.tsx';
+import { StreetTeamManager } from './components/StreetTeamManager.tsx';
 import { OfflineSyncClient } from './services/offlineSyncClient.ts';
 import { api } from './api.ts';
 
@@ -507,6 +508,10 @@ export const App: React.FC = () => {
             materiais={materiais}
             onRefresh={loadMateriais}
           />
+        )}
+
+        {activeTab === 'equipe-rua' && (
+          <StreetTeamManager />
         )}
 
         {activeTab === 'bot' && (

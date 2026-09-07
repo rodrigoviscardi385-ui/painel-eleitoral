@@ -131,6 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       defaultTab: 'liderancas',
       subTabs: [
         { id: 'liderancas', label: 'Árvore de Lideranças', icon: Users },
+        { id: 'equipe-rua', label: 'Equipe de Rua & Contratos', icon: UsersRound },
         { id: 'materiais', label: 'Acervo Digital', icon: FolderOpen },
       ],
     },
@@ -401,6 +402,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <span>Nova Meta de Votos</span>
                       </button>
                     )}
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setIsActionsOpen(false);
+                        setActiveTab('equipe-rua');
+                      }}
+                    >
+                      <UsersRound size={15} color="var(--primary)" />
+                      <span>Equipe de Rua & Contratos</span>
+                    </button>
                     <button
                       className="dropdown-item"
                       onClick={() => {

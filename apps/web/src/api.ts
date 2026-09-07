@@ -356,5 +356,37 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // Equipe de Rua & Contratos Eleitorais TSE (Lei 9.504/97)
+  getEquipeRua: (params: { busca?: string; tipo_jornada?: string; status_contrato?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.busca) query.set('busca', params.busca.trim());
+    if (params.tipo_jornada) query.set('tipo_jornada', params.tipo_jornada);
+    if (params.status_contrato) query.set('status_contrato', params.status_contrato);
+    return request<{ membros: any[]; metricas: { total: number; meioPeriodo: number; periodoIntegral: number; folhaTotal: number } }>(
+      `/api/equipe-rua?${query.toString()}`
+    );
+  },
+  getEquipeRuaMembro: (id: string) => request<any>(`/api/equipe-rua/${id}`),
+  createEquipeRua: (data: any) =>
+    request<any>('/api/equipe-rua', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateEquipeRua: (id: string, data: any) =>
+    request<any>(`/api/equipe-rua/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteEquipeRua: (id: string) =>
+    request<any>(`/api/equipe-rua/${id}`, {
+      method: 'DELETE',
+    }),
+  getContratoEquipeRua: (id: string, params?: { tipo_jornada?: 'MEIO_PERIODO' | 'PERIODO_INTEGRAL'; format?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.tipo_jornada) query.set('tipo_jornada', params.tipo_jornada);
+    if (params?.format) query.set('format', params.format);
+    return request<any>(`/api/equipe-rua/${id}/contrato?${query.toString()}`);
+  },
 };
 

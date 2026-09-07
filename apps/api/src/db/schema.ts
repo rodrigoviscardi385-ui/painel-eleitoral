@@ -581,5 +581,56 @@ export const pushSubscriptions = pgTable(
   ]
 );
 
+// ─── Módulo Exclusivo: Equipe de Rua & Contratos TSE (Lei 9.504/97) ─────────
+export const equipeRua = pgTable(
+  'equipe_rua',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    nome_completo: text('nome_completo').notNull(),
+    cpf: text('cpf').notNull().unique(),
+    rg: text('rg').notNull(),
+    rg_orgao_emissor: text('rg_orgao_emissor').default('SSP/SP').notNull(),
+    titulo_eleitor: text('titulo_eleitor'),
+    zona_eleitoral: text('zona_eleitoral'),
+    secao_eleitoral: text('secao_eleitoral'),
+    telefone_whatsapp: text('telefone_whatsapp').notNull(),
+    endereco_completo: text('endereco_completo').notNull(),
+    bairro: text('bairro').notNull(),
+    cidade: text('cidade').default('Santos').notNull(),
+    uf: text('uf').default('SP').notNull(),
+    cep: text('cep').notNull(),
 
+    // Dados Bancários para Pagamento Eleitoral (TSE)
+    dados_bancarios_banco: text('dados_bancarios_banco'),
+    dados_bancarios_agencia: text('dados_bancarios_agencia'),
+    dados_bancarios_conta: text('dados_bancarios_conta'),
+    chave_pix: text('chave_pix'),
 
+    // Contratação & Jornada (Meio Período vs Período Integral)
+    funcao_atividade: text('funcao_atividade').default('MOBILIZADOR_RUA').notNull(),
+    tipo_jornada: text('tipo_jornada', { enum: ['MEIO_PERIODO', 'PERIODO_INTEGRAL'] }).default('MEIO_PERIODO').notNull(),
+    carga_horaria_semanal: integer('carga_horaria_semanal').default(20).notNull(),
+    remuneracao_pactuada: numeric('remuneracao_pactuada').default('1500.00').notNull(),
+    forma_pagamento: text('forma_pagamento').default('PIX_CONTA_CAMPANHA').notNull(),
+
+    // Vigência da Campanha
+    data_inicio: timestamp('data_inicio', { withTimezone: true }).defaultNow().notNull(),
+    data_fim: timestamp('data_fim', { withTimezone: true }).notNull(),
+
+    // Status do Contrato
+    status_contrato: text('status_contrato', {
+      enum: ['MINUTA_GERADA', 'ASSINADO', 'PAGO', 'CANCELADO'],
+    }).default('MINUTA_GERADA').notNull(),
+    observacoes: text('observacoes'),
+
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_equipe_rua_cpf').on(table.cpf),
+    index('idx_equipe_rua_whatsapp').on(table.telefone_whatsapp),
+    index('idx_equipe_rua_tipo_jornada').on(table.tipo_jornada),
+    index('idx_equipe_rua_funcao').on(table.funcao_atividade),
+    index('idx_equipe_rua_status').on(table.status_contrato),
+  ]
+);

@@ -13,12 +13,14 @@ const WEB_DIR = path.join(ROOT_DIR, 'apps', 'web');
 const LOCAL_API_TAR = path.join(ROOT_DIR, 'api.tar.gz');
 const LOCAL_WEB_TAR = path.join(ROOT_DIR, 'web.tar.gz');
 const LOCAL_MIGRATION_SQL = path.join(API_DIR, 'src', 'db', 'migrations', '20260907_santos_postgis_territorial.sql');
+const LOCAL_EQUIPE_RUA_SQL = path.join(API_DIR, 'src', 'db', 'migrations', '20260907_create_equipe_rua.sql');
 
 const REMOTE_API_DIR = '/var/www/painel-eleitoral/apps/api';
 const REMOTE_WEB_DIR = '/var/www/painel-eleitoral/apps/web';
 const REMOTE_API_TAR = '/tmp/api.tar.gz';
 const REMOTE_WEB_TAR = '/tmp/web.tar.gz';
 const REMOTE_MIGRATION_SQL = '/tmp/migration_santos.sql';
+const REMOTE_EQUIPE_RUA_SQL = '/tmp/migration_equipe_rua.sql';
 
 async function main() {
   const startTime = Date.now();
@@ -63,14 +65,26 @@ async function main() {
           sftp.fastPut(LOCAL_WEB_TAR, REMOTE_WEB_TAR, (err2: any) => {
             if (err2) return reject(err2);
 
+            const uploadEquipeRua = () => {
+              if (fs.existsSync(LOCAL_EQUIPE_RUA_SQL)) {
+                console.log('📤 Enviando migração SQL Equipe de Rua & Contratos TSE...');
+                sftp.fastPut(LOCAL_EQUIPE_RUA_SQL, REMOTE_EQUIPE_RUA_SQL, (err4: any) => {
+                  if (err4) return reject(err4);
+                  resolve();
+                });
+              } else {
+                resolve();
+              }
+            };
+
             if (fs.existsSync(LOCAL_MIGRATION_SQL)) {
               console.log('📤 Enviando migração SQL territorial (Santos PostGIS)...');
               sftp.fastPut(LOCAL_MIGRATION_SQL, REMOTE_MIGRATION_SQL, (err3: any) => {
                 if (err3) return reject(err3);
-                resolve();
+                uploadEquipeRua();
               });
             } else {
-              resolve();
+              uploadEquipeRua();
             }
           });
         });
@@ -124,6 +138,13 @@ EOF
       echo "--- EXECUTANDO MIGRAÇÃO POSTGIS SANTOS NO POSTGRESQL ---"
       sudo -u postgres psql -d painel_eleitoral -f ${REMOTE_MIGRATION_SQL} || true
       rm -f ${REMOTE_MIGRATION_SQL}
+    fi
+
+    # Executar migração SQL Equipe de Rua & Contratos TSE caso exista
+    if [ -f "${REMOTE_EQUIPE_RUA_SQL}" ]; then
+      echo "--- EXECUTANDO MIGRAÇÃO EQUIPE DE RUA & CONTRATOS TSE NO POSTGRESQL ---"
+      sudo -u postgres psql -d painel_eleitoral -f ${REMOTE_EQUIPE_RUA_SQL} || true
+      rm -f ${REMOTE_EQUIPE_RUA_SQL}
     fi
 
     # Instalar dependências de produção se necessário e reiniciar PM2
