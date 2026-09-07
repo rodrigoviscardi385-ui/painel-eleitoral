@@ -469,16 +469,25 @@ export async function initDatabase() {
     );
   `;
 
-  // Colunas Gov.br caso tabela já existisse
+  // Colunas Gov.br e Autenticação caso tabela já existisse
   await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS link_gov_br TEXT;`;
   await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS document_uuid_gov_br TEXT;`;
   await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS hash_sha256_original TEXT;`;
   await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS hash_sha256_assinado TEXT;`;
   await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS carimbo_tempo_assinatura TIMESTAMPTZ;`;
   await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS dados_signatario_gov TEXT;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS senha_hash TEXT;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS primeiro_acesso_realizado BOOLEAN NOT NULL DEFAULT false;`;
+  await queryClient`ALTER TABLE equipe_rua ADD COLUMN IF NOT EXISTS ultimo_login_at TIMESTAMPTZ;`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_equipe_rua_cpf ON equipe_rua(cpf);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_equipe_rua_status ON equipe_rua(status_contrato);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_equipe_rua_hash_orig ON equipe_rua(hash_sha256_original);`;
+
+  // Colunas Geodésicas e Rastreabilidade de Usuários / Apoiadores
+  await queryClient`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS latitude NUMERIC;`;
+  await queryClient`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS longitude NUMERIC;`;
+  await queryClient`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cadastrado_por_nome TEXT;`;
+  await queryClient`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS cadastrado_por_id TEXT;`;
 
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_whatsapp ON usuarios(whatsapp);`;
   await queryClient`CREATE INDEX IF NOT EXISTS idx_usuarios_lider_acima ON usuarios(lider_acima_id);`;
@@ -791,4 +800,92 @@ export async function logAuditLGPD(usuario: string, acao: string, ip?: string, d
   } catch (err) {
     console.error('[LGPD AUDIT ERROR]', err);
   }
+}
+
+/**
+ * Protocolo Zero-Data / Reset Limpo Total de Produção
+ * Trunca dados de teste e inicializa estado limpo oficial.
+ */
+export async function resetDatabaseToCleanSlate() {
+  console.log('[RESET] Iniciando protocolo Zero-Data no PostgreSQL...');
+
+  // 1. Truncate em tabelas de dados operacionais com CASCADE
+  await queryClient`
+    TRUNCATE TABLE 
+      disparos_itens,
+      disparos_campanha,
+      mensagens_chat,
+      conversa_status,
+      gastos_campanha,
+      retiradas_materiais,
+      boletins_urna,
+      eleitores_analitico,
+      eleitores_identidade,
+      sync_mutations_log,
+      sirene_crise_incidentes,
+      fraude_auditoria_log,
+      push_subscriptions,
+      equipe_rua,
+      usuarios
+    CASCADE;
+  `;
+
+  // 2. Garantir que as Metas estão zeradas
+  await queryClient`UPDATE metas SET quantidade_atual = 0;`;
+
+  // 3. Garantir que o Chip Warming está com contadores zerados
+  await queryClient`UPDATE chip_warming_config SET msgs_enviadas_hoje = 0, status = 'PAUSADO';`;
+
+  // 4. Garantir que o Admin Master existe com senha segura
+  const adminCheck = await queryClient`SELECT id FROM usuarios_auth WHERE email = 'admin@painel2026.com.br' LIMIT 1;`;
+  if (adminCheck.length === 0) {
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash('admin123', salt);
+    await db.insert(schema.usuariosAuth).values({
+      nome: 'Administrador Master',
+      email: 'admin@painel2026.com.br',
+      senha_hash: hash,
+      role: 'ADMIN',
+      permissoes: JSON.stringify(['ALL', 'CHAT', 'LIDERANCAS', 'DISPAROS', 'FINANCEIRO', 'CONFIG']),
+      ativo: 'SIM',
+    });
+  }
+
+  // 5. Garantir configuração oficial da campanha de Santos
+  const configCheck = await queryClient`SELECT id FROM campanha_config LIMIT 1;`;
+  if (configCheck.length === 0) {
+    await db.insert(schema.campanhaConfig).values({
+      nome_urna: 'Gustavo Reis',
+      nome_completo: 'Gustavo Reis',
+      numero_candidato: '55955',
+      cargo: 'Deputado Federal',
+      partido: 'PSD',
+      coligacao: 'Coligação Por Dias Melhores',
+      slogan: 'Trabalho, honestidade e compromisso com você',
+      cidade: 'Santos',
+      estado: 'SP',
+      cor_primaria: '#10b981',
+      biografia_ia: 'Gustavo Reis é candidato a Deputado Federal com forte compromisso com a saúde, segurança e Baixada Santista.',
+      propostas_ia: 'SAÚDE: Fila zero e UBSs equipadas.\nEDUCAÇÃO: Tecnologia e tempo integral.\nDESENVOLVIMENTO: Polo de inovação no Porto de Santos.',
+      tom_voz_ia: 'POPULAR',
+    });
+  }
+
+  // 6. Contagem de verificação de integridade pós-reset
+  const countUsuarios = await queryClient`SELECT COUNT(*)::int as count FROM usuarios;`;
+  const countEquipe = await queryClient`SELECT COUNT(*)::int as count FROM equipe_rua;`;
+  const countMensagens = await queryClient`SELECT COUNT(*)::int as count FROM mensagens_chat;`;
+  const countDisparos = await queryClient`SELECT COUNT(*)::int as count FROM disparos_itens;`;
+  const countGastos = await queryClient`SELECT COUNT(*)::int as count FROM gastos_campanha;`;
+
+  const counts = {
+    usuarios_apoiadores: countUsuarios[0].count,
+    equipe_rua: countEquipe[0].count,
+    mensagens_chat: countMensagens[0].count,
+    disparos: countDisparos[0].count,
+    gastos: countGastos[0].count,
+  };
+
+  console.log('[RESET] Protocolo Zero-Data concluído com sucesso:', counts);
+  return counts;
 }

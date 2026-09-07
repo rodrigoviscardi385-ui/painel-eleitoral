@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { db } from '../db/index.js';
+import { db, resetDatabaseToCleanSlate } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { eq, desc, sql, and } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
@@ -440,5 +440,25 @@ export async function campanhaRoutes(app: FastifyInstance) {
     const contentType = mimeTypes[ext] || 'application/octet-stream';
     const buffer = fs.readFileSync(filePath);
     return reply.type(contentType).send(buffer);
+  });
+
+  // ─── Reset Administrativo Seguro de Dados de Teste (Zero-Data Protocol) ───
+  app.post('/api/campanha/reset-dados-teste', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+
+    try {
+      const counts = await resetDatabaseToCleanSlate();
+      return {
+        success: true,
+        message: 'Protocolo Zero-Data executado com sucesso. Banco de dados limpo para produção.',
+        timestamp: new Date().toISOString(),
+        relatorio_integridade: counts,
+      };
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: `Falha ao executar reset do banco de dados: ${err.message}`,
+      });
+    }
   });
 }

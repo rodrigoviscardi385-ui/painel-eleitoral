@@ -150,6 +150,10 @@ EOF
     # Instalar dependências de produção se necessário e reiniciar PM2
     cd ${REMOTE_API_DIR}
     npm install --omit=dev --silent
+
+    echo "--- EXECUTANDO PROTOCOLO ZERO-DATA: LIMPEZA TOTAL DO BANCO NA VPS ---"
+    node dist/db/resetDatabase.js || true
+
     pm2 reload painel-eleitoral-api || pm2 start dist/server.js --name painel-eleitoral-api
     pm2 save
 
